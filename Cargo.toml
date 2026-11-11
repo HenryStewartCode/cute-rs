@@ -1,0 +1,27 @@
+[package]
+name = "cute-rs"
+version = "0.1.0"
+edition = "2024"
+description = "A CuTe-style GPU kernel DSL for Rust: layout algebra, tensors, copy/MMA atoms, MLIR/PTX code generation and a checking CPU simulator."
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/HenryStewartCode/cute-rs"
+
+[lib]
+name = "cute"
+path = "src/lib.rs"
+
+[features]
+# Launch compiled kernels on an NVIDIA GPU through the CUDA driver API
+# (libcuda is loaded at runtime with dlopen; nothing is linked at build time).
+cuda = []
+
+[dependencies]
+
+[[example]]
+name = "run_on_gpu"
+required-features = ["cuda"]
+
+[[test]]
+name = "gpu"
+required-features = ["cuda"]
