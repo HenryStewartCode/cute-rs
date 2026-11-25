@@ -12,7 +12,7 @@
 // licence text and lists what each part ports.
 
 //! EFC, the epilogue fusion configuration framework of CuTe DSL's Blackwell EFC examples
-//! (`common_efc.py`, roadmap part m10-port-efc), as example-side code shared by the three
+//! (`common_efc.py`), as example-side code shared by the three
 //! `*_custom_epilogue_dense_gemm` examples. It is not a crate API.
 //!
 //! The user writes one epilogue function over named scalars and tensors; EFC runs it in

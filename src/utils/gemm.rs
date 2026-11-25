@@ -19,8 +19,7 @@
 //! layout; cross-check them against `blockscaled-sf-gmem-layout` when that
 //! lands.
 
-/// CuTe DSL's `cutlass.utils.gemm.sm100`: the packaged Blackwell epilogues
-/// (roadmap part m10-epilogue-helpers).
+/// CuTe DSL's `cutlass.utils.gemm.sm100`: the packaged Blackwell epilogues.
 pub mod sm100 {
     pub use crate::utils::sm100_epilogue::{
         EpilogueConfig, SmemCopyPartition, TmemCopyPartition, epilogue, epilogue_smem_copy_and_partition,

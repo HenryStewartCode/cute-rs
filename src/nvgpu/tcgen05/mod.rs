@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 //! CuTe DSL's `cute.nvgpu.tcgen05` (Blackwell, SM100 and its family): so
-//! far (roadmap part m10-umma-layouts) the build-time pieces of the UMMA
+//! far the build-time pieces of the UMMA
 //! operands: the shared-memory layout atoms ([`SmemLayoutAtomKind`],
 //! [`make_smem_layout_atom`], [`make_sparse_smem_layout_atom`]),
 //! [`tile_to_mma_shape`], and the shared-memory descriptors
@@ -25,28 +25,28 @@
 
 pub(crate) mod copy;
 mod layouts;
-// m10-umma-f16: tcgen05 MMAs and commits.
+// Tcgen05 MMAs and commits.
 pub(crate) mod mma;
-// m10-umma-dense-kinds: the TF32, I8 and F8F6F4 MMAs.
+// The TF32, I8 and F8F6F4 MMAs.
 mod mma_dense;
-// m10-umma-blockscaled: the block-scaled MMAs.
+// The block-scaled MMAs.
 pub(crate) mod mma_blockscaled;
-// m10-sparse-umma: the sparse MMAs.
+// The sparse MMAs.
 mod mma_sparse;
-// m10-rubin-umma: the Rubin (sm_107) MMAs.
+// The Rubin (sm_107) MMAs.
 mod mma_sm107;
 mod smem_desc;
-// m10-s2t-copies: SMEM-to-TMEM copies.
+// SMEM-to-TMEM copies.
 pub(crate) mod s2t;
 
-// m10-tmem-ld-st: TMEM load and store copy atoms.
+// TMEM load and store copy atoms.
 pub use copy::{
     Ld16x32bx2Op, Ld16x64bOp, Ld16x128bOp, Ld16x256bOp, Ld32x32bOp, Pack, Repetition, St16x32bx2Op, St16x64bOp,
     St16x128bOp, St16x256bOp, St32x32bOp, Unpack, make_tmem_copy,
 };
-// m10-ldred-packed-math: TMEM loads with a row reduction.
+// TMEM loads with a row reduction.
 pub use copy::{LdRed16x32bx2Op, LdRed32x32bOp, TmemLoadRedOp};
-// m10-rubin-extras: TMEM loads with sparse compression.
+// TMEM loads with sparse compression.
 pub use copy::{LdRedSPCompress32x32bOp, LdSPCompress32x32bOp};
 
 // m10-umma-f16.
@@ -63,7 +63,7 @@ pub use mma_sparse::{MmaF16BF16SparseOp, MmaFP8SparseOp};
 // m10-rubin-umma.
 pub use crate::ir::CollectorOp;
 pub use mma_sm107::{SM107BlockScaledMmaMXF8F6F4Op, SM107MmaFP8Op, SM107MmaMXF4NVF4Op};
-// m10-umma-pipelines: TMEM copy introspection.
+// TMEM copy introspection.
 pub use crate::arch::find_tmem_tensor_col_offset;
 pub use copy::{TmemPacking, get_tmem_copy_properties, is_tmem_load, is_tmem_store};
 

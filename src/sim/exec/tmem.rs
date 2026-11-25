@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The simulator's tensor memory (roadmap part m10-tmem-core), modelled from
+//! The simulator's tensor memory, modelled from
 //! the PTX ISA ("Tensor Memory", 9.7.18.1, and `tcgen05.alloc`,
 //! `tcgen05.dealloc` and `tcgen05.relinquish_alloc_permit`, 9.7.18.7.1).
 //!
@@ -208,9 +208,9 @@ pub(super) struct State<'a> {
     /// Each warp's (by key) loads and stores in flight.
     loads: HashMap<usize, Vec<PendingLd<'a>>>,
     stores: HashMap<usize, Vec<PendingSt<'a>>>,
-    /// The tcgen05 MMAs in flight (roadmap part m10-umma-f16), in issue order.
+    /// The tcgen05 MMAs in flight, in issue order.
     pub(super) mmas: Vec<super::umma::UmmaFlight>,
-    /// m10-rubin-umma: the collector buffers, by CTA and slot (0: A, 5: the
+    /// The collector buffers, by CTA and slot (0: A, 5: the
     /// sm_107 B; m11-prims-mma-forms: `1 + i` the `.ws` B buffer `b<i>`).
     pub(super) collectors: HashMap<(usize, u8), super::umma::Collector>,
 }
@@ -582,7 +582,7 @@ impl<'a> Machine<'a> {
         Ok(())
     }
 
-    /// m10-umma-pipelines: where warp `k`'s oldest `tcgen05.ld` that its
+    /// Where warp `k`'s oldest `tcgen05.ld` that its
     /// `tcgen05.wait::ld` has not completed was issued, if any.
     pub(super) fn tmem_pending_load(&self, k: usize) -> Option<Loc> {
         self.tmem.loads.get(&k).and_then(|v| v.first()).map(|p| p.inst.loc)
@@ -595,7 +595,7 @@ impl<'a> Machine<'a> {
         block: usize,
         cols: Range<u32>,
     ) -> Option<(usize, &'static str, &'static str, Loc)> {
-        // m10-umma-f16: an MMA writing D there (m10-umma-kinds: or reading A there).
+        // An MMA writing D there (or reading A there).
         let overlaps = |c: &Range<usize>| (c.start as u32) < cols.end && cols.start < c.end as u32;
         if let Some(f) = self
             .tmem
@@ -731,7 +731,7 @@ impl<'a> Machine<'a> {
                         Some(base),
                     ));
                 }
-                // m10-umma-kinds: a store over the A an MMA in flight reads from TMEM.
+                // A store over the A an MMA in flight reads from TMEM.
                 if !load && let Some(f) = self.tmem.mmas.iter().find(|f| f.reads_a(block, l, c)) {
                     return Err(self.err(
                         format!(

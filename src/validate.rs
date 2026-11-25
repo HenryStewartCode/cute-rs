@@ -8,7 +8,7 @@ use std::fmt;
 use crate::backend::Arch;
 
 mod wgmma;
-// m11-extern-distributed: external calls, device functions and multimem.
+// External calls, device functions and multimem.
 mod extern_calls;
 use crate::ir::{
     AsmConstraint, AsmInput, AtomicKind, AtomicType, BarrierKind, BinaryOp, BufferId, BulkCompletion, BulkDirection,
@@ -361,7 +361,7 @@ impl Checker<'_> {
         Ok(())
     }
 
-    /// An access to another CTA's shared memory (roadmap part m8-dsmem):
+    /// An access to another CTA's shared memory:
     /// the buffer is shared memory and the peer an Int32 rank.
     fn dsmem_peer(&self, buffer: BufferId, peer: Option<ValueId>, what: &str) -> Result {
         let Some(peer) = peer else { return Ok(()) };
@@ -1348,7 +1348,7 @@ impl Checker<'_> {
                 zero_col_mask,
             } => {
                 self.expect(*taddr, DType::I32, "a tcgen05.mma TMEM address")?;
-                // m11-prims-mma-forms: the prims forms' rules (block-scaled sparse kinds included).
+                // The prims forms' rules (block-scaled sparse kinds included).
                 if let Some(why) = kind.form_error() {
                     return Err(self.err(format!("{}: {why}", kind.ptx())));
                 }
@@ -1368,7 +1368,7 @@ impl Checker<'_> {
                         );
                     }
                 }
-                // m10-umma-blockscaled: the scale factors' TMEM addresses, exactly for a block-scaled kind.
+                // The scale factors' TMEM addresses, exactly for a block-scaled kind.
                 match (sf, kind.scale) {
                     (Some((a, b)), Some(_)) => {
                         self.expect(*a, DType::I32, "a tcgen05.mma TMEM address of SFA")?;
@@ -2030,8 +2030,7 @@ impl Checker<'_> {
         Ok(())
     }
 
-    /// The coordinates and offsets of a TMA access mode (roadmap parts m7-tma-im2col and
-    /// m7-tma-sm100-modes): the im2col modes take 3 to 5 coordinates (and `.im2col` one
+    /// The coordinates and offsets of a TMA access mode: the im2col modes take 3 to 5 coordinates (and `.im2col` one
     /// i16 offset per spatial dimension), the four-row modes five.
     fn tma_mode(&self, mode: &TmaMode, n: usize, what: &str) -> Result {
         match mode {
@@ -2064,7 +2063,7 @@ impl Checker<'_> {
         Ok(())
     }
 
-    /// The `.override::*` operands of a TMA instruction (roadmap part m7-tma-sm100-modes).
+    /// The `.override::*` operands of a TMA instruction.
     fn tma_override(&self, o: &crate::ir::TmaOverride, mode: &TmaMode, n: usize, what: &str) -> Result {
         self.expect(o.global_address, DType::I64, "overriding global address")?;
         if o.dims.is_empty() {
@@ -2363,7 +2362,7 @@ fn mem_attrs_requirement(attrs: &MemAttrs) -> Vec<Option<TargetRequirement>> {
 }
 
 /// An access to another CTA's shared memory (`.shared::cluster`, after
-/// `mapa`): sm_90 and PTX 7.8 (roadmap part m8-dsmem).
+/// `mapa`): sm_90 and PTX 7.8.
 fn dsmem_requirement(peer: Option<ValueId>) -> Option<TargetRequirement> {
     peer.map(|_| TargetRequirement {
         sm: 90,
@@ -2453,11 +2452,11 @@ pub const UE8M0X2: ArchSpecific = ArchSpecific {
 };
 
 /// The mixed-precision packed add, sub and fma (`.f16x2` or `.bf16x2` with
-/// `.f32x2`; roadmap part m10-ldred-packed-math): the sm_107f family from
+/// `.f32x2`): the sm_107f family from
 /// PTX ISA 9.4.
 pub const PACKED_MIXED: ArchSpecific = ArchSpecific { chips: &[], families: &[(107, 94)], baselines: &[] };
 
-/// `cvt` with the `.ue5m3x2` type (roadmap part m10-ldred-packed-math): the
+/// `cvt` with the `.ue5m3x2` type: the
 /// sm_107f family from PTX ISA 9.4 (the first PTX ISA that has the type;
 /// cute-rs lists the Rubin family, the only one with PTX 9.4 targets
 /// documented, and no installed ptxas assembles it).
@@ -2680,7 +2679,7 @@ pub const LDMATRIX_B8: ArchSpecific = ArchSpecific {
 pub const SM90A_ONLY: ArchSpecific = ArchSpecific { chips: &[(90, 80)], families: &[], baselines: &[] };
 
 /// `wgmma.mma_async` on mixed signed and unsigned 8-bit integers
-/// (`.s8.u8`, `.u8.s8`): sm_90a from PTX ISA 8.4 (m8-wgmma-variants).
+/// (`.s8.u8`, `.u8.s8`): sm_90a from PTX ISA 8.4.
 pub const SM90A_PTX84: ArchSpecific = ArchSpecific { chips: &[(90, 84)], families: &[], baselines: &[] };
 
 /// `setmaxnreg`: sm_90a from PTX ISA 8.0, sm_100a and sm_120a from 8.6,
@@ -2692,7 +2691,7 @@ pub const SETMAXNREG: ArchSpecific = ArchSpecific {
     baselines: &[],
 };
 
-/// `tensormap.replace` (roadmap part m7-tensormap-update; the PTX ISA's
+/// `tensormap.replace` (the PTX ISA's
 /// target notes for it): sm_90a from PTX ISA 8.3, sm_100a, sm_101a and
 /// sm_120a (8.6; sm_101a is sm_110a from 9.0), and the sm_100f, sm_101f,
 /// sm_110f and sm_120f families from 8.8.
@@ -2702,7 +2701,7 @@ pub const TENSORMAP_REPLACE: ArchSpecific = ArchSpecific {
     baselines: &[],
 };
 
-/// `.tile::gather4` to `.shared::cluster` (roadmap part m7-tma-sm100-modes; the PTX ISA's
+/// `.tile::gather4` to `.shared::cluster` (the PTX ISA's
 /// target notes for `cp.async.bulk.tensor` and `cp.async.bulk.prefetch.tensor`): sm_100a
 /// from PTX ISA 8.6, and the sm_100f family from 8.8.
 pub const TMA_GATHER4: ArchSpecific = ArchSpecific { chips: &[(100, 86)], families: &[(100, 88)], baselines: &[] };
@@ -2720,7 +2719,7 @@ pub const TMA_SCATTER4: ArchSpecific = ArchSpecific {
 pub const TMA_OVERRIDE: ArchSpecific = ArchSpecific { chips: &[], families: &[(107, 94)], baselines: &[] };
 
 /// `tcgen05.alloc`, `tcgen05.dealloc` and `tcgen05.relinquish_alloc_permit`
-/// (roadmap part m10-tmem-core; the PTX ISA's target notes): sm_100a and
+/// (the PTX ISA's target notes): sm_100a and
 /// sm_101a from PTX ISA 8.6 (sm_101a is sm_110a from 9.0), and the sm_100f,
 /// sm_101f and sm_110f families from 8.8 (9.0 for sm_110f).
 pub const TCGEN05_ALLOC: ArchSpecific = ArchSpecific {
@@ -2729,17 +2728,17 @@ pub const TCGEN05_ALLOC: ArchSpecific = ArchSpecific {
     baselines: &[],
 };
 
-/// `tcgen05.ld.red` (roadmap part m10-ldred-packed-math; the PTX ISA's
+/// `tcgen05.ld.red` (the PTX ISA's
 /// target notes): sm_110a (sm_101a before PTX 9.0) and the sm_103f and
 /// sm_110f families (so sm_103a too), from PTX ISA 8.8, not sm_100a.
 pub const TCGEN05_LD_RED: ArchSpecific =
     ArchSpecific { chips: &[(101, 88), (110, 90)], families: &[(103, 88), (110, 90)], baselines: &[] };
 
-/// `tcgen05.ld{.red}.spcompress` (roadmap part m10-rubin-extras): the
+/// `tcgen05.ld{.red}.spcompress`: the
 /// architecture-specific sm_107a only, PTX ISA 9.4 (no `f` family).
 pub const TCGEN05_LD_SPCOMPRESS: ArchSpecific = ArchSpecific { chips: &[(107, 94)], families: &[], baselines: &[] };
 
-/// `tcgen05.mma.kind::i8` (roadmap part m10-umma-dense-kinds): the PTX
+/// `tcgen05.mma.kind::i8`: the PTX
 /// ISA's target notes allow it only on the architecture-specific targets
 /// sm_100a and sm_101a (PTX ISA 8.6) and sm_110a (9.0), not on any `f`
 /// family. CuTe DSL 4.8.1's `MmaI8Op` lists sm_100f and sm_103f among its
@@ -2771,7 +2770,7 @@ pub const TCGEN05_MMA_MXF4NVF4: ArchSpecific =
 pub const TCGEN05_MMA_K96: ArchSpecific =
     ArchSpecific { chips: &[(103, 88), (107, 90)], families: &[], baselines: &[] };
 
-/// m10-rubin-umma: the Rubin `tcgen05.mma` forms (K = 64 `.kind::f8f6f4`
+/// The Rubin `tcgen05.mma` forms (K = 64 `.kind::f8f6f4`
 /// and `.kind::mxf8f6f4`, K = 128 `.kind::mxf4nvf4`, and the collector
 /// qualifiers of CuTe DSL's SM107 MMAs): the sm_107f family (so sm_107a
 /// too) from PTX ISA 9.4.
@@ -2782,14 +2781,14 @@ pub const TCGEN05_MMA_SM107: ArchSpecific = ArchSpecific { chips: &[], families:
 pub const TCGEN05_MMA_SCALE_INPUT_D: ArchSpecific =
     ArchSpecific { chips: &[(100, 86)], families: &[(100, 88)], baselines: &[] };
 
-/// m11-prims-mma-forms: the sparse block-scaled `mma.sp` with
+/// The sparse block-scaled `mma.sp` with
 /// `.scale_vec::4X`, UE8M0 scales and `.kind::mxf4nvf4`: PTX ISA 9.1 on the
 /// sm_120a/sm_121a targets and the sm_120f family.
 pub const SM120_SP_BLOCK_SCALED_MMA_4X_UE8M0: ArchSpecific =
     ArchSpecific { chips: &[(120, 91), (121, 91)], families: &[(120, 91)], baselines: &[] };
 
 /// `clusterlaunchcontrol.try_cancel` with `.multicast::cluster::all`
-/// (roadmap part m10-clc-scheduling; the PTX ISA's target notes): sm_100a,
+/// (the PTX ISA's target notes): sm_100a,
 /// sm_101a (sm_110a from PTX 9.0) and sm_120a from PTX ISA 8.6, and the
 /// sm_100f, sm_101f, sm_110f and sm_120f families from 8.8.
 pub const CLC_MULTICAST: ArchSpecific = ArchSpecific {
@@ -2919,7 +2918,7 @@ pub fn target_requirement(op: &Op) -> Option<TargetRequirement> {
         Op::CpAsyncBulk { direction: BulkDirection::S2S, .. } => {
             vec![need(90, 80, "cp.async.bulk.shared::cluster.shared::cta")]
         }
-        // m7-tma-sm100-modes: the overrides (sm_107f), gather4 and scatter4 (sm_100a and the f
+        // The overrides (sm_107f), gather4 and scatter4 (sm_100a and the f
         // families), and the byte-masked bulk store (sm_100).
         Op::TmaLoad { overrides: Some(_), .. } | Op::TmaStore { overrides: Some(_), .. } => {
             vec![specific("cp.async.bulk.tensor with .override::global_address (a TMA override copy)", TMA_OVERRIDE)]
@@ -3028,8 +3027,8 @@ pub fn target_requirement(op: &Op) -> Option<TargetRequirement> {
             if *inst == Tcgen05Inst::Alloc { "tcgen05.alloc.exclusive" } else { "tcgen05.dealloc.exclusive" },
             TCGEN05_EXCLUSIVE,
         )],
-        // m10-tmem-ld-st: the same targets as tcgen05.alloc.
-        // m10-rubin-extras: tcgen05.ld{.red}.spcompress (PTX 9.4, sm_107a).
+        // The same targets as tcgen05.alloc.
+        // Tcgen05.ld{.red}.spcompress (PTX 9.4, sm_107a).
         Op::Tcgen05Ld { sp: Some(_), red, .. } => vec![specific(
             if red.is_some() {
                 "tcgen05.ld.red.spcompress (tcgen05.LdRedSPCompress32x32bOp)"
@@ -3043,10 +3042,10 @@ pub fn target_requirement(op: &Op) -> Option<TargetRequirement> {
         }
         Op::Tcgen05Ld { .. } => vec![specific("tcgen05.ld (a TMEM load copy atom)", TCGEN05_ALLOC)],
         Op::Tcgen05St { .. } => vec![specific("tcgen05.st (a TMEM store copy atom)", TCGEN05_ALLOC)],
-        // m10-umma-f16: the same targets (sm_100a, sm_110a; the f families from PTX 8.8).
-        // m10-umma-dense-kinds: kind::tf32 and kind::f8f6f4 likewise; kind::i8 on the
+        // The same targets (sm_100a, sm_110a; the f families from PTX 8.8).
+        // Kind::tf32 and kind::f8f6f4 likewise; kind::i8 on the
         // `a` targets only.
-        // m10-rubin-umma: the Rubin forms, whatever their kind.
+        // The Rubin forms, whatever their kind.
         Op::Tcgen05Mma { kind: UmmaKind { sm107: Some(r), kind, .. }, .. } => vec![specific(
             match (kind, r.wide_k) {
                 (UmmaDataKind::F8F6F4, true) => "tcgen05.mma.kind::f8f6f4 with K = 64 (tcgen05.SM107MmaFP8Op)",
@@ -3060,7 +3059,7 @@ pub fn target_requirement(op: &Op) -> Option<TargetRequirement> {
             },
             TCGEN05_MMA_SM107,
         )],
-        // m11-prims-mma-forms: scale-input-d (sm_100a from PTX 8.6, the sm_100f family from 8.8)
+        // Scale-input-d (sm_100a from PTX 8.6, the sm_100f family from 8.8)
         // and the weight-stationary i8 form (architecture-specific targets only, as kind::i8).
         Op::Tcgen05Mma { kind, .. } if kind.prims.scale_input_d.is_some() => {
             vec![specific("tcgen05.mma with scale-input-d (prims::tcgen05_mma)", TCGEN05_MMA_SCALE_INPUT_D)]
@@ -3102,7 +3101,7 @@ pub fn target_requirement(op: &Op) -> Option<TargetRequirement> {
             )],
         },
         Op::Tcgen05Commit { .. } => vec![specific("tcgen05.commit (tcgen05::commit)", TCGEN05_ALLOC)],
-        // m10-s2t-copies: the same targets.
+        // The same targets.
         Op::Tcgen05Cp { .. } => vec![specific("tcgen05.cp (an SMEM-to-TMEM copy atom, tcgen05.Cp..Op)", TCGEN05_ALLOC)],
         // m10-clc-scheduling.
         Op::ClcTryCancel { multicast: false, .. } => vec![need(100, 86, "clusterlaunchcontrol.try_cancel")],
@@ -3164,7 +3163,7 @@ pub fn check_target(ir: &KernelIr, arch: Arch) -> std::result::Result<u32, Valid
             loc: Some(ir.loc),
         });
     }
-    // m7-tma-sm100-modes: a hidden descriptor in a sub-byte (FP4/FP6) format needs SM100's
+    // A hidden descriptor in a sub-byte (FP4/FP6) format needs SM100's
     // tensor copies (and sm_120a's copies into shared::cluster, which cute-rs issues, lack them).
     if let Some(t) =
         ir.tensor_maps.iter().filter_map(|m| m.source.as_ref().map(|s| s.spec.data_type)).find(|t| t.is_packed())
@@ -3179,7 +3178,7 @@ pub fn check_target(ir: &KernelIr, arch: Arch) -> std::result::Result<u32, Valid
             loc: Some(ir.loc),
         });
     }
-    // m11-prims-descriptors-swizzle: the 128-byte swizzle of 32-byte atoms is an SM100
+    // The 128-byte swizzle of 32-byte atoms is an SM100
     // tensor-map mode.
     if let Some(sw) =
         ir.tensor_maps.iter().filter_map(|m| m.source.as_ref().map(|s| s.spec.swizzle)).find(|s| s.is_atom_mode())

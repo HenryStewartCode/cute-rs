@@ -9,7 +9,7 @@
 // steps. Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights
 // reserved. See THIRD-PARTY-NOTICES.md.
 
-//! Task Scheduling part 1 (roadmap part m11-ts-resources): schedule capture
+//! Task Scheduling part 1: schedule capture
 //! of the copy tutorials compared with expected listings, the capture
 //! diagnostics, pipeline configuration checks, and hand-written
 //! warp-specialised kernels calling resources directly on the simulator.

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! Sparse element types (roadmap part m10-sparse-umma): CuTe DSL's
+//! Sparse element types: CuTe DSL's
 //! `cute.get_sparse_elem_type(num_logical, num_phys, elem_type)` and
 //! `cute.make_sparse_elem(num_logical, elems)`, and the recasts that take
 //! them as a type.

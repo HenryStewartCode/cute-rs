@@ -1,4 +1,4 @@
-//! TMA atom configurations (roadmap part m7-tma-atom), shared by the host tests
+//! TMA atom configurations, shared by the host tests
 //! (`tests/tma_atom.rs`) and the GPU tests (`tests/gpu_tma.rs`, which has the driver encode
 //! every descriptor), and the placement check: for every element of a shared-memory tile,
 //! the descriptor's box-and-swizzle model must place the global element that the CuTe

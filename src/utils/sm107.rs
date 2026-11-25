@@ -11,8 +11,7 @@
 // SM107's NVFP4 GEMMs is a table of numbers CuTe DSL 4.8.1 documents by its
 // behaviour (`cutlass.utils.rubin_helpers`); its code is not copied.
 
-//! CuTe DSL's Rubin (SM107) `cutlass.utils` helpers (roadmap part
-//! m10-rubin-extras; `cutlass.utils.rubin_helpers`): the resource
+//! CuTe DSL's Rubin (SM107) `cutlass.utils` helpers (`cutlass.utils.rubin_helpers`): the resource
 //! architecture ([`canonicalize_rubin_resource_arch`]: SM107 has 576 TMEM
 //! columns and 327 KiB of shared memory per block, see
 //! [`Arch::smem_capacity_bytes`](crate::Arch::smem_capacity_bytes) and
@@ -260,7 +259,7 @@ impl TiledMma {
     /// A copy whose MMAs keep B in the collector buffer for later ones
     /// (CuTe DSL's `with_bkeep(accumulate=None)`): `b_collector_op =
     /// FILL`; with `accumulate`, also sets
-    /// [`Field::ACCUMULATE`](crate::nvgpu::tcgen05::Field::ACCUMULATE).
+    /// [`Field::ACCUMULATE`].
     /// Panics unless this is a Rubin tcgen05 MMA.
     #[track_caller]
     pub fn with_bkeep(&self, accumulate: Option<bool>) -> TiledMma {

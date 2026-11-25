@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The simulator's tensor maps in memory (roadmap part m7-tensormap-update):
+//! The simulator's tensor maps in memory:
 //! `tensormap.replace`, `tensormap.cp_fenceproxy` and the tensormap-proxy
 //! fences, modelled from the PTX ISA.
 //!

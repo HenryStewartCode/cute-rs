@@ -1,5 +1,4 @@
-//! Packed `.f32x2` arithmetic and the mixed-precision packed forms (roadmap
-//! part m10-ldred-packed-math): CuTe DSL's `cute.arch.add_packed_f32x2`,
+//! Packed `.f32x2` arithmetic and the mixed-precision packed forms: CuTe DSL's `cute.arch.add_packed_f32x2`,
 //! `sub_packed_f32x2`, `mul_packed_f32x2`, `fma_packed_f32x2`,
 //! `exp_packed_f32x2` and the ten Rubin-only mixed-precision functions
 //! (`add_packed_f16x2_f32x2_f32x2`, ...). A pair is a 2-tuple; the

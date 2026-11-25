@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! cute_ext's TMEM accumulator buffering (roadmap part
-//! m11-cute-ext-sched-tmem; CuTe DSL's
+//! cute_ext's TMEM accumulator buffering (CuTe DSL's
 //! `cutlass.cute.experimental.accumulator_buffering`): how many accumulator
 //! views a warp-specialised GEMM keeps in tensor memory, where they and the
 //! kernel's other TMEM allocations go, and how the MMA warp and the epilogue

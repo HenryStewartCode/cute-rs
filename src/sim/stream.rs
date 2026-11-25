@@ -41,7 +41,7 @@ impl From<KernelArg> for StreamArg {
 }
 
 /// Kernels launched in order on shared host buffers, with the PDL model described in the
-/// [module documentation](self).
+/// module documentation.
 ///
 /// ```
 /// use cute::prelude::*;

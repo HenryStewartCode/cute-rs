@@ -1,5 +1,4 @@
-//! The grouped GEMM tile scheduler and the contiguous group search
-//! (roadmap part m9-grouped-gemm-schedulers) on the simulator, against
+//! The grouped GEMM tile scheduler and the contiguous group search on the simulator, against
 //! plain-Rust models.
 
 #[allow(dead_code)]

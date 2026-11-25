@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! cute_ext's GEMM building blocks (roadmap part m11-cute-ext-gemm) on the simulator,
+//! cute_ext's GEMM building blocks on the simulator,
 //! against plain Rust: the persistent SM100 GEMM port (`examples/cute_ext_dense_gemm_persistent.rs`)
 //! with 1SM on a (1, 1) cluster, 2SM on (2, 1), 2SM with multicast on (2, 2), a ragged
 //! problem, `get_cta_v_map_ab`'s maps given to the loads, random data within Float32's bound,

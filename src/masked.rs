@@ -123,7 +123,7 @@ impl<T: Numeric> Tensor<T> {
             return TensorSsa::new(shape, values);
         }
         refuse_sub_byte::<T>(what);
-        // A tensor in another CTA's shared memory keeps its peer (m8-dsmem).
+        // A tensor in another CTA's shared memory keeps its peer.
         let Engine::Memory { buffer, peer, .. } = self.engine else { unreachable!() };
         let attrs = MemAttrs { peer, ..MemAttrs::default() };
         let values = (0..n)

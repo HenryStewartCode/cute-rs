@@ -63,8 +63,7 @@ pub struct TmaAtomInfo {
     /// rewrites the descriptor from).
     pub(crate) dim_modes: Vec<Vec<usize>>,
     pub(crate) flat_modes: usize,
-    /// What an atom in another access mode needs when it issues (roadmap
-    /// parts m7-tma-im2col and m7-tma-sm100-modes).
+    /// What an atom in another access mode needs when it issues.
     pub(crate) mode: TmaAtomMode,
 }
 
@@ -73,7 +72,7 @@ pub struct TmaAtomInfo {
 pub(crate) enum TmaAtomMode {
     /// `.tile`: the TMA tensor's coordinates are the instruction's.
     Tile,
-    /// `.im2col` and `.im2col_no_offs` (roadmap part m7-tma-im2col).
+    /// `.im2col` and `.im2col_no_offs`.
     Im2col(crate::nvgpu::tma_im2col::Im2colGeometry),
     /// `.tile::gather4` and `.tile::scatter4`: the index tensor's gather
     /// mode is the TMA tensor's flat mode `gather_mode`.
@@ -164,7 +163,7 @@ impl<T> From<TmaInfo<T>> for (CopyAtom<T>, Tensor<Ident>) {
 }
 
 /// The keyword arguments of CuTe DSL's `make_tiled_tma_atom` beyond the
-/// multicast (roadmap part m7-tma-sm100-modes): the index tensor of the
+/// multicast: the index tensor of the
 /// gather4/scatter4 modes, and an internal type to move the elements as (an
 /// 8-bit one unpacks FP4 and FP6 elements into 16-byte slots).
 #[derive(Clone, Debug, Default)]
@@ -254,7 +253,7 @@ pub fn make_tiled_tma_atom_with<T: Numeric>(
 /// How a TMA atom's CTA tile is given: by a tiler of the tensor's leading
 /// modes, or by a `cta_v_map` (CTA value index -> global mode) whose
 /// first `rank` modes match one stage of the SMEM layout (the SM100
-/// MMA-aware atoms, m10-port-fp16-gemm).
+/// MMA-aware atoms).
 pub(crate) enum TmaTile {
     Tiler(Tiler),
     VMap { map: Layout, rank: usize },
@@ -262,7 +261,7 @@ pub(crate) enum TmaTile {
 
 /// The body of [`make_tiled_tma_atom_with`], for a tile given either way;
 /// `what` names the user-facing function in messages.
-/// m10-cta-pair: a TMA load for a CTA pair (`cta_group=CtaGroup::TWO`,
+/// A TMA load for a CTA pair (`cta_group=CtaGroup::TWO`,
 /// `.cta_group::2`) needs a kernel target with tcgen05's CTA pairs (sm_100a,
 /// sm_101a, sm_110a, or their `f` families from PTX 8.8); SM90 has none.
 pub(crate) fn check_pair_load_target() -> Result<(), String> {
@@ -287,7 +286,7 @@ pub(crate) fn make_tma_atom_core<T: Numeric>(
     options: &TmaAtomOptions,
 ) -> TmaInfo<T> {
     let fail = |m: String| -> ! { user_panic(loc, format!("cute: {what}({op:?}): {m}")) };
-    // m7-tma-sm100-modes: the gather4/scatter4 and override operations check as their
+    // The gather4/scatter4 and override operations check as their
     // tiled forms do.
     let (base_op, mode) = match op {
         CopyOp::TmaLoadMode { mode: TmaOpMode::Im2col, .. } | CopyOp::TmaStoreMode { mode: TmaOpMode::Im2col } => {
@@ -306,7 +305,7 @@ pub(crate) fn make_tma_atom_core<T: Numeric>(
     match base_op {
         CopyOp::TmaLoad { multicast, cta_group } => {
             if cta_group == CtaGroup::TWO {
-                // m10-cta-pair: SM100's 2-CTA loads (CuTe DSL's TiledTmaLoadEnum.sm_100_2sm).
+                // SM100's 2-CTA loads (CuTe DSL's TiledTmaLoadEnum.sm_100_2sm).
                 if let Err(why) = check_pair_load_target() {
                     fail(why);
                 }
@@ -457,7 +456,7 @@ pub(crate) fn make_tma_atom_core<T: Numeric>(
 }
 
 /// The encoding of a descriptor for a tensor of `dtype` moved as CuTe DSL's
-/// `internal_type` (roadmap part m7-tma-sm100-modes; CuTe DSL's `use_unpack` and C++
+/// `internal_type` (CuTe DSL's `use_unpack` and C++
 /// CuTe's `TMA::to_CUtensorMapDataType`): without one, the type's own
 /// ([`TensorMapDataType::for_dtype`](crate::tma::TensorMapDataType::for_dtype): the
 /// packed `f416u4_align8b` for FP4, the padded `f416u6_align16b` for FP6); an 8-bit
@@ -529,7 +528,7 @@ pub(crate) fn tma_swizzle(sw: Swizzle, elem_bits: usize) -> Result<TensorMapSwiz
         (1, 4, 3) => Ok(TensorMapSwizzle::s32b),
         (2, 4, 3) => Ok(TensorMapSwizzle::s64b),
         (3, 4, 3) => Ok(TensorMapSwizzle::s128b),
-        // m11-prims-descriptors-swizzle: the 128-byte swizzle of 32-byte atoms (the SM100
+        // The 128-byte swizzle of 32-byte atoms (the SM100
         // UMMA layout `SW128_32B` that make_smem_layout_epi picks for M-major Float32
         // tiles), sm_100 and newer.
         (2, 5, 2) => match crate::builder::declared_target() {
@@ -607,10 +606,9 @@ pub(crate) fn tiler_v_map(glayout: &Layout, tiler: &Tiler) -> Result<Layout, Str
 
 /// The plan for a given `cta_v_map` (CTA value index -> global mode, C++
 /// CuTe's `cta_v_map`): from a tiler ([`tiler_v_map`]), or from an MMA's
-/// partitioning of the tile (the SM100 MMA-aware atoms,
-/// m10-port-fp16-gemm). Runs contiguous in global memory merge into one
+/// partitioning of the tile (the SM100 MMA-aware atoms). Runs contiguous in global memory merge into one
 /// TMA dimension only with `merge` (gather4/scatter4 keep the tensor's two
-/// modes apart; m7-tma-sm100-modes).
+/// modes apart).
 pub(crate) fn plan_tma_v(
     glayout: &Layout,
     elem_bits: usize,
@@ -699,7 +697,7 @@ pub(crate) fn plan_tma_v(
             continue;
         }
         let d = strides[k].as_static();
-        // Runs fold into one dimension only over static extents (m10-port-nvfp4-gemm: a
+        // Runs fold into one dimension only over static extents (a
         // scale-factor tile's 32-row run and its runtime-extent K-chunk mode are contiguous
         // in global memory, but stay two dimensions).
         let foldable = |j: usize| extents[j].as_static().is_some() && strides[j].as_static().is_some();
@@ -1038,8 +1036,7 @@ pub fn tma_partition<T: Numeric, S, G>(
 }
 
 /// The list form of CuTe DSL's `tma_partition` (`[coord_tensor, index_tensor]`,
-/// giving `(tXsX, tXgX, tXgI)`) for the gather4/scatter4 modes (roadmap part
-/// m7-tma-sm100-modes).
+/// giving `(tXsX, tXgX, tXgI)`) for the gather4/scatter4 modes.
 pub use crate::nvgpu::tma_sm100::tma_partition_indexed;
 
 #[cfg(test)]
@@ -1059,7 +1056,7 @@ mod tests {
             assert!(tma_swizzle(Swizzle::new(b, 3, 3), 32).is_err());
         }
         assert_eq!(tma_swizzle(Swizzle::identity(), 16), Ok(TensorMapSwizzle::none));
-        // m11-prims-descriptors-swizzle: S<2,5,2> on bytes is S<2,3,2> on Float32.
+        // S<2,5,2> on bytes is S<2,3,2> on Float32.
         assert_eq!(tma_swizzle(Swizzle::new(2, 3, 2), 32), Ok(TensorMapSwizzle::s128b_atom_32b));
         assert_eq!(TensorMapSwizzle::s128b_atom_32b.to_byte_swizzle(), Swizzle::new(2, 5, 2));
         for a in 0..2048usize {

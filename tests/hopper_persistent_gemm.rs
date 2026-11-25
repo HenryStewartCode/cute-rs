@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The Hopper persistent GEMM port (roadmap part m9-hopper-persistent-gemm):
+//! The Hopper persistent GEMM port:
 //! the simulator against a plain Rust GEMM, with grids that have fewer
 //! clusters than tiles, swizzled and rastered schedules, every cluster shape,
 //! partial tiles, several scheduler seeds (the DMA warp runs ahead of the MMA

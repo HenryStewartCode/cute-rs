@@ -9,8 +9,7 @@
 // That portion is under the BSD-3-Clause licence, and the rest of the file is cute-rs's own,
 // under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the licence text.
 
-//! Rubin cutlass.utils helpers and the sm_107a TMEM load with sparse compression (roadmap
-//! part m10-rubin-extras). Host tests of the helpers' choices; simulator kernels for
+//! Rubin cutlass.utils helpers and the sm_107a TMEM load with sparse compression. Host tests of the helpers' choices; simulator kernels for
 //! `tcgen05.ld{.red}.spcompress` over every row operation and the NaN option against plain
 //! Rust; a compress-then-sparse-MMA round trip; a Rubin tiled MMA made by
 //! `utils::sm107::make_trivial_tiled_mma` with B reuse (`with_bkeep`, `with_breuse`) running a

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The elements one TMA instruction moves, in each of the PTX ISA's tensor access modes
-//! (roadmap parts m7-tma-im2col and m7-tma-sm100-modes): the tiled box, the im2col
+//! The elements one TMA instruction moves, in each of the PTX ISA's tensor access modes: the tiled box, the im2col
 //! column of pixels, and the four rows of `.tile::gather4` and `.tile::scatter4`. This is
 //! the simulator's model of the hardware, written from the PTX ISA's description of the
 //! modes alone (no layout algebra), so that a simulated copy built from an atom checks the

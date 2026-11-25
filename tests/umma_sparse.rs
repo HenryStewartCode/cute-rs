@@ -11,7 +11,7 @@
 // That portion is under the BSD-3-Clause licence, and the rest of the file is cute-rs's own,
 // under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the licence text.
 
-//! The 2:4 structured-sparse tcgen05 MMAs (roadmap part m10-sparse-umma): GEMM tiles on the
+//! The 2:4 structured-sparse tcgen05 MMAs: GEMM tiles on the
 //! simulator for F16, BF16, E4M3 and E5M2 with M = 128 on one CTA and M = 256 on a CTA pair.
 //! A is random 2:4 sparse, stored compressed in shared memory (make_sparse_smem_layout_a);
 //! the metadata is placed in global memory by make_sparse_gmem_layout_e, copied into shared

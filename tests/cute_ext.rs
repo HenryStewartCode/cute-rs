@@ -1,4 +1,4 @@
-//! cute_ext foundations (roadmap part m11-cute-ext-core): `cute::experimental`'s allocate,
+//! cute_ext foundations: `cute::experimental`'s allocate,
 //! partition, copy with automatic predication, warp_reduce, elementwise and dot, simulated
 //! against plain Rust; the pooled TMEM allocation in the simulator and (when `mlir-opt` and
 //! `ptxas` are installed) assembled for sm_100a; and the build-time diagnostics.

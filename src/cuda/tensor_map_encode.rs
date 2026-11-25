@@ -139,7 +139,7 @@ impl CudaContext {
     }
 
     /// [`encode_tensor_map_unchecked`](CudaContext::encode_tensor_map_unchecked) of an im2col
-    /// descriptor, with `cuTensorMapEncodeIm2col` (roadmap part m7-tma-im2col).
+    /// descriptor, with `cuTensorMapEncodeIm2col`.
     fn encode_im2col_unchecked(&self, desc: &TmaDesc) -> Result<EncodedTensorMap, CudaError> {
         let Some(encode) = self.api.tensor_map_encode_im2col else {
             return Err(err(format!(

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The simulator's warpgroup MMAs (roadmap part m8-wgmma-core):
+//! The simulator's warpgroup MMAs:
 //! `wgmma.mma_async`, `wgmma.fence`, `wgmma.commit_group` and
 //! `wgmma.wait_group`, modelled from the PTX ISA independently of cute-rs's
 //! layout algebra.
@@ -21,7 +21,7 @@
 //!   completes it, the operation reads them: overwriting them is reported;
 //!   after it they count as the waiting warp's reads (a later writer must be
 //!   ordered after the wait).
-//! * **Register A** (roadmap part m8-wgmma-variants). With A from registers
+//! * **Register A**. With A from registers
 //!   each thread's fragment is placed by the PTX ISA's A-fragment layout
 //!   ([`a_coord`]), and its registers, like the accumulators, must not have
 //!   been accessed by another instruction after the warp's last
@@ -727,7 +727,7 @@ impl<'a> Machine<'a> {
     /// warpgroup MMA, so is `to`, and it lands with it.
     pub(super) fn carry_pending(&mut self, from: ValueId, to: ValueId, t: usize) {
         if !self.wgmma.enabled {
-            // A tcgen05.ld's pending registers (m10-tmem-ld-st) carry the same way.
+            // A tcgen05.ld's pending registers carry the same way.
             if let Some(id) = self.pending_results.get(&(from, t)).copied() {
                 let bits = self.ops[id].results.iter().find(|r| r.0 == from && r.1 == t).map_or(0, |r| r.2);
                 self.ops[id].results.push((to, t, bits));

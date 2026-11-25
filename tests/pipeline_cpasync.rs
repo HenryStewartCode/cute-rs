@@ -1,5 +1,4 @@
-//! `PipelineCpAsync` and `PipelineOrder` (roadmap part
-//! m9-pipeline-cp-async-order) on the simulator: the `cp.async` rings and
+//! `PipelineCpAsync` and `PipelineOrder` on the simulator: the `cp.async` rings and
 //! the turn logs under seeded schedules with random completion of the
 //! copies, the barriers each makes, and what the SM89 and SM90 builds emit.
 

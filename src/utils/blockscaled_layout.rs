@@ -16,7 +16,7 @@
 
 //! The global-memory layout of block-scaled MMA scale factors (CuTe DSL's
 //! `cutlass.utils.BlockScaledBasicChunk`, `Sm103BlockScaledBasicChunk` and
-//! `tile_atom_to_shape_SF`, roadmap part m10-umma-layouts).
+//! `tile_atom_to_shape_SF`).
 //!
 //! A scale-factor atom covers 128 rows (M of A, N of B) by 4 scale factors
 //! along K, each shared by `sf_vec_size` consecutive K elements: 512 bytes
@@ -104,7 +104,7 @@ pub fn tile_atom_to_shape_sf(shape: impl Into<Shape>, sf_vec_size: usize) -> Lay
     tile_to_shape_ordered(atom.layout(), shape, order)
 }
 
-// m10-sm120-blockscaled: the SM120 shared-memory scale-factor layouts.
+// The SM120 shared-memory scale-factor layouts.
 
 /// CuTe DSL's `blockscaled_layout.sm120_make_smem_layout_sfa(tiled_mma,
 /// tile_shape_mnk, sf_vec_size, num_stages)`: the shared-memory layout of
@@ -177,7 +177,7 @@ fn sm120_smem_layout_sf(
     Layout::from_modes([m_mode, k_mode, Layout::new(num_stages, stage)])
 }
 
-// m10-port-nvfp4-gemm: the SM100 shared-memory and tensor-memory scale-factor layouts of
+// The SM100 shared-memory and tensor-memory scale-factor layouts of
 // a tcgen05 block-scaled MMA (CuTe DSL's `blockscaled_layout.make_smem_layout_sf`,
 // `make_smem_layout_sfa/sfb`, `make_tmem_layout_sfa/sfb` and
 // `sm103_make_smem_layout_sfa/sfb`).

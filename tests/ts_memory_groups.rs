@@ -9,7 +9,7 @@
 // licence, and the rest of the file is cute-rs's own, under MIT OR Apache-2.0.
 // THIRD-PARTY-NOTICES.md has the licence text.
 
-//! Task Scheduling part 3 (m11-ts-memory-groups): the declarative SMEM and
+//! Task Scheduling part 3: the declarative SMEM and
 //! TMEM allocators on the host (offsets, alignment, reordering, barrier
 //! placement, alias groups), the manager's new checks (alias races, group
 //! arrival counts, TMEM capacity, barrier storage, group misuse), the ported

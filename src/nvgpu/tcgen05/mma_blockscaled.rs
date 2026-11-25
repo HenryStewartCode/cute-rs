@@ -10,7 +10,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! The block-scaled tcgen05 MMAs (roadmap part m10-umma-blockscaled):
+//! The block-scaled tcgen05 MMAs:
 //! CuTe DSL's `tcgen05.MmaMXF8F6F4Op` (and its deprecated FP8 form
 //! `MmaMXF8Op`), `MmaMXF4Op`, `MmaMXF4NVF4Op`, and the sm_103a K = 96 forms
 //! `SM103MmaMXF4Op` and `SM103MmaMXF4NVF4Op`.
@@ -394,8 +394,7 @@ impl SM103MmaMXF4NVF4Op {
 
 block_scaled_accessors!(SM103MmaMXF4NVF4Op);
 
-/// The TMEM placement of one scale factor (roadmap part
-/// m10-umma-blockscaled): factor `j` of row `row` (of A's rows, or B's
+/// The TMEM placement of one scale factor: factor `j` of row `row` (of A's rows, or B's
 /// columns, in one CTA) for an instruction reading `nsf` factors per row,
 /// starting at byte `sf_id` of each column. Returns the lane within a
 /// 32-lane sub-partition, the column after the scale factors' address and

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The simulator's tcgen05 MMAs and commits (roadmap part m10-umma-f16),
+//! The simulator's tcgen05 MMAs and commits,
 //! modelled from the PTX ISA (9.7.18.10 `tcgen05.mma`, its data-path
 //! layouts in 9.7.18.10.5, the instruction descriptor in 9.7.18.4.2 and
 //! `tcgen05.commit` in 9.7.18.12) independently of cute-rs's layout algebra.
@@ -28,7 +28,7 @@
 //!   `enable-input-d`) or 0 and adds the K products in order of K in
 //!   Float32 (products of 16-bit floats are exact), then rounds once to the
 //!   accumulator type. Small-integer data is bit-exact.
-//! * **Other kinds** (m10-umma-dense-kinds). `.kind::tf32` reads 32-bit
+//! * **Other kinds**. `.kind::tf32` reads 32-bit
 //!   operands and drops their low 13 mantissa bits (as warp `mma.sync`
 //!   does, `tf32_truncate`); `.kind::i8` multiplies Int8/Uint8 operands and
 //!   adds into the Int32 accumulator exactly (wrapping); `.kind::f8f6f4`
@@ -53,7 +53,7 @@
 //!   (the same deferred arrival as `cp.async.mbarrier.arrive.noinc`; the
 //!   elected lane that issued the MMAs is the committing thread's warp's).
 //!   It is per thread: an unelected commit arrives once per lane.
-//! * **Sparse** (m10-sparse-umma). `tcgen05.mma.sp` reads A compressed
+//! * **Sparse**. `tcgen05.mma.sp` reads A compressed
 //!   (half of K) through its descriptor and expands each row with the
 //!   metadata read from TMEM at `[sp-meta-tmem]` plus the descriptor's
 //!   sparse selector (bits 0-1) in columns: each group of four K elements
@@ -63,7 +63,7 @@
 //!   ISA's metadata layouts for 128 rows per CTA, written as a formula
 //!   here ([`sparse_meta_place`]) and not from the library's layouts; the
 //!   ISA figures could not be checked when this was written.
-//! * **Prims forms** (m11-prims-mma-forms). An MMA from `cute::prims` is
+//! * **Prims forms**. An MMA from `cute::prims` is
 //!   issued by each thread that executes it (inside `elect_one`), with no
 //!   convergence or uniformity rule. `.ws` (weight stationary) writes D by
 //!   the data-path layouts of CuTe C++'s `UMMA::tmem_frg_ws` (Layout G for
@@ -96,7 +96,7 @@ use crate::tensor::AddressSpace;
 /// TMEM cells as lane ranges and a column range.
 pub(super) type TmemCells = (Vec<Range<usize>>, Range<usize>);
 
-/// m10-rubin-umma: what a collector buffer holds after a `FILL`: the
+/// What a collector buffer holds after a `FILL`: the
 /// descriptor and form of the tile it was filled from, the tile's values,
 /// the shared-memory bytes they were read from (to report a later change)
 /// and where the filling MMA was issued.
@@ -117,9 +117,9 @@ pub(super) struct UmmaFlight {
     pub lanes: Vec<Range<usize>>,
     pub cols: Range<usize>,
     pub loc: Loc,
-    /// m10-umma-kinds: the TMEM cells of an A read from tensor memory (its
+    /// The TMEM cells of an A read from tensor memory (its
     /// lanes and columns), being read until the MMA completes;
-    /// m10-umma-blockscaled: and those of the scale factors.
+    /// And those of the scale factors.
     pub a_cells: Vec<TmemCells>,
 }
 
@@ -160,7 +160,7 @@ fn d_lanes(kind: UmmaKind) -> Vec<Range<usize>> {
 /// M = 128 (Layout B).
 fn d_columns(kind: UmmaKind) -> usize {
     if kind.prims.ws {
-        // m11-prims-mma-forms: Layouts G, E and D.
+        // Layouts G, E and D.
         return kind.n as usize * kind.m as usize / 128;
     }
     if kind.two_cta && kind.m == 128 { kind.n as usize / 2 } else { kind.n as usize }
@@ -174,7 +174,7 @@ fn d_columns(kind: UmmaKind) -> usize {
 /// 0 to 63 and the others in lanes 64 to 127, in `N / 2` columns.
 pub(super) fn d_place(kind: UmmaKind, row: usize, col: usize) -> (usize, usize, usize) {
     if kind.prims.ws {
-        // m11-prims-mma-forms: Layout G (M = 32, 1x4), E (M = 64, 2x2) or D (M = 128).
+        // Layout G (M = 32, 1x4), E (M = 64, 2x2) or D (M = 128).
         let w = d_columns(kind);
         return (0, row + kind.m as usize * (col / w), col % w);
     }
@@ -191,7 +191,7 @@ pub(super) fn d_place(kind: UmmaKind, row: usize, col: usize) -> (usize, usize, 
     }
 }
 
-/// m10-sparse-umma: where the 4-bit metadata field of K group `g` (four
+/// Where the 4-bit metadata field of K group `g` (four
 /// logical K elements) of row `row` (of one CTA's 128) of a sparse MMA
 /// is in tensor memory: `(lane, column after the metadata's, bit)`.
 ///
@@ -227,7 +227,7 @@ impl<'a> Machine<'a> {
         let kind = *kind;
         let w = self.warps_per_block;
         self.progress();
-        // m11-prims-mma-forms: a prims MMA is issued by each thread that executes it.
+        // A prims MMA is issued by each thread that executes it.
         if kind.prims.thread_issue {
             for &t in active {
                 let k = self.clock_index(t);
@@ -270,10 +270,10 @@ impl<'a> Machine<'a> {
                 (*desc_b, "B descriptor"),
                 (*enable_input_d, "enable-input-d (Field.ACCUMULATE)"),
             ];
-            // m10-umma-kinds: the runtime descriptor and the lane mask.
+            // The runtime descriptor and the lane mask.
             uniform.extend(idesc.iter().map(|&v| (v, "instruction descriptor (Field.NEGATE_A/NEGATE_B)")));
             uniform.extend(disable_lane.iter().map(|&v| (v, "disable-output-lane mask")));
-            // m10-umma-blockscaled: the scale factors' TMEM addresses.
+            // The scale factors' TMEM addresses.
             if let Some((a, b)) = sf {
                 uniform.extend([(*a, "TMEM address of SFA"), (*b, "TMEM address of SFB")]);
             }
@@ -296,7 +296,7 @@ impl<'a> Machine<'a> {
                 }
             }
             self.tcgen05_group(&format!("tcgen05.mma.kind::{}", kind.kind.ptx()), kind.two_cta, inst.loc, base)?;
-            // m10-cta-pair: the even CTA of a cluster pair issues the pair's MMAs.
+            // The even CTA of a cluster pair issues the pair's MMAs.
             if kind.two_cta && (!self.cluster_size.is_multiple_of(2) || block % 2 == 1) {
                 return Err(self.err(
                     if self.cluster_size.is_multiple_of(2) {
@@ -335,7 +335,7 @@ impl<'a> Machine<'a> {
         let addr = self.get(*taddr, base) as u32;
         let (lane0, col0) = ((addr >> 16) as usize, (addr & 0xffff) as usize);
         let name = kind.ptx();
-        // m11-prims-mma-forms: what cute-rs does not model of the .ws forms.
+        // What cute-rs does not model of the .ws forms.
         if let Some(z) = zero_col_mask {
             let z = self.get(*z, base);
             if z != 0 {
@@ -362,7 +362,7 @@ impl<'a> Machine<'a> {
             return Err(self
                 .err(format!("{name}: D's TMEM address {addr:#x} has lane {lane0}; D starts at lane 0"), Some(base)));
         }
-        // m10-cta-pair: a pair's MMA writes D into both CTAs' TMEM, at the same address.
+        // A pair's MMA writes D into both CTAs' TMEM, at the same address.
         let pair: Vec<usize> = if kind.two_cta { vec![block, block + 1] } else { vec![block] };
         let cols = col0..col0 + d_columns(kind);
         for &blk in &pair {
@@ -400,10 +400,10 @@ impl<'a> Machine<'a> {
         // descriptors' addresses in its own shared memory.
         let v = pair.len();
         let major = |t: bool| if t { OperandMajorMode::MN } else { OperandMajorMode::K };
-        // m10-rubin-umma: a Rubin MMA's descriptors have the sm_107 encoding.
+        // A Rubin MMA's descriptors have the sm_107 encoding.
         let enc = if kind.sm107.is_some() { UmmaDescEncoding::Sm107 } else { UmmaDescEncoding::Sm100 };
         let mut ranges: Vec<(usize, BufferId, Range<usize>)> = Vec::new();
-        // m11-prims-mma-forms: the plain MMA's A collector.
+        // The plain MMA's A collector.
         let a_op = kind.sm107.map(|r| r.collector_a).unwrap_or(kind.prims.collector_a);
         let (mut a, a_cells) = if kind.a_tmem {
             let a_addr = self.get(*desc_a, base) as u32;
@@ -453,7 +453,7 @@ impl<'a> Machine<'a> {
         };
         let mut a_cells = a_cells;
         let mut b = Vec::with_capacity(n * kk);
-        // m11-prims-mma-forms: a .ws MMA's B buffer b<i> is collector slot 1 + i; the Rubin
+        // A .ws MMA's B buffer b<i> is collector slot 1 + i; the Rubin
         // (sm_107) B collector is slot 5.
         let (op, slot) = match kind.prims.collector_b {
             Some((i, op)) => (op, 1 + i),
@@ -486,11 +486,11 @@ impl<'a> Machine<'a> {
             b.extend(part);
             ranges.extend(r.into_iter().map(|(bf, bytes)| (blk, bf, bytes)));
         }
-        // m10-umma-kinds: the runtime negate bits of the descriptor.
+        // The runtime negate bits of the descriptor.
         let desc_bits = idesc.map(|v| self.get(v, base) as u32).unwrap_or_else(|| kind.idesc());
-        // m10-umma-blockscaled: and the scale-factor IDs.
+        // And the scale-factor IDs.
         let sf_ids = if kind.scale.is_some() { 3 << UmmaKind::A_SF_ID_BIT | 3 << UmmaKind::B_SF_ID_BIT } else { 0 };
-        // m10-sparse-umma: and the sparse selector.
+        // And the sparse selector.
         let sf_ids = sf_ids | if kind.sparse { UmmaKind::SPARSE_ID2_MASK } else { 0 };
         if desc_bits & !(1 << UmmaKind::NEGATE_A_BIT | 1 << UmmaKind::NEGATE_B_BIT | sf_ids) != kind.idesc() {
             return Err(self.err(
@@ -503,7 +503,7 @@ impl<'a> Machine<'a> {
                 Some(base),
             ));
         }
-        // m10-umma-blockscaled: the scale factors, per CTA: SFA for the CTA's rows of A, SFB
+        // The scale factors, per CTA: SFA for the CTA's rows of A, SFB
         // for all N columns of B (each CTA of a pair reads its own TMEM).
         let mut scales: Vec<(Vec<f64>, Vec<f64>)> = Vec::new();
         if let (Some(sc), Some((sfa_v, sfb_v))) = (kind.scale, sf) {
@@ -520,7 +520,7 @@ impl<'a> Machine<'a> {
                 scales.push((sa, sb));
             }
         }
-        // m10-sparse-umma: expand the compressed A with each CTA's metadata.
+        // Expand the compressed A with each CTA's metadata.
         if let Some(e) = meta {
             let id2 = (desc_bits & UmmaKind::SPARSE_ID2_MASK) as usize;
             let addr = self.get(*e, base) as u32;
@@ -532,7 +532,7 @@ impl<'a> Machine<'a> {
                 if blk == block {
                     a_cells.push(cells);
                 }
-                // m11-prims-mma-forms: FP4 sparsity is by pairs (a field per eight K elements).
+                // FP4 sparsity is by pairs (a field per eight K elements).
                 let pairs = matches!(kind.kind, UmmaDataKind::Mxf4 | UmmaDataKind::Mxf4Nvf4);
                 let span = if pairs { 8 } else { 4 };
                 let (kh, groups) = (kk / 2, kk / span);
@@ -639,7 +639,7 @@ impl<'a> Machine<'a> {
                         iacc = bits as i32;
                     } else {
                         acc = to_f64(kind.acc, bits as u64) as f32;
-                        // m11-prims-mma-forms: D's input scaled by 2^-scale-input-d (exact).
+                        // D's input scaled by 2^-scale-input-d (exact).
                         if let Some(s) = kind.prims.scale_input_d {
                             acc = (acc as f64 * 2f64.powi(-(s as i32))) as f32;
                         }
@@ -655,7 +655,7 @@ impl<'a> Machine<'a> {
                     continue;
                 }
                 if let Some(sc) = kind.scale {
-                    // m10-umma-blockscaled: each K-block's products times its two scale factors.
+                    // Each K-block's products times its two scale factors.
                     let (sa, sb) = &scales[cta];
                     let (nsf, r) = (kind.scale_factors(), row % (m / v));
                     let vec = sc.vec as usize;
@@ -726,7 +726,7 @@ impl<'a> Machine<'a> {
         Ok(())
     }
 
-    /// m10-umma-kinds: read the `m x k` A operand of `kind` from tensor
+    /// Read the `m x k` A operand of `kind` from tensor
     /// memory at `addr` for the MMA warp `k` (thread `t`) of `block` issues,
     /// by the PTX ISA's description of matrix A in tensor memory: row `i`
     /// in the lane of row `i` of D (Layout D for M = 128, Layout F for
@@ -814,7 +814,7 @@ impl<'a> Machine<'a> {
         Ok((values, (d_lanes(kind), cols)))
     }
 
-    /// m10-sparse-umma: read the sparsity metadata of one CTA's 128 rows
+    /// Read the sparsity metadata of one CTA's 128 rows
     /// for a sparse `kind` from tensor memory at `addr` (lane 0, an even
     /// column) and selector `id2`, in `block`'s TMEM, by
     /// [`sparse_meta_place`]. Each cell must be in a live allocation and
@@ -850,7 +850,7 @@ impl<'a> Machine<'a> {
             ));
         }
         let col0 = col + id2;
-        // m11-prims-mma-forms: FP4 sparsity takes a field per eight K elements.
+        // FP4 sparsity takes a field per eight K elements.
         let span = if matches!(kind.kind, UmmaDataKind::Mxf4 | UmmaDataKind::Mxf4Nvf4) { 8 } else { 4 };
         let groups = kind.k() / span;
         let ncols = if eight_bit { 2 } else { 1 };
@@ -870,7 +870,7 @@ impl<'a> Machine<'a> {
                 Some(t),
             ));
         }
-        // m11-prims-mma-forms: a .ws MMA of M rows reads them from each 128 / M-lane replica
+        // A .ws MMA of M rows reads them from each 128 / M-lane replica
         // (CuTe C++'s tmem_e_frg_ws), which must agree.
         let rows = if kind.prims.ws { kind.m as usize } else { 128 };
         let mut out = vec![0u32; rows * groups];
@@ -986,7 +986,7 @@ impl<'a> Machine<'a> {
         Ok(cell.bits)
     }
 
-    /// m10-umma-blockscaled: read the scale factors `what` (SFA or SFB) of
+    /// Read the scale factors `what` (SFA or SFB) of
     /// `rows` rows, `nsf` each, from tensor memory at `addr` for the MMA warp
     /// `k` (thread `t`) issues, in `block`'s TMEM: by
     /// [`sf_place`](crate::nvgpu::tcgen05::mma_blockscaled::sf_place) from
@@ -1174,7 +1174,7 @@ impl<'a> Machine<'a> {
         let mut values = vec![0f64; mn * kk];
         for row in 0..mn {
             for c in 0..kk {
-                // m10-umma-blockscaled: packed FP4 (.kind::mxf4, mxf4nvf4) shares bytes.
+                // Packed FP4 (.kind::mxf4, mxf4nvf4) shares bytes.
                 let bit = map.bit_address(row, c);
                 let mut addr = bit / 8;
                 let (mut bytes, mut shift) = ((container / 8).max(1), (bit % 8) as usize);
@@ -1217,7 +1217,7 @@ impl<'a> Machine<'a> {
         Ok(values)
     }
 
-    /// m10-rubin-umma: the operand (`b`: B, else A) of a `USE` or `LASTUSE`
+    /// The operand (`b`: B, else A) of a `USE` or `LASTUSE`
     /// MMA, from the collector buffer of `block`, or `None` when the MMA
     /// reads shared memory. Reports a collector nothing filled, one filled
     /// from another tile or form, and a tile whose shared memory has changed
@@ -1244,7 +1244,7 @@ impl<'a> Machine<'a> {
         let Some(c) = self.tmem.collectors.get(&(block, slot)) else {
             return Err(self.err(
                 format!(
-                    "{name} reads {what} from {what}'s collector buffer, but no earlier MMA of this CTA filled it                      (or a DISCARD or LASTUSE MMA emptied it): the first MMA of a reuse sequence uses                      CollectorOp.FILL"
+                    "{name} reads {what} from {what}'s collector buffer, but no earlier MMA of this CTA filled it (or a DISCARD or LASTUSE MMA emptied it): the first MMA of a reuse sequence uses CollectorOp.FILL"
                 ),
                 Some(t),
             ));
@@ -1252,7 +1252,7 @@ impl<'a> Machine<'a> {
         if c.desc != desc || c.form != form {
             return Err(self.err(
                 format!(
-                    "{name} reads {what} from its collector buffer through descriptor {desc:#018x}, but the buffer was                      filled from another tile (descriptor {:#018x}, {:?} {}x{}, at {}): a collected operand is reused                      with the same descriptor and form",
+                    "{name} reads {what} from its collector buffer through descriptor {desc:#018x}, but the buffer was filled from another tile (descriptor {:#018x}, {:?} {}x{}, at {}): a collected operand is reused with the same descriptor and form",
                     c.desc,
                     c.form.0,
                     c.form.1,
@@ -1268,7 +1268,7 @@ impl<'a> Machine<'a> {
             if let Some(i) = now.iter().zip(bytes).position(|(x, y)| x != y) {
                 return Err(self.err(
                     format!(
-                        "{name} reuses {what} from its collector buffer, but byte {} of shared buffer {} it was filled                          from (at {}) has changed since: the collector holds the old tile; fill it again                          (CollectorOp.FILL) after changing the operand",
+                        "{name} reuses {what} from its collector buffer, but byte {} of shared buffer {} it was filled from (at {}) has changed since: the collector holds the old tile; fill it again (CollectorOp.FILL) after changing the operand",
                         start + i,
                         buffer.0,
                         at(c.loc)
@@ -1284,7 +1284,7 @@ impl<'a> Machine<'a> {
         Ok(Some(values))
     }
 
-    /// m10-rubin-umma: after an MMA read an operand from shared memory:
+    /// After an MMA read an operand from shared memory:
     /// `FILL` keeps it (and the bytes it came from) in the collector of
     /// `block`; any other usage leaves the collector empty.
     #[allow(clippy::too_many_arguments)]
@@ -1360,7 +1360,7 @@ impl<'a> Machine<'a> {
     /// Land MMA `id` as a write of its CTA's tensor-core agent: its D cells
     /// become the agent's, at a new time of the agent's, which it returns.
     ///
-    /// m10-cta-pair: a pair's MMA has a flight in each CTA. Its cells in both
+    /// A pair's MMA has a flight in each CTA. Its cells in both
     /// become their CTA's tensor-core writes at one time, to which both
     /// CTAs' agent clocks advance, so that a waiter in either CTA whose
     /// commit arrival publishes its CTA's agent time observes them.
@@ -1425,7 +1425,7 @@ impl<'a> Machine<'a> {
             };
             let k = self.clock_index(t);
             let mut copies: Vec<usize> = self.tmem.mmas.iter().filter(|f| f.warp == k).map(|f| f.id).collect();
-            // m10-cta-pair: one entry per MMA, not per CTA of its pair.
+            // One entry per MMA, not per CTA of its pair.
             copies.dedup();
             if self.opts.async_completion == crate::sim::AsyncCompletion::Early {
                 for &id in &copies {

@@ -1,5 +1,4 @@
-//! Tensor maps and grid-constant parameters on a real GPU (roadmap part
-//! m7-tma-descriptor): the driver's `cuTensorMapEncodeTiled` against cute-rs's validator,
+//! Tensor maps and grid-constant parameters on a real GPU: the driver's `cuTensorMapEncodeTiled` against cute-rs's validator,
 //! the by-value grid-constant ABI read through the parameter's address, and hidden and
 //! host-bound descriptors through the launcher. Needs the `cuda` feature; skipped (with a
 //! note) without an NVIDIA GPU or an `mlir-opt`:
@@ -258,7 +257,7 @@ fn descriptor_kernels_assemble_for_sm90() {
     }
 }
 
-/// The descriptors of TMA atoms (roadmap part m7-tma-atom) over a device buffer: the
+/// The descriptors of TMA atoms over a device buffer: the
 /// K- and M-major GMMA tiles of f16, bf16 and f32. From sm_90 the driver encodes every one;
 /// below it encodes nothing (`CUDA_ERROR_NOT_SUPPORTED`) but must not find a field invalid
 /// (`CUDA_ERROR_INVALID_VALUE`). The hidden descriptor of an atom kernel goes through the

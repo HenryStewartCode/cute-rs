@@ -9,7 +9,7 @@
 // That portion is under the BSD-3-Clause licence, and the rest of the file is cute-rs's
 // own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the licence text.
 
-//! The MMA-aware TMA atoms of SM100 (roadmap part m10-port-fp16-gemm; CuTe DSL's
+//! The MMA-aware TMA atoms of SM100 (CuTe DSL's
 //! `cute.nvgpu.make_tiled_tma_atom_A/B/C`): the CTA tile of the atom is the part of
 //! the MMA tile (`mma_tiler_mnk`) one CTA's tcgen05 MMA reads or writes, laid out as the
 //! MMA partitions it, `(MMA, MMA_M, MMA_K)` for A, so that one stage of the shared-memory

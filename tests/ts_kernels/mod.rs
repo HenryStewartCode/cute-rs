@@ -248,7 +248,7 @@ pub fn ramp_i16(n: usize) -> Vec<i16> {
 }
 
 // ---------------------------------------------------------------------------
-// 02_copy_tma through the TaskManager (roadmap part m11-ts-task-manager)
+// 02_copy_tma through the TaskManager
 // ---------------------------------------------------------------------------
 
 /// [`staged_copy`] written as two tasks for the TaskManager: `LoadTask` on

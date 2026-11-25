@@ -10,7 +10,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! TMEM load and store copy atoms (roadmap part m10-tmem-ld-st): CuTe DSL's
+//! TMEM load and store copy atoms: CuTe DSL's
 //! `tcgen05.Ld16x64bOp`, `Ld16x128bOp`, `Ld16x256bOp`, `Ld16x32bx2Op`,
 //! `Ld32x32bOp` and their `St..Op` counterparts, used through
 //! [`make_copy_atom`](crate::make_copy_atom) and [`copy`](crate::copy), and
@@ -154,7 +154,7 @@ macro_rules! tmem_red_ops {
     ($($(#[$doc:meta])* $ld:ident, $shape:expr $(, $split:ident)?;)*) => {$(
         $(#[$doc])*
         ///
-        /// CuTe DSL's op of the same name (roadmap part m10-ldred-packed-math):
+        /// CuTe DSL's op of the same name:
         /// `repeat` (`.x2` to `.x128`), the reduction `red_op` and `nan`
         /// (`.NaN`: any NaN is the result; otherwise NaNs are ignored). Used
         /// on Float32 atoms through [`copy_atom_call`](crate::copy_atom_call)
@@ -203,7 +203,7 @@ tmem_red_ops! {
     LdRed32x32bOp, TmemShape::S32x32b;
 }
 
-/// `tcgen05.ld.spcompress.32x32b` (roadmap part m10-rubin-extras; CuTe DSL's
+/// `tcgen05.ld.spcompress.32x32b` (CuTe DSL's
 /// `tcgen05.LdSPCompress32x32bOp(repeat, redOp)`): 32 lanes of 32 bits, `.x4`
 /// to `.x128`, loading Float32 values and keeping two of every four of each
 /// thread's as `red_op` prefers (the larger for `Max`, the smaller for
@@ -466,7 +466,7 @@ mod tests {
     }
 }
 
-// m10-umma-pipelines: TMEM copy introspection (CuTe DSL's tcgen05 helpers
+// TMEM copy introspection (CuTe DSL's tcgen05 helpers
 // is_tmem_load, is_tmem_store and get_tmem_copy_properties).
 
 /// The packing of a TMEM copy atom, as [`get_tmem_copy_properties`]

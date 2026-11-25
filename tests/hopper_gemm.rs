@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The Hopper dense GEMM port (roadmap part m8-port-hopper): the simulator
+//! The Hopper dense GEMM port: the simulator
 //! against a plain Rust GEMM for clusters of 1x1, 2x1, 1x2 and 2x2 CTAs,
 //! Float16, BFloat16, FP8 and 8-bit integer inputs, every major mode the
 //! example allows, partial tiles and batches; the configuration it derives;
@@ -98,7 +98,7 @@ fn float16_accumulators_and_float32_c() {
     }
 }
 
-/// FP8 (m8-wgmma-variants): E4M3 and E5M2 in each pairing (K-major only),
+/// FP8: E4M3 and E5M2 in each pairing (K-major only),
 /// a K tile of 128, Float16, Float32 and E5M2 C.
 #[test]
 fn float8() {
@@ -233,7 +233,7 @@ fn shared_storage_layout() {
     assert!(!hopper_gemm::epi_reuses_smem_a(g.a_dtype, g.c_dtype));
 }
 
-/// Misuse the example reports (roadmap part m9-hopper-dense-gemm): a
+/// Misuse the example reports: a
 /// consumer count in threads instead of warps hangs (a consumer release is
 /// one arrival per warp), a stage count beyond the shared memory fails the
 /// target check, and a K that breaks TMA's alignment is refused before

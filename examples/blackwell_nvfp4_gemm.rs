@@ -9,8 +9,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! The first Blackwell tutorial NVFP4 GEMM, ported from CuTe DSL's `nvfp4_gemm_0.py`
-//! (roadmap part m10-port-nvfp4-gemm): a simple 1-CTA block-scaled tcgen05 GEMM,
+//! The first Blackwell tutorial NVFP4 GEMM, ported from CuTe DSL's `nvfp4_gemm_0.py`: a simple 1-CTA block-scaled tcgen05 GEMM,
 //! `C = (A * SFA) (B * SFB)^T`.
 //!
 //! - A `(M, K)` and B `(N, K)` are K-major Float4E2M1FN (packed two per byte), each run of

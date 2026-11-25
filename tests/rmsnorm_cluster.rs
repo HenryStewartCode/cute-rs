@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The cluster RMSNorm port (roadmap part m8-port-rmsnorm-cluster): the
+//! The cluster RMSNorm port: the
 //! simulator against plain Rust for one, two and four CTAs per cluster on
 //! Float16, BFloat16 and Float32, the simulator's diagnostics of a broken
 //! cluster reduction, and the sm_90 PTX (with `ptxas` where installed).

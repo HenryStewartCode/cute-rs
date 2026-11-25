@@ -1,5 +1,4 @@
-//! `PipelineAsync`, its participants, try-wait tokens and `PipelineEmpty`
-//! (roadmap part m9-pipeline-async) on the simulator: the warp-specialised
+//! `PipelineAsync`, its participants, try-wait tokens and `PipelineEmpty` on the simulator: the warp-specialised
 //! hand-offs under seeded schedules, both paths of the token-taking waits,
 //! and one generic kernel body over a real and an empty pipeline.
 

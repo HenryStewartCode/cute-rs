@@ -8,8 +8,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! CuTe DSL's SM100 sparse GEMM layout helpers (roadmap part
-//! m10-sparse-umma; `cutlass.utils` from `blackwell_helpers`): the element
+//! CuTe DSL's SM100 sparse GEMM layout helpers (`cutlass.utils` from `blackwell_helpers`): the element
 //! types of compressed A and of the metadata E ([`make_sparse_a_dtype`],
 //! [`make_sparse_e_dtype`]), the metadata atom ([`make_tensor_e_atom_layout`]),
 //! the metadata layouts in global, shared and tensor memory

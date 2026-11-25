@@ -1,4 +1,4 @@
-//! TMEM loads and stores (roadmap part m10-tmem-ld-st): `tcgen05.ld`/`tcgen05.st` copy atoms
+//! TMEM loads and stores: `tcgen05.ld`/`tcgen05.st` copy atoms
 //! of every shape, with several repetitions, packing and the `.16x32bx2` half split, their
 //! waits, and `make_tmem_copy` round trips (one in the style of the epilogue of CUTLASS's
 //! `examples/python/CuTeDSL/cute/blackwell/tutorial/tutorial_gemm/fp16_gemm_0.py`, BSD-3-Clause).

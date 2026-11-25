@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The simulator's shared-memory-to-TMEM copies, `tcgen05.cp` (roadmap part
-//! m10-s2t-copies), modelled from the PTX ISA (9.7.18.9.2) independently of
+//! The simulator's shared-memory-to-TMEM copies, `tcgen05.cp`, modelled from the PTX ISA (9.7.18.9.2) independently of
 //! cute-rs's layout algebra.
 //!
 //! * **Issue.** `cute.copy` of an S2T atom is called by a whole warp, which

@@ -9,7 +9,7 @@
 // BSD-3-Clause licence, and the rest of the file is cute-rs's own, under MIT
 // OR Apache-2.0. THIRD-PARTY-NOTICES.md has the licence text.
 
-//! Roadmap part m11-ts-gemm-example: the Task Scheduling tcgen05 GEMM
+//! The Task Scheduling tcgen05 GEMM
 //! (`02_gemm_simple_ts/01_fp16_bf16_gemm_3.py`) end to end. On the
 //! simulator against plain Rust: bit for bit on small integers (FP16 and
 //! BF16, a tile-aligned size and a ragged one), within the FP32 summation

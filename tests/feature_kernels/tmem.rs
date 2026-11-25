@@ -1,4 +1,4 @@
-//! Tensor memory (roadmap part m10-tmem-core): `alloc_tmem`, `retrieve_tmem_ptr`,
+//! Tensor memory: `alloc_tmem`, `retrieve_tmem_ptr`,
 //! `dealloc_tmem` and `relinquish_tmem_alloc_permit`, with TMEM tensors' address arithmetic.
 //! sm_100a: simulated, compiled for sm_100a and assembled by `tests/ptxas.rs`; no GPU here
 //! runs them.

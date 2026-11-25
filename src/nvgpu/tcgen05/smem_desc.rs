@@ -9,7 +9,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! UMMA shared-memory descriptors (roadmap part m10-umma-layouts): the
+//! UMMA shared-memory descriptors: the
 //! 64-bit operand descriptors of `tcgen05.mma` (CuTe DSL's
 //! `tcgen05.make_umma_smem_desc`), split into the fields fixed when a kernel
 //! is built ([`umma_desc_fields`]) and the start address added at run time,
@@ -163,7 +163,7 @@ impl SmemDescriptor {
             assert!(v <= mask, "UMMA descriptor: the {name} {v} does not fit its {}-bit field", mask.count_ones());
             v
         };
-        // m11-prims-descriptors-swizzle: the bits are placed by the public
+        // The bits are placed by the public
         // encoder (`prims::Tcgen05SmemDesc`).
         crate::prims::Tcgen05SmemDesc::pack(
             fit("start address", self.start_address as u64, wide),
@@ -215,7 +215,7 @@ impl SmemDescriptor {
 /// * K-major, 32 bytes of K (`2T` elements): `((8,m),(T,2)):((W T, SBO),(1,
 ///   L))` with `L = LBO` unswizzled and `T` swizzled (`Swizzle128BBase32B` is
 ///   MN-major only). The swizzled forms have no LBO; CuTe writes 1. With the
-///   sm_107 encoding (m10-rubin-umma) also 64 bytes of K, `(T,4)`.
+///   sm_107 encoding also 64 bytes of K, `(T,4)`.
 /// * MN-major: `((T,W,m),(R,k)):((1,T,A),(W T,B))`, where unswizzled `A` is
 ///   the SBO and `B` the LBO, and swizzled the other way round.
 ///
@@ -251,8 +251,8 @@ pub fn umma_desc_fields(
             if layout_type == UmmaLayoutType::Swizzle128BBase32B {
                 return Err("the 128-byte swizzle with 32-byte atomicity is only for MN-major operands".into());
             }
-            // m10-umma-blockscaled: the sm_103a K = 96 FP4 MMAs read 48 bytes of K (3 units).
-            // m10-rubin-umma: the Rubin K = 64 (8-bit) and K = 128 (packed FP4) MMAs read 64
+            // The sm_103a K = 96 FP4 MMAs read 48 bytes of K (3 units).
+            // The Rubin K = 64 (8-bit) and K = 128 (packed FP4) MMAs read 64
             // bytes (4 units), with the sm_107 encoding.
             let k_ok = k == 2 * t || (bits == 4 && k == 3 * t) || (enc == UmmaDescEncoding::Sm107 && k == 4 * t);
             if !k_ok || !mn.is_multiple_of(8) {

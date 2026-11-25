@@ -8,8 +8,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! The synthetic EFC GEMM (`synthetic_custom_epilogue_dense_gemm.py`, roadmap part
-//! m10-port-efc): an epilogue generated for any number of read and written tensors, on
+//! The synthetic EFC GEMM (`synthetic_custom_epilogue_dense_gemm.py`): an epilogue generated for any number of read and written tensors, on
 //! [`DenseGemmEfc`](efc::dense_gemm::DenseGemmEfc).
 //!
 //! With parameters `alpha`, `beta`, `read_t0..` and `written_t0..`, the epilogue sums

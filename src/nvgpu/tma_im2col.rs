@@ -11,7 +11,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! Im2col TMA atoms (roadmap part m7-tma-im2col): [`make_im2col_tma_atom`] and what
+//! Im2col TMA atoms: [`make_im2col_tma_atom`] and what
 //! their copies issue.
 //!
 //! An implicit-GEMM convolution reads its activation tensor (`NWC`, `NHWC` or `NDHWC`,
@@ -211,7 +211,7 @@ pub fn make_im2col_tma_atom<T: Numeric>(
 
 /// How an im2col atom's CTA tile is given: by a tiler of the tensor's `(pixels,
 /// channels)`, or as a tcgen05 MMA partitions its `(TILE_M, TILE_K)` tile of them (CuTe
-/// DSL's `make_im2col_tma_atom_A`, m10-port-fp16-gemm).
+/// DSL's `make_im2col_tma_atom_A`).
 pub(crate) enum Im2colTile<'a> {
     Tiler(Tiler),
     MmaA { tiled_mma: &'a crate::atom::mma::TiledMma, tile_mk: (usize, usize) },

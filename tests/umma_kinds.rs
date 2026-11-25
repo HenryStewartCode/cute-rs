@@ -8,7 +8,7 @@
 // That portion is under the BSD-3-Clause licence, and the rest of the file is cute-rs's own,
 // under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the licence text.
 
-//! The dense tcgen05 UMMA kinds TF32, I8 and F8F6F4 (roadmap part m10-umma-dense-kinds):
+//! The dense tcgen05 UMMA kinds TF32, I8 and F8F6F4:
 //! single-CTA, single-tile GEMMs (128x128 and 64x64, several k-blocks) on the simulator,
 //! bit-exact against plain Rust: tf32 -> f32 (including operands with low mantissa bits the
 //! tensor core drops); s8 and u8 -> s32; every A x B pair of the five f8f6f4 formats with F16
@@ -507,7 +507,7 @@ fn illegal_operations_panic_when_built() {
     let e = panic_text(|| {
         MmaTF32Op::new((64, 64), CtaGroup::TWO, s, K, K);
     });
-    // m10-cta-pair: a CTA pair's M is 128 or 256.
+    // A CTA pair's M is 128 or 256.
     assert!(e.contains("M is 64") && e.contains("128 or 256"), "{e}");
     // A packed FP4 shared-memory tensor (not the padded image).
     let e = panic_text(|| {

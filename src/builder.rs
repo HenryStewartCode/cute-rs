@@ -222,16 +222,15 @@ pub(crate) struct BuilderState {
     /// Building a standalone device function ([`crate::ffi::DeviceFunction`]), and its
     /// result once the body has returned it.
     pub(crate) device_function: Option<crate::ir::DeviceFunctionSig>,
-    /// Profiling scopes, the symbol registry and IKET tracing (m11-profiling-iket).
+    /// Profiling scopes, the symbol registry and IKET tracing.
     pub(crate) profiling: crate::profiling::ProfilingState,
-    /// Code to emit once the body has returned (roadmap part
-    /// m11-cute-ext-core: the pooled TMEM allocation of
+    /// Code to emit once the body has returned (the pooled TMEM allocation of
     /// [`crate::experimental`]), run in order by [`run_finish_hooks`].
     pub(crate) finish_hooks: Vec<Box<dyn FnOnce()>>,
     /// The pooled TMEM allocation of [`crate::experimental::allocate`].
     pub(crate) cute_ext_tmem: Option<crate::experimental::memory::TmemPool>,
     /// The TMA atoms of [`crate::experimental`]'s TMA operations, one per
-    /// distinct descriptor (roadmap part m11-cute-ext-tma), by key.
+    /// distinct descriptor, by key.
     pub(crate) cute_ext_tma: HashMap<String, std::rc::Rc<dyn std::any::Any>>,
     /// The kernel's device workspace ([`crate::experimental::host_runtime`]).
     pub(crate) workspace: Option<crate::experimental::host_runtime::WorkspaceBuild>,
@@ -1077,14 +1076,13 @@ impl BuilderState {
 
     /// Whether an `if` branch or loop body opened after serial `created`
     /// (a fragment's creation) is still open: the fragment is then state
-    /// from outside the current region (roadmap part m8-wgmma-core).
+    /// from outside the current region.
     pub(crate) fn region_opened_since(&self, created: u64) -> bool {
         self.regions.iter().any(|r| r.kind != RegionKind::Root && r.serial > created)
     }
 
     /// The serials of the open regions, outermost first: a value used where
-    /// the path was `p` is visible wherever `p` is a prefix of the path
-    /// (roadmap part m8-wgmma-variants).
+    /// the path was `p` is visible wherever `p` is a prefix of the path.
     pub(crate) fn region_path(&self) -> Vec<u64> {
         self.regions.iter().map(|r| r.serial).collect()
     }
@@ -1092,8 +1090,7 @@ impl BuilderState {
     /// Whether `v` was defined inside the outermost `if` branch or loop body
     /// opened after serial `created` that is still open (true when there is
     /// none): a register of a fragment from outside the region that holds
-    /// such a value was written in the region, which may then rebind it
-    /// (roadmap part m8-wgmma-core).
+    /// such a value was written in the region, which may then rebind it.
     pub(crate) fn defined_since_region_opened(&self, created: u64, v: ValueId) -> bool {
         match self.regions.iter().find(|r| r.kind != RegionKind::Root && r.serial > created) {
             Some(r) => v.0 >= r.first_value,

@@ -8,7 +8,7 @@
 // That portion is under the BSD-3-Clause licence, and the rest of the file is cute-rs's own,
 // under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the licence text.
 
-//! tcgen05 UMMAs (F16/BF16) into TMEM and `tcgen05.commit` (roadmap part m10-umma-f16):
+//! tcgen05 UMMAs (F16/BF16) into TMEM and `tcgen05.commit`:
 //! single-CTA, single-tile GEMMs (128x128x64 and 64x64x64; f16->f32, bf16->f32, f16->f16;
 //! every legal shared-memory layout atom for A and for B) on the simulator, bit-exact against
 //! plain Rust on small integers; a two-stage double buffer released by commits; the
@@ -470,7 +470,7 @@ fn illegal_operations_panic_when_built() {
     assert!(e.contains("Float32 only"), "{e}");
     let e = panic_text(new(DType::F32, DType::F32, (128, 64), CtaGroup::ONE, src, KM));
     assert!(e.contains("ab_dtype"), "{e}");
-    // m10-cta-pair: a CTA pair's N goes in steps of 16, and its A is in shared memory.
+    // A CTA pair's N goes in steps of 16, and its A is in shared memory.
     let e = panic_text(new(DType::F16, DType::F32, (256, 24), CtaGroup::TWO, src, KM));
     assert!(e.contains("N is 24") && e.contains("multiple of 16"), "{e}");
     let e = panic_text(new(DType::F16, DType::F32, (128, 64), CtaGroup::TWO, OperandSource::TMEM, KM));

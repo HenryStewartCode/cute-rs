@@ -9,7 +9,7 @@
 // That portion is under the BSD-3-Clause licence, and the rest of the file is cute-rs's own,
 // under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the licence text.
 
-//! CTA pairs (roadmap part m10-cta-pair): a `(2, 1, 1)` cluster computes one `M x N` tile
+//! CTA pairs: a `(2, 1, 1)` cluster computes one `M x N` tile
 //! with `tcgen05.mma.cta_group::2`. Each CTA loads its half of A (`M / 2` rows) and of B
 //! (`N / 2` rows) with 2-CTA TMA loads that report to the leader CTA's mbarrier, the leader
 //! expects both CTAs' bytes, waits, issues the MMAs and commits with a mask naming both

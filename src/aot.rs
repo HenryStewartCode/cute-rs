@@ -34,7 +34,7 @@ use crate::signature::{KernelSignature, ParamKind};
 /// The version of the export format (the manifest and the generated C), which loading checks.
 pub const EXPORT_FORMAT_VERSION: u32 = 1;
 
-// Several kernels in one module (m6b-multi-kernel): export format 2.
+// Several kernels in one module: export format 2.
 mod module;
 pub use module::{ExportedModule, MODULE_EXPORT_FORMAT_VERSION};
 
@@ -878,7 +878,7 @@ fn c_load(k: &CImage<'_>, p: &str, up: &str, names: &CModuleNames, lookup: &str)
     if let Some(t) = k.stamp.cubin_target.filter(|_| k.cubin.is_some()) {
         let _ = writeln!(
             c,
-            "    r = CUDA_ERROR_NO_BINARY_FOR_GPU;\n    if ({}) {{\n        r = cuModuleLoadData(&m->module, {p}_cubin);\n        if (r == CUDA_SUCCESS) m->from_cubin = 1;\n        else m->module = NULL;\n    }}",
+            " r = CUDA_ERROR_NO_BINARY_FOR_GPU;\n if ({}) {{\n r = cuModuleLoadData(&m->module, {p}_cubin);\n if (r == CUDA_SUCCESS) m->from_cubin = 1;\n else m->module = NULL;\n }}",
             c_runs_on(t, true)
         );
     }
@@ -1059,7 +1059,7 @@ fn c_launch(
     c
 }
 
-/// Why PTX cannot be exported on its own (m11-extern-distributed): it calls an external
+/// Why PTX cannot be exported on its own: it calls an external
 /// function it does not define (an `.extern .func`, from an `ExternFn` whose code is linked
 /// at load time), which loading the export would fail to resolve, or it has no kernel (a
 /// standalone `DeviceFunction`, which is linked into other code rather than launched).

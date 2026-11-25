@@ -7,8 +7,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! MLIR for the warpgroup MMA instructions (roadmap parts m8-wgmma-core and
-//! m8-wgmma-variants: the FP8 and integer forms, whose immediates differ,
+//! MLIR for the warpgroup MMA instructions (the FP8 and integer forms, whose immediates differ,
 //! and the register form, whose A is four 32-bit registers of packed
 //! elements, which the operand fences pass through too).
 //!

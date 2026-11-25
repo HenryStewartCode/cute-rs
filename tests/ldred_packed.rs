@@ -1,5 +1,5 @@
 //! TMEM loads with a row reduction, packed f32x2 arithmetic, the Rubin mixed-precision packed
-//! forms and the UE5M3 conversion (roadmap part m10-ldred-packed-math): kernels in the
+//! forms and the UE5M3 conversion: kernels in the
 //! simulator against plain Rust, and the generated MLIR and PTX where a toolchain has them.
 //! The `.f32x2` forms assemble for sm_100a (see `tests/ptxas.rs`); `tcgen05.ld.red` is PTX 8.8
 //! and the mixed forms and `.ue5m3x2` PTX 9.4, so those are checked as MLIR text only.

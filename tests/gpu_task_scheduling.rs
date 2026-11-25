@@ -5,7 +5,7 @@
 // THIRD-PARTY-NOTICES.md) on a real GPU.
 
 //! Task Scheduling resources called from hand-written warp-specialised
-//! kernels on a real GPU (roadmap part m11-ts-resources): the grid-stride
+//! kernels on a real GPU: the grid-stride
 //! copy, the staged copy through an `AsyncAsync` shared-memory resource and
 //! the persistent copy over a static work queue that skips over-launched
 //! tiles. All SM80-level, so they run on the SM89 GPU. Needs the `cuda`
@@ -65,7 +65,7 @@ fn gpu_task_scheduling_copies() {
     assert_eq!(args[2].to_vec::<i32>(), [1, 1, 1, 2, 2]);
 }
 
-/// The TaskManager's kernels (roadmap part m11-ts-task-manager): the two
+/// The TaskManager's kernels: the two
 /// ported examples and the two-task pipelined copy, against plain Rust.
 #[test]
 fn gpu_task_manager_kernels() {

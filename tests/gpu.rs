@@ -2067,7 +2067,7 @@ fn copy_atom_cache_hints_match_the_simulator() {
     assert!(ptx.contains("ld.global.L2::cache_hint") && ptx.contains("st.global.L2::cache_hint"), "{ptx}");
 }
 
-// m8-port-rmsnorm-cluster: the single-CTA form of the cluster RMSNorm port.
+// The single-CTA form of the cluster RMSNorm port.
 
 /// One unit in the last place of `v` in a type with `mant` mantissa bits
 /// and smallest normal exponent `min_exp` (the subnormal spacing below it).
@@ -2125,7 +2125,7 @@ fn rmsnorm_single_cta_matches_the_simulator() {
     }
 }
 
-/// The cute_ext foundation ports (m11-cute-ext-core) on the GPU: the memcpy bit-exact at
+/// The cute_ext foundation ports on the GPU: the memcpy bit-exact at
 /// the ragged default shape and others, from one compiled kernel; the GEMM bit-exact on small
 /// integers and within the Float32 summation bound on random data.
 #[test]

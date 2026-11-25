@@ -8,7 +8,7 @@
 // That portion is under the BSD-3-Clause licence, and the rest of the file is cute-rs's own,
 // under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the licence text.
 
-//! Shared-memory-to-TMEM copies (roadmap part m10-s2t-copies): every `tcgen05.cp` shape
+//! Shared-memory-to-TMEM copies: every `tcgen05.cp` shape
 //! with `cta_group::1` on the simulator (zeroed TMEM, a copy issued by a converged warp, a
 //! commit and an mbarrier wait, then `tcgen05.ld` read-back compared with plain Rust,
 //! including the replicated lanes of the broadcast forms); `cta_group::2` in a `(2, 1, 1)`

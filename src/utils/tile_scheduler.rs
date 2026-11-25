@@ -203,8 +203,7 @@ impl PersistentTileSchedulerParams {
 
     /// The same schedule for a launch with preferred clusters of this
     /// schedule's shape and fallback clusters of `fallback_cluster_shape_mnk`
-    /// (CuTe DSL's `fallback_cluster_shape_mnk=`; roadmap part
-    /// m10-port-clc-clusters). A scheduler made from it may then be created in
+    /// (CuTe DSL's `fallback_cluster_shape_mnk=`). A scheduler made from it may then be created in
     /// either arm of [`mixed_cluster_arms`](super::mixed_cluster_arms).
     ///
     /// The fallback arm keeps the preferred shape's work decomposition: each
@@ -379,7 +378,7 @@ impl PersistentTileSchedulerParams {
 /// The cluster coordinate of work index `idx` of `params`' visiting order:
 /// the FastDivmod decode with `divisors` (major, minor; an unswizzled
 /// schedule), `get_flat_coord` of the problem layout otherwise. Shared with
-/// the cluster launch control scheduler (m10-clc-scheduling).
+/// the cluster launch control scheduler.
 #[track_caller]
 pub(crate) fn decode_cluster(
     params: &PersistentTileSchedulerParams,

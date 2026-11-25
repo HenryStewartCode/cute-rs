@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! Tensor-memory capacity (CuTe DSL's `cute.arch` TMEM helpers, roadmap
-//! part m10-umma-layouts): how many TMEM columns a CTA can allocate on each
+//! Tensor-memory capacity (CuTe DSL's `cute.arch` TMEM helpers): how many TMEM columns a CTA can allocate on each
 //! Blackwell target, and when an allocation must take the whole of TMEM.
 
 use crate::Arch;
@@ -50,7 +49,7 @@ pub fn is_tmem_allocation_exclusive(num_columns: usize, arch: Arch) -> bool {
     num_columns > 512 && arch.version() == (10, 7)
 }
 
-// m10-tmem-core: allocating tensor memory (PTX ISA 9.7.18.7.1, tcgen05.alloc,
+// Allocating tensor memory (PTX ISA 9.7.18.7.1, tcgen05.alloc,
 // tcgen05.dealloc and tcgen05.relinquish_alloc_permit).
 
 use std::panic::Location;
@@ -273,7 +272,7 @@ pub fn find_tmem_tensor_col_offset<T: Numeric>(tmem_tensor: &crate::Tensor<T>) -
     cells.layout().cosize() & 0xFFFF
 }
 
-// m10-tmem-ld-st: waiting for TMEM loads and stores, and the tcgen05 thread-sync
+// Waiting for TMEM loads and stores, and the tcgen05 thread-sync
 // fences (PTX ISA 9.7.18.8.5 tcgen05.wait, 9.7.18.11.1 tcgen05.fence).
 
 /// The tcgen05 operations [`fence_view_async_tmem_op`] waits for (CuTe DSL's

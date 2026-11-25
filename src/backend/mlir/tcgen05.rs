@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! MLIR for the `tcgen05` instructions (roadmap part m10-tmem-core).
+//! MLIR for the `tcgen05` instructions.
 //!
 //! `tcgen05.alloc`, `tcgen05.dealloc` and `tcgen05.relinquish_alloc_permit`
 //! are warp-collective, so they are LLVM 21's NVVM operations, whose
@@ -46,7 +46,7 @@ pub(super) fn thread_sync_fences(op: &Op) -> (bool, bool) {
         Op::Barrier => (true, true),
         Op::NamedBarrier { kind: BarrierKind::Sync, .. } | Op::BarrierRed { .. } => (true, true),
         Op::NamedBarrier { .. } | Op::MbarrierArrive { .. } | Op::ClusterArrive { .. } => (true, false),
-        // m11-prims-nvvm-layer: the arrivals among the extra mbarrier operations.
+        // The arrivals among the extra mbarrier operations.
         Op::MbarrierExt { kind, .. } if kind.has_state() => (true, false),
         Op::MbarrierWait { .. } | Op::ClusterWait { .. } => (false, true),
         _ => (false, false),
@@ -192,8 +192,7 @@ impl Emitter<'_> {
         }
     }
 
-    /// `tcgen05.ld{.red}.spcompress.32x32b` (roadmap part m10-rubin-extras;
-    /// PTX ISA 9.4, sm_107a), as inline PTX (no LLVM has an `nvvm` op for it):
+    /// `tcgen05.ld{.red}.spcompress.32x32b` (PTX ISA 9.4, sm_107a), as inline PTX (no LLVM has an `nvvm` op for it):
     /// `mdata`, `cdata`{, `redval`}, `[taddr]`. The qualifier spellings are
     /// cute-rs's reading of the PTX syntax and have not been assembled.
     fn tcgen05_ld_spcompress(
@@ -233,8 +232,7 @@ impl Emitter<'_> {
         self.ptx_inst(indent, inst, &template, &results, &inputs, true);
     }
 
-    /// `tcgen05.ld.red` (`nvvm.tcgen05.ld.red`, LLVM 23; roadmap part
-    /// m10-ldred-packed-math): the Float32 data as one `vector<Nxf32>`, then
+    /// `tcgen05.ld.red` (`nvvm.tcgen05.ld.red`, LLVM 23): the Float32 data as one `vector<Nxf32>`, then
     /// the Float32 reduction; the PTX ISA's `.red` forms need PTX 8.8.
     #[allow(clippy::too_many_arguments)]
     fn tcgen05_ld_red(
@@ -280,7 +278,7 @@ impl Emitter<'_> {
         }
     }
 
-    /// `tcgen05.mma` (roadmap part m10-umma-f16), as inline PTX issued by
+    /// `tcgen05.mma`, as inline PTX issued by
     /// the elected lane. m10-umma-kinds: A from TMEM (`[a-tmem]`), a runtime
     /// instruction descriptor, and `{disable-output-lane}`; an MMA with none
     /// of them is emitted as before.
@@ -322,7 +320,7 @@ impl Emitter<'_> {
             (lead, DType::I32),
             (acc, DType::I32),
         ];
-        // The operands after the six above, in PTX order (m11-prims-mma-forms: verified against
+        // The operands after the six above, in PTX order (verified against
         // LLVM 23's NVPTX printer and CUTLASS's sparse block-scaled forms):
         // `[d], a, b, [sp-meta], idesc, [sfa], [sfb], {disable-output-lane}, enable-input-d,
         // scale-input-d | zero-column-mask`.
@@ -350,7 +348,7 @@ impl Emitter<'_> {
             let regs: Vec<String> = disable_lane.iter().map(|&w| next(&mut inputs, self.v(w), DType::I32)).collect();
             format!(" {{{}}},", regs.join(", "))
         };
-        // m11-prims-mma-forms: the immediate scale-input-d, or a .ws MMA's zero-column mask.
+        // The immediate scale-input-d, or a .ws MMA's zero-column mask.
         let tail = match (kind.prims.scale_input_d, zero_col_mask) {
             (Some(s), _) => format!(", {s}"),
             (None, Some(z)) => format!(", {}", next(&mut inputs, self.v(*z), DType::U64)),
@@ -363,7 +361,7 @@ impl Emitter<'_> {
         self.asm_memory(indent, inst, &template, &inputs);
     }
 
-    /// `tcgen05.cp` (roadmap part m10-s2t-copies), as inline PTX issued by
+    /// `tcgen05.cp`, as inline PTX issued by
     /// the elected lane (as `tcgen05.mma` is).
     pub(super) fn tcgen05_cp(&mut self, indent: usize, inst: &Inst) {
         let Op::Tcgen05Cp { shape, two_cta, taddr, desc, elect } = &inst.op else { unreachable!("a tcgen05.cp") };

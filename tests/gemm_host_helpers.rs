@@ -1,5 +1,5 @@
 //! The SM90 epilogue helpers, the TMA alignment preflight checks and the
-//! torch-free GEMM host tensors (roadmap part m9-gemm-host-helpers).
+//! torch-free GEMM host tensors.
 
 use std::str::FromStr;
 

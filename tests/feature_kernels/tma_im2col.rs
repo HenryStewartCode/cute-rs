@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! Im2col TMA loads and stores (roadmap part m7-tma-im2col), held to a plain Rust im2col
+//! Im2col TMA loads and stores, held to a plain Rust im2col
 //! of NHWC and NDHWC tensors: each kernel loads the GEMM operand `A` of an implicit-GEMM
 //! forward convolution tile by tile (`(pixels, channels)` boxes of the output pixels
 //! `(q, p, (z,) n)` and the filter taps `(c, s, r, (t,))`, padding and the pixels past

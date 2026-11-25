@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The TMA pipelines of the Hopper mainloop and epilogue (roadmap part
-//! m9-pipeline-tma): [`PipelineTmaAsync`], whose producers fill stages with
+//! The TMA pipelines of the Hopper mainloop and epilogue: [`PipelineTmaAsync`], whose producers fill stages with
 //! TMA loads (multicast across a cluster included), and the mbarrier-free
 //! [`PipelineTmaStore`] with its [`TmaStoreFence`], which paces TMA stores
 //! out of a ring of shared-memory staging buffers by bulk async-groups.

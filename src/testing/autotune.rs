@@ -154,7 +154,7 @@ impl TuneKey {
 
 /// A tuner that keeps the winning configuration per problem (CuTe DSL's `autotune_jit`): the
 /// first call for a [`TuneKey`] tunes, later ones return the winner. See the
-/// [module documentation](self).
+/// module documentation.
 #[derive(Clone, Debug)]
 pub struct Autotuner<C> {
     configs: Vec<C>,

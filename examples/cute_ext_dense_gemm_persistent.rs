@@ -11,8 +11,7 @@
 // licence text and lists what each part ports.
 
 //! A persistent SM100 dense GEMM in the fragment-free style, ported from the
-//! CuTe DSL example `cute_ext/blackwell/dense_gemm/dense_gemm_persistent.py`
-//! (roadmap part m11-cute-ext-gemm).
+//! CuTe DSL example `cute_ext/blackwell/dense_gemm/dense_gemm_persistent.py`.
 //!
 //! `D = A B^T`: A `(M, K)` and B `(N, K)` K-major Float16, the accumulator
 //! Float32 in tensor memory, D `(M, N)` row-major Float32. 192 threads per

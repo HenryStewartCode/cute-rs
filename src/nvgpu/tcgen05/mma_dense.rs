@@ -10,8 +10,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! The dense tcgen05 MMAs other than F16/BF16 (roadmap part
-//! m10-umma-dense-kinds): CuTe DSL's `tcgen05.MmaTF32Op`, `MmaI8Op`,
+//! The dense tcgen05 MMAs other than F16/BF16: CuTe DSL's `tcgen05.MmaTF32Op`, `MmaI8Op`,
 //! `MmaF8F6F4Op` and its deprecated FP8-only form `MmaFP8Op`, on the
 //! machinery of [`MmaF16BF16Op`](super::MmaF16BF16Op) (descriptor
 //! fragments, TMEM accumulators, [`gemm`](crate::gemm),

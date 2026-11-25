@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: (MIT OR Apache-2.0) AND BSD-3-Clause
-//! Roadmap part m11-prims-nvvm-layer: the primitives operations without a `cute::arch`
+//! The primitives operations without a `cute::arch`
 //! counterpart (`bar.red`, the rest of the mbarrier family, the markers, `exit`,
 //! `dp4a`/`dp2a`, `st.bulk`, `tcgen05.shift`) on the simulator against plain Rust, in the
 //! PTX for sm_80 to sm_100a (and through `ptxas` when one is on PATH), and (with

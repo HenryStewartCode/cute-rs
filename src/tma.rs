@@ -28,7 +28,7 @@ use crate::layout::{IndexExpr, StrideLeaf};
 use crate::tensor::{Engine, Tensor};
 use crate::value::{Int64, Numeric, Value};
 
-// The access modes (roadmap parts m7-tma-im2col and m7-tma-sm100-modes).
+// The access modes.
 mod access;
 pub use access::{TmaAccess, TmaElement};
 
@@ -84,7 +84,7 @@ macro_rules! tensor_map_enum {
 
 tensor_map_enum! {
     /// The element encoding of a tensor map (`CUtensorMapDataType`; CuTe DSL's
-    /// `TensorMapDataType`). The three sub-byte encodings (roadmap part m7-tma-sm100-modes)
+    /// `TensorMapDataType`). The three sub-byte encodings
     /// move FP4 and FP6 values in groups of 16: `f416u4_align8b` packed as in global
     /// memory (PTX's `.b4x16`), `f416u4_align16b` and `f416u6_align16b` each group padded to
     /// a 16-byte slot of shared memory (`.b4x16_p64`, `.b6x16_p32`).
@@ -121,8 +121,7 @@ tensor_map_enum! {
 tensor_map_enum! {
     /// The shared-memory swizzle of a tensor map (`CUtensorMapSwizzle`; CuTe DSL's
     /// `TensorMapSwizzle`). Of the SM100 `s128b_atom_*` modes, `s128b_atom_32b` (the
-    /// 128-byte swizzle of 32-byte atoms, `CU_TENSOR_MAP_SWIZZLE_128B_ATOM_32B`; roadmap part
-    /// m11-prims-descriptors-swizzle) is supported on sm_100 and newer; the other two are
+    /// 128-byte swizzle of 32-byte atoms, `CU_TENSOR_MAP_SWIZZLE_128B_ATOM_32B`) is supported on sm_100 and newer; the other two are
     /// refused.
     TensorMapSwizzle {
         none = 0, "none";
@@ -221,7 +220,7 @@ impl TensorMapDataType {
             DType::I64 => int64,
             DType::U64 => uint64,
             DType::I16 | DType::U16 => uint16,
-            // m10-mixed-input: packed Int4 moves as the packed 4-bit encoding too.
+            // Packed Int4 moves as the packed 4-bit encoding too.
             DType::F4E2M1FN | DType::I4 => f416u4_align8b,
             DType::F6E2M3FN | DType::F6E3M2FN => f416u6_align16b,
             t if t.bits() == 8 && !t.is_sub_byte() => uint8,
@@ -304,8 +303,7 @@ impl TensorMapSwizzle {
     }
 }
 
-/// The im2col fields of a tensor map (`cuTensorMapEncodeIm2col`; roadmap part
-/// m7-tma-im2col): the bounding box of the pixels in the spatial (W, H, D) dimensions,
+/// The im2col fields of a tensor map (`cuTensorMapEncodeIm2col`): the bounding box of the pixels in the spatial (W, H, D) dimensions,
 /// given by its corners relative to the tensor's extents, and the pixels and channels one
 /// instruction moves. The box covers spatial coordinates `lower_corner[i]` to
 /// `extent[i] - 1 + upper_corner[i]` of dimension `i + 1` (W is dimension 1); entries past
@@ -541,7 +539,7 @@ impl TmaDesc {
         b[8] = self.swizzle.code() as u8;
         b[9] = self.l2_promotion.code() as u8;
         b[10] = self.oob_fill.code() as u8;
-        // m7-tma-im2col: the mode at byte 11 (0 tiled, 1 im2col) and the im2col fields in
+        // The mode at byte 11 (0 tiled, 1 im2col) and the im2col fields in
         // the last 16 bytes, which tiled descriptors leave zero.
         if let Some(i) = &self.im2col {
             b[11] = 1;
@@ -684,7 +682,7 @@ pub struct TensorMapCheck<'a> {
 ///
 /// - the swizzle is not an SM100 atom mode (they arrive with roadmap part
 ///   m10-umma-layouts);
-/// - the sub-byte encodings (roadmap part m7-tma-sm100-modes) have no interleave or NaN
+/// - the sub-byte encodings have no interleave or NaN
 ///   fill and a box whose inner extent is a whole number of 16-value groups; the padded
 ///   ones (`f416u4_align16b`, `f416u6_align16b`) also an inner box of exactly 128 values
 ///   (PTX's 64 bytes of `.b4x16_p64`, 96 of `.b6x16_p32`), an inner extent that is a
@@ -863,7 +861,7 @@ fn check_packed(c: &TensorMapCheck<'_>) -> Result<(), String> {
 }
 
 /// Check an im2col descriptor against what `cuTensorMapEncodeIm2col` accepts (CUDA 12.8's
-/// documented requirements and the PTX ISA's im2col mode; roadmap part m7-tma-im2col),
+/// documented requirements and the PTX ISA's im2col mode),
 /// for the fields that are known: the rank is 3 to 5 (NWC, NHWC, NDHWC), the encoding a
 /// whole-byte one, no interleave (cute-rs's choice: the driver takes the interleaves,
 /// but CuTe's im2col atoms never use them), each corner within the signed range of its
@@ -922,10 +920,7 @@ pub fn check_im2col(c: &TensorMapCheck<'_>, p: &Im2colParams) -> Result<(), Stri
         ));
     }
     if c.swizzle.is_atom_mode() {
-        return Err(format!(
-            "im2col tensor map: the {} swizzle is not supported yet (roadmap part m10-umma-layouts)",
-            c.swizzle
-        ));
+        return Err(format!("im2col tensor map: the {} swizzle is not supported yet", c.swizzle));
     }
     // The driver: the bounding box has a non-zero area in every spatial dimension.
     for k in 0..c.rank - 2 {
@@ -967,7 +962,7 @@ pub struct TmaDescSpec {
     pub oob_fill: TensorMapFloatOOBFill,
     /// Bytes from the buffer's start to element (0, ..., 0).
     pub base_offset: IndexExpr,
-    /// The im2col fields of an im2col descriptor (roadmap part m7-tma-im2col); `None`
+    /// The im2col fields of an im2col descriptor; `None`
     /// for a tiled one.
     pub im2col: Option<Im2colParams>,
 }

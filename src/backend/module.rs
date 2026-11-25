@@ -78,7 +78,7 @@ impl From<ModuleError> for CompileError {
     }
 }
 
-/// Several kernels compiled into one module (see the [module documentation](self)).
+/// Several kernels compiled into one module (see the module documentation).
 #[derive(Clone, Debug)]
 pub struct KernelModule {
     name: String,
@@ -195,7 +195,7 @@ impl KernelModule {
                 }
             }
         }
-        // External functions are the module's: one prototype per symbol (m11-extern-distributed).
+        // External functions are the module's: one prototype per symbol.
         let mut externs: BTreeMap<&str, (String, &str)> = BTreeMap::new();
         for k in &kernels {
             for d in &k.ir().externs {
@@ -441,7 +441,7 @@ fn split_parts(text: &str) -> Parts {
             0 => parts.header.push(line.to_string()),
             1 if line.starts_with("  gpu.module @kernels") => stage = 2,
             2 if line.starts_with("    memref.global ") => parts.decls.push(line.to_string()),
-            // External device functions' prototypes (m11-extern-distributed).
+            // External device functions' prototypes.
             2 if line.starts_with("    func.func private ") => parts.decls.push(line.to_string()),
             2 if line.starts_with("  }") => {
                 stage = 3;

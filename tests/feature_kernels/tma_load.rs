@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! TMA tile loads (roadmap part m7-tma-load), held to plain Rust: single tiles
+//! TMA tile loads, held to plain Rust: single tiles
 //! into each SM90 shared-memory layout atom (128-, 64- and 32-byte swizzles and
 //! none, K- and M-major), a K loop through a two-stage ring with phase-tracked
 //! mbarriers, edge tiles (zero fill counted in the transaction bytes), a batched

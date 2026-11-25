@@ -8,8 +8,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! CuTe DSL's `cutlass.utils.compute_epilogue_tile_shape` (roadmap part
-//! m10-umma-layouts).
+//! CuTe DSL's `cutlass.utils.compute_epilogue_tile_shape`.
 
 use super::LayoutEnum;
 use super::sm100::{compute_epilogue_tile_size, default_tmem_warp_shape_mn, epilogue_n_minimums};

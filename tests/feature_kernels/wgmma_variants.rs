@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The warpgroup MMA variants (roadmap part m8-wgmma-variants), held to plain Rust:
+//! The warpgroup MMA variants, held to plain Rust:
 //! single-warpgroup `64 x N x 128` tiles of FP8 (every E4M3/E5M2 pair, accumulated in
 //! Float32 and Float16) and 8-bit integers (every S8/U8 pair, bit-exact), built with
 //! `make_trivial_tiled_mma`; and the register-sourced A form: A loaded from shared

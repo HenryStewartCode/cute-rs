@@ -1,5 +1,4 @@
-//! Multi-GPU helpers over multicast memory (CuTe DSL's `cutlass.utils.distributed`; roadmap
-//! part m11-distributed): `multimem` load-reduce, store and reduction, and flag spin locks.
+//! Multi-GPU helpers over multicast memory (CuTe DSL's `cutlass.utils.distributed`): `multimem` load-reduce, store and reduction, and flag spin locks.
 //!
 //! # Multicast memory
 //!

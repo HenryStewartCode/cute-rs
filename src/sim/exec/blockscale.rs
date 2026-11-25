@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The simulator's block-scaled MMA arithmetic (roadmap part
-//! m10-sm120-blockscaled), modelled from the PTX ISA (9.7.14.5 `mma` with
+//! The simulator's block-scaled MMA arithmetic, modelled from the PTX ISA (9.7.14.5 `mma` with
 //! `.block_scale`, its fragment tables for `.m16n8k64 .e2m1` and `.m16n8k32`
 //! 8-bit operands, and the scale-factor tables for byte-id and thread-id 0)
 //! independently of cute-rs's layout algebra.
@@ -10,7 +9,7 @@
 //!   [`block_scaled_dot`] are the block-scale arithmetic: decode A and B,
 //!   multiply each K-block's products by its two scale factors and add them
 //!   to the accumulator in Float32 in order of K. The tcgen05 block-scaled
-//!   MMAs (m10-umma-blockscaled) are meant to reuse them.
+//!   MMAs are meant to reuse them.
 //! * **Registers.** A warp-level block-scaled `mma.sync` takes A and B as
 //!   32-bit registers: FP4 packed eight per register (`kind::mxf4`,
 //!   `kind::mxf4nvf4`), or four 8-bit containers per register
@@ -21,7 +20,7 @@
 //!   0). With thread-id 0, row `r` of A takes its scales from lane
 //!   `4 (r % 8) + r / 8` and column `n` of B from lane `4 n`. UE8M0 is
 //!   `2^(e - 127)` (`0xFF` NaN); UE4M3 is E4M3 without the sign bit.
-//! * **Sparse** (m11-prims-mma-forms, `mma.sp::ordered_metadata` with
+//! * **Sparse** (`mma.sp::ordered_metadata` with
 //!   `.block_scale`, `m16n8k64` and `m16n8k128`). A's four registers hold
 //!   the compressed half of K in the dense layout of half the K; B's four
 //!   registers extend the dense B layout to the full K. Each row of A has
@@ -177,7 +176,7 @@ impl<'a> Machine<'a> {
 }
 
 impl<'a> Machine<'a> {
-    /// m11-prims-mma-forms: the warp-level sparse block-scaled `mma.sp`.
+    /// The warp-level sparse block-scaled `mma.sp`.
     #[allow(clippy::too_many_arguments)]
     pub(super) fn mma_sp_block_scaled(
         &mut self,

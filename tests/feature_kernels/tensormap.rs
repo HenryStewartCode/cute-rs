@@ -9,7 +9,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! In-kernel tensor-map copies and updates (roadmap part m7-tensormap-update),
+//! In-kernel tensor-map copies and updates,
 //! held to plain Rust: a descriptor copied from a TMA atom to a global workspace,
 //! pointed at a later row of a second tensor and shrunk to fewer rows (the rows past
 //! them zero-filled), then used by a TMA load; and a grouped copy in which each CTA

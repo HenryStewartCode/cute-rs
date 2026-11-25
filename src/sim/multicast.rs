@@ -1,4 +1,4 @@
-//! Simulated multicast memory (roadmap lane m11-extern-distributed): the replicas a multicast
+//! Simulated multicast memory: the replicas a multicast
 //! kernel parameter ([`param_tensor_multicast`](crate::utils::distributed::param_tensor_multicast))
 //! stands for, one per simulated GPU.
 //!

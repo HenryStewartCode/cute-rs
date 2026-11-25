@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The Hopper fused multi-head attention forward port (roadmap part
-//! m9-hopper-fmha): the simulator against a plain Rust attention in f64 for
+//! The Hopper fused multi-head attention forward port: the simulator against a plain Rust attention in f64 for
 //! non-causal, residual-mask, causal and windowed masks, head dimensions 64
 //! and 128, sequence lengths that are not multiples of the tile,
 //! grouped-query heads, batches, the persistent scheduler and random

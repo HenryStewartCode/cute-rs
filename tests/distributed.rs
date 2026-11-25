@@ -1,4 +1,4 @@
-//! `cutlass.utils.distributed` (roadmap part m11-distributed): multimem load-reduce, store and
+//! `cutlass.utils.distributed`: multimem load-reduce, store and
 //! reduction on multicast buffers in the simulator, their MLIR and PTX (sm_90a, and FP8 on
 //! sm_100a; assembled with `ptxas` where it is installed), the flag spin locks (a handshake
 //! of co-resident blocks, and a wait that can never succeed), the all-reduce example, and the

@@ -49,16 +49,16 @@ mod order;
 mod participants;
 mod state;
 mod sync;
-// m9-pipeline-tma: the TMA load and store pipelines.
+// The TMA load and store pipelines.
 mod tma_pipeline;
-// m10-umma-pipelines: the Blackwell (tcgen05) pipelines.
+// The Blackwell (tcgen05) pipelines.
 mod umma_pipeline;
 
-// m10-clc-scheduling: the cluster launch control pipeline.
+// The cluster launch control pipeline.
 mod clc_pipeline;
 pub use clc_pipeline::{PipelineClcFetchAsync, PipelineClcFetchAsyncOptions};
 
-// m10-cta-pair-pipelines: the TMA pipeline with UMMA and async consumers.
+// The TMA pipeline with UMMA and async consumers.
 mod tma_multi_consumer_pipeline;
 pub use tma_multi_consumer_pipeline::{
     PipelineTmaMultiConsumersAsync, PipelineTmaMultiConsumersAsyncOptions, init_empty_barrier_arrive_signal_2sm,

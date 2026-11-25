@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! Runtime fields of MMA atoms (roadmap part m7-tma-load): CuTe DSL's
+//! Runtime fields of MMA atoms: CuTe DSL's
 //! `Atom.set(field, value)`, `Atom.get(field)` and `Atom.with_(...)` on
 //! [`MmaAtom`] and [`TiledMma`].
 //!
@@ -19,7 +19,7 @@
 //! carried; every field the atom takes is (an unset one as `false`).
 //!
 //! Which fields an atom takes comes from its operation. The `mma.sync`
-//! atoms of cute-rs take none; the WGMMA atoms (roadmap part m8-wgmma-core)
+//! atoms of cute-rs take none; the WGMMA atoms
 //! take [`MmaField::ACCUMULATE`], and the tcgen05 atoms (m10) the rest.
 
 use std::fmt;
@@ -82,9 +82,9 @@ pub(crate) struct MmaFields {
     admissible: &'static [MmaField],
     values: [Option<Boolean>; 7],
     /// The tensor fields SFA and SFB of a block-scaled warp MMA
-    /// (m10-sm120-blockscaled; [`MmaAtom::set_tensor`]).
+    /// ([`MmaAtom::set_tensor`]).
     pub(crate) tensors: [Option<crate::atom::mma::ScaleOperand>; 2],
-    /// m10-umma-kinds: the `{disable-output-lane}` words (Int32) of a
+    /// The `{disable-output-lane}` words (Int32) of a
     /// tcgen05 MMA ([`MmaAtom::set_disable_output_lane`]).
     pub(crate) disable_output_lane: Option<Vec<ValueId>>,
 }
@@ -96,7 +96,7 @@ impl MmaFields {
     }
 }
 
-/// m10-umma-kinds: fields carried through a loop only when set before it
+/// Fields carried through a loop only when set before it
 /// (so atoms that never set them carry what they did before).
 fn carried_when_set(f: MmaField) -> bool {
     matches!(f, MmaField::NEGATE_A | MmaField::NEGATE_B | MmaField::DISABLE_OUTPUT_LANE)
@@ -149,8 +149,7 @@ impl MmaAtom {
     }
 
     /// Set the `{disable-output-lane}` mask of a tcgen05 MMA (CuTe DSL's
-    /// `atom.set(tcgen05.Field.DISABLE_OUTPUT_LANE, value)`, roadmap part
-    /// m10-umma-kinds): 4 Int32 words for `cta_group::1` (8 for `::2`). Bit
+    /// `atom.set(tcgen05.Field.DISABLE_OUTPUT_LANE, value)`): 4 Int32 words for `cta_group::1` (8 for `::2`). Bit
     /// `i % 32` of word `i / 32` set leaves TMEM lane `i` of D unwritten by
     /// the MMAs [`gemm`](crate::gemm) issues (PTX ISA 9.7.18.10). Panics if
     /// the atom does not take the field.
@@ -266,8 +265,7 @@ impl TiledMma {
 }
 
 /// Every field the atom takes, in order, an unset one as `false`; the
-/// tcgen05 fields `NEGATE_A`, `NEGATE_B` and `DISABLE_OUTPUT_LANE`
-/// (m10-umma-kinds) only when set before the loop.
+/// tcgen05 fields `NEGATE_A`, `NEGATE_B` and `DISABLE_OUTPUT_LANE` only when set before the loop.
 impl Carry for MmaAtom {
     #[track_caller]
     fn flatten(&self, out: &mut Vec<ValueId>) {

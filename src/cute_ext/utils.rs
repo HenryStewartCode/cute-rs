@@ -1,7 +1,7 @@
-//! cute_ext's GEMM building blocks (roadmap part m11-cute-ext-gemm; CuTe
+//! cute_ext's GEMM building blocks (CuTe
 //! DSL's `cute.experimental.utils`): reusable kernel fragments over the rest
-//! of cute_ext ([`allocate`](super::allocate), [`tma_load`](super::tma_load)
-//! and [`tma_store`](super::tma_store), the pipeline classes, [`dot`](super::dot)
+//! of cute_ext ([`allocate`], [`tma_load`](super::tma_load)
+//! and [`tma_store`], the pipeline classes, [`dot`](super::dot)
 //! and the tcgen05 TMEM copies).
 //!
 //! - [`is_preferred_cluster`]: whether the launch gave this block's cluster
@@ -11,7 +11,7 @@
 //!   store of an epilogue tile uses, for [`TmaLoadOptions::cta_v_map`](super::TmaLoadOptions::cta_v_map).
 //! - [`make_tmem_layout_acc`] and [`make_tmem_layout_a`]: staged
 //!   tensor-memory layouts of the accumulator and of A, for
-//!   [`allocate`](super::allocate) in tensor memory.
+//!   [`allocate`] in tensor memory.
 //! - [`make_t2r_rmem_layout`]: the per-thread register layout one epilogue
 //!   TMEM load (`tcgen05.ld`) fills.
 //! - [`mainloop_mma`]: the tcgen05 mainloop over the stages of a TMA -> UMMA
@@ -165,7 +165,7 @@ fn append_mode(shape: Shape, extra: usize) -> Shape {
 /// `make_tmem_layout_acc(tiled_mma, mnk_tiler, acc_stage)`): the layout of
 /// `make_fragment_c` of `partition_shape_c((M, N))` with the stages
 /// appended, `((M, N), MMA_M, MMA_N, STAGE)` (one CTA's half of a pair's
-/// accumulator for a 2SM MMA). Give it to [`allocate`](super::allocate) in
+/// accumulator for a 2SM MMA). Give it to [`allocate`] in
 /// tensor memory.
 #[track_caller]
 pub fn make_tmem_layout_acc(tiled_mma: &TiledMma, mnk_tiler: (usize, usize, usize), acc_stage: usize) -> Layout {
@@ -285,7 +285,7 @@ fn check_mainloop_pipeline<P: AsGenericPipeline, T>(
 /// `a_buffer` and `b_buffer` are the staged operand buffers, `(MMA, MMA_MN,
 /// MMA_K, STAGE)` with `MMA_K` at least `mma_inst_tile_k` (shared memory:
 /// [`make_smem_layout_a`](crate::utils::sm100::make_smem_layout_a) through
-/// [`allocate`](super::allocate); or A in tensor memory), and `acc_buffer`
+/// [`allocate`]; or A in tensor memory), and `acc_buffer`
 /// the accumulator, `((M, N), MMA_M, MMA_N)`. For each k-tile from
 /// `k_tile_start` to `k_tile_end` (runtime values), the loop waits for the
 /// A stage (and the B stage, from `b_buffer_pipeline`, unless

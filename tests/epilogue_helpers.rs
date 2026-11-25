@@ -9,7 +9,7 @@
 // Those portions are under the BSD-3-Clause licence, and the rest of the file is cute-rs's
 // own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the licence text.
 
-//! Roadmap part m10-epilogue-helpers: the SM100 epilogue helpers.
+//! The SM100 epilogue helpers.
 //!
 //! * host tests of the TMEM load, the shared-memory store, the epilogue's atom and its staged
 //!   layout over the matrix of D types, majors and CTA counts, against values worked from the
@@ -502,7 +502,7 @@ fn tma_matrix(cfg: Fp16GemmConfig, m: usize, n: usize, k: usize) {
             run_drain::<F16>(cfg, case, m, n, k);
             run_drain::<BF16>(cfg, case, m, n, k);
             // The M-major Float32 tile takes the 128-byte swizzle with 32-byte atoms
-            // (`MN_SW128_32B`, TMA's s128b_atom_32b; m11-prims-descriptors-swizzle).
+            // (`MN_SW128_32B`, TMA's s128b_atom_32b).
             run_drain::<f32>(cfg, case, m, n, k);
         }
     }
@@ -513,7 +513,7 @@ fn tma_store_epilogue_on_one_cta() {
     tma_matrix(FP16_GEMM_0, 128, 512, 128);
 }
 
-/// m11-prims-descriptors-swizzle: the M-major Float32 epilogue's TMA descriptor takes the
+/// The M-major Float32 epilogue's TMA descriptor takes the
 /// 128-byte swizzle of 32-byte atoms (`CU_TENSOR_MAP_SWIZZLE_128B_ATOM_32B`, code 4; tests/prims.rs
 /// checks that targets before sm_100 refuse it).
 #[test]
@@ -700,7 +700,7 @@ fn epilogue_ptx_for_sm100a() {
             build_drain::<BF16>(m64, tma(N_MAJOR, None, false), 2),
             &["tcgen05.ld.sync.aligned.16x256b.x8.b32", "stmatrix.sync.aligned.m8n8.x4.shared.b16"],
         ),
-        // m11-prims-descriptors-swizzle: M-major Float32 through the s128b_atom_32b TMA store.
+        // M-major Float32 through the s128b_atom_32b TMA store.
         (
             "f32_m_major_tma",
             build_drain::<f32>(FP16_GEMM_0, tma(M_MAJOR, None, false), 2),

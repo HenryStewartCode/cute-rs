@@ -1,7 +1,7 @@
 //! The driver's tensor-map encoders against cute-rs's validator for the im2col descriptors
-//! (`cuTensorMapEncodeIm2col`, roadmap part m7-tma-im2col) and the FP4/FP6 encodings
+//! (`cuTensorMapEncodeIm2col`) and the FP4/FP6 encodings
 //! (`cuTensorMapEncodeTiled` with `CU_TENSOR_MAP_DATA_TYPE_16U4_ALIGN8B`, `16U4_ALIGN16B`,
-//! `16U6_ALIGN16B`; m7-tma-sm100-modes). Below compute capability 9.0 the driver encodes
+//! `16U6_ALIGN16B`). Below compute capability 9.0 the driver encodes
 //! nothing but checks some fields first: what it rejects as invalid, cute-rs must reject
 //! too. Needs the `cuda` feature:
 //!

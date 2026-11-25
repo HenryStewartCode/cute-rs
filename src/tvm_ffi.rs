@@ -79,7 +79,7 @@ pub const TVM_FFI_VERSION: (u32, u32, u32) = (0, 1, 14);
 /// The prefix of an exported function's symbol (`tvm_ffi_symbol_prefix`).
 pub const SYMBOL_PREFIX: &str = "__tvm_ffi_";
 
-// Several kernels in one module (m6b-multi-kernel).
+// Several kernels in one module.
 mod multi;
 pub use multi::shared_module_loads;
 
@@ -698,7 +698,7 @@ tuples!(A, B, C, D, E, F, G, H);
 enum Image {
     Compiled(Box<CompiledKernel>),
     Exported(Box<ExportedKernel>),
-    /// A kernel of a module of several (m6b-multi-kernel), loaded once per thread and device
+    /// A kernel of a module of several, loaded once per thread and device
     /// for every function of the module ([`TvmFfiFunction::from_module`]).
     Module(Box<multi::SharedModule>),
 }
@@ -810,7 +810,7 @@ where
         TvmFfiFunction::with_image(kernel, signature, Image::Compiled(Box::new(compiled)), config)
     }
 
-    /// Compile `kernel` with `options` plus [`CompileOptions::enable_tvm_ffi`] and make its
+    /// Compile `kernel` with `options` plus `CompileOptions::enable_tvm_ffi` and make its
     /// callable. The target is the options', else the kernel's, else (feature `cuda`) the best
     /// one for CUDA device 0.
     pub fn compile(

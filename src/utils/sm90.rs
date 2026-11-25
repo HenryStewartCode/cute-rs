@@ -122,7 +122,7 @@ pub fn make_smem_layout_epi(
 /// A tiled warpgroup MMA for the operand types (CuTe DSL's
 /// `make_trivial_tiled_mma(a_dtype, b_dtype, a_leading_mode,
 /// b_leading_mode, acc_dtype, atom_layout_mnk, tiler_mn, a_source)`, also
-/// `sm90_make_trivial_tiled_mma`; roadmap part m8-wgmma-variants): the
+/// `sm90_make_trivial_tiled_mma`): the
 /// atom of instruction shape `(tiler_mn.0, tiler_mn.1, K)` for the types,
 /// tiled over `atom_layout_mnk` (column-major). `tiler_mn` is the
 /// instruction's `(64, N)`, not the CTA tile.
@@ -197,7 +197,7 @@ pub fn sm90_make_trivial_tiled_mma(
     )
 }
 
-// m9-gemm-host-helpers: the SM90 epilogue helpers.
+// The SM90 epilogue helpers.
 
 /// The widest register-to-shared store atom for an epilogue's D under the
 /// constraint of its global layout (CuTe DSL's `get_smem_store_op(layout_d,

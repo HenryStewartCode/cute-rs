@@ -23,7 +23,7 @@ pub enum PipelineOp {
     /// Ordinary threads arrive (`mbarrier.arrive`).
     AsyncThread,
     /// A `tcgen05` MMA commits to the barrier (sm_100; the arrival comes
-    /// with `tcgen05.commit`, roadmap part m10-umma-f16).
+    /// with `tcgen05.commit`).
     TCGen05Mma,
     /// A TMA load: one elected thread arrives and sets the bytes to expect
     /// (`mbarrier.arrive.expect_tx`).
@@ -276,7 +276,7 @@ impl MbarrierArray {
             }
             PipelineOp::AsyncLoad => cp_async_mbarrier_arrive_noinc(&bar),
             PipelineOp::TCGen05Mma => {
-                // m10-umma-f16: a tcgen05.commit from the warp's elected lane, with `dst` as the
+                // A tcgen05.commit from the warp's elected lane, with `dst` as the
                 // multicast mask.
                 let group = cta_group.unwrap_or_else(|| {
                     panic!("cute: MbarrierArray::arrive: a TCGen05Mma arrival needs a CtaGroup (cta_group is None)")
@@ -298,7 +298,7 @@ impl MbarrierArray {
     /// The warp's elected lane arrives on stage `index` and sets `tx_count`
     /// bytes to expect (CuTe DSL's `arrive_and_expect_tx`), whatever the
     /// array's operation; the UMMA pipelines arm a stage with a per-acquire
-    /// byte count this way (m10-umma-pipelines).
+    /// byte count this way.
     #[track_caller]
     pub fn arrive_and_expect_tx(&self, index: impl Into<IndexExpr>, tx_count: impl IntoValue<i32>) {
         let _at = crate::builder::LocationScope::new();

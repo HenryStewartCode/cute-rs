@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! Distributed shared memory (roadmap part m8-dsmem): the feature kernels in the
+//! Distributed shared memory: the feature kernels in the
 //! simulator, diagnostics, and the MLIR and PTX.
 
 mod feature_kernels;

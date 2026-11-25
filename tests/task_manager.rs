@@ -5,7 +5,7 @@
 // 01_copy_persistent_skip_tile.py); see examples/ts_copy_*.rs,
 // tests/ts_kernels/mod.rs and THIRD-PARTY-NOTICES.md.
 
-//! Task Scheduling part 2 (roadmap part m11-ts-task-manager): tasks, the
+//! Task Scheduling part 2: tasks, the
 //! TaskManager's static checks, kernel emission on the simulator (with seeded
 //! interleavings), PDL barrier resources, IKET ranges per step, and the
 //! diagnostics.

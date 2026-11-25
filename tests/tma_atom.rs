@@ -1,4 +1,4 @@
-//! TMA atoms (roadmap part m7-tma-atom): `make_tiled_tma_atom` and `tma_partition` on the
+//! TMA atoms: `make_tiled_tma_atom` and `tma_partition` on the
 //! host. Expected descriptors and TMA tensors are derived from C++ CuTe's algorithm
 //! (`include/cute/atom/copy_traits_sm90_tma.hpp`: invert the SMEM layout, compose with the
 //! CTA tile's map into the global modes, keep the leading unit-step runs, merge runs
@@ -203,7 +203,7 @@ fn swizzle_units_for_8_16_and_32_bit_elements() {
     }
 }
 
-/// m11-prims-descriptors-swizzle: the SM100 128-byte swizzle of 32-byte atoms, `S<2,5,2>`
+/// The SM100 128-byte swizzle of 32-byte atoms, `S<2,5,2>`
 /// on bytes (`S<2,3,2>` on f32, `S<2,4,2>` on f16), is TMA's `s128b_atom_32b`: the
 /// descriptor model places every element where the swizzled layout does. A target before
 /// sm_100 refuses it, while the atom is planned and when the kernel is checked.
@@ -871,7 +871,7 @@ fn diagnostics() {
         },
         &["num_multicast is 1, not 2"],
     );
-    // m10-cta-pair: CTA-pair loads exist on SM100 only.
+    // CTA-pair loads exist on SM100 only.
     let msg = build_panic(|| {
         Kernel::builder("diag").target(Arch::Sm90a).build(|| {
             let op = cpasync::CopyBulkTensorTileG2SOp { cta_group: cpasync::CtaGroup::TWO };

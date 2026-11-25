@@ -1,5 +1,4 @@
-//! TMA stores and reduce stores, L2 cache hints and prefetches (roadmap part
-//! m7-tma-store): the feature kernels under seeded schedules and random completion, a
+//! TMA stores and reduce stores, L2 cache hints and prefetches: the feature kernels under seeded schedules and random completion, a
 //! split-K reduction from CTAs outside a cluster with known inputs, the simulator's
 //! reports of misuse, the build-time checks, and the MLIR and PTX the operations lower to.
 

@@ -14,8 +14,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! The epilogue helpers of the Blackwell GEMMs (roadmap part
-//! m10-epilogue-helpers): CuTe DSL's `cutlass.utils.sm100.get_tmem_load_op`,
+//! The epilogue helpers of the Blackwell GEMMs: CuTe DSL's `cutlass.utils.sm100.get_tmem_load_op`,
 //! `get_smem_store_op`, `get_smem_layout_atom_epi` and `make_smem_layout_epi`,
 //! and `cutlass.utils.gemm.sm100`'s `transform_partitioned_tensor_layout`,
 //! `epilogue_tmem_copy_and_partition`, `epilogue_smem_copy_and_partition`,

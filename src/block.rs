@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! CuTe DSL's block API, `cutlass.block` (roadmap part m10-s2t-copies):
+//! CuTe DSL's block API, `cutlass.block`:
 //! [`block_copy`], one call for a CTA's whole TMA tile or S2T copy, which
 //! partitions the tile-shaped operands itself.
 

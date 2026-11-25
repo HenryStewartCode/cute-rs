@@ -1,11 +1,10 @@
-//! cute_ext's pipeline classes: [`TMAStorePipeline`] (roadmap part
-//! m11-cute-ext-tma), the staging of a TMA-store epilogue, and the
+//! cute_ext's pipeline classes: [`TMAStorePipeline`], the staging of a TMA-store epilogue, and the
 //! convenience classes over the low-level operations of
-//! [`pipeline_ops`](super::pipeline_ops) (roadmap part m11-cute-ext-pipelines):
+//! [`pipeline_ops`](super::pipeline_ops):
 //! [`GenericPipelineBase`] and [`GenericPipeline`], [`TMAToUMMAPipeline`],
 //! [`TMAToUMMACircularPipeline`], [`TMAToAsyncPipeline`],
 //! [`AsyncToUMMAPipeline`] and [`UMMAtoAsyncPipeline`]; and the scheduler
-//! pipelines (roadmap part m11-cute-ext-sched-tmem), which broadcast
+//! pipelines, which broadcast
 //! scheduling results from shared memory to every warp:
 //! [`GroupedGemmSchedulerPipeline`] and [`CLCPipeline`].
 
@@ -172,7 +171,7 @@ impl Carry for TMAStorePipeline {
 }
 
 // ---------------------------------------------------------------------------
-// Convenience classes (m11-cute-ext-pipelines)
+// Convenience classes
 // ---------------------------------------------------------------------------
 
 use super::core::OperationType;
@@ -1076,7 +1075,7 @@ impl Carry for TMAToUMMACircularPipeline {
 }
 
 // ---------------------------------------------------------------------------
-// Scheduler pipelines (m11-cute-ext-sched-tmem)
+// Scheduler pipelines
 // ---------------------------------------------------------------------------
 
 use crate::arch::{

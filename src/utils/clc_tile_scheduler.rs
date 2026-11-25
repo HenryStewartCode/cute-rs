@@ -4,8 +4,7 @@
 // (ClcDynamicPersistentTileSchedulerParams, ClcDynamicPersistentTileScheduler), Copyright (c)
 // 2025 - 2026 NVIDIA CORPORATION & AFFILIATES, BSD-3-Clause; see THIRD-PARTY-NOTICES.md.
 
-//! The cluster launch control dynamic persistent tile scheduler (roadmap part
-//! m10-clc-scheduling): the grid covers the whole problem, each cluster starts
+//! The cluster launch control dynamic persistent tile scheduler: the grid covers the whole problem, each cluster starts
 //! on the tile of its own position in the grid, and then claims the tiles of
 //! still-queued clusters, which it takes off the launch queue
 //! (`clusterlaunchcontrol.try_cancel`), until the queue is empty.

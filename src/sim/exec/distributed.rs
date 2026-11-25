@@ -1,5 +1,4 @@
-//! The simulator's external calls and multimem instructions (roadmap lane
-//! m11-extern-distributed).
+//! The simulator's external calls and multimem instructions.
 //!
 //! A multicast buffer stands for a group of replicas, one per simulated GPU
 //! ([`MulticastReplicas`](crate::sim::MulticastReplicas)): the local replica is the launch's
@@ -236,7 +235,7 @@ impl<'a> Machine<'a> {
             }
             let (b, idx) = self.target(buffer, index, size, t, "atomic")?;
             let byte = idx as usize * size;
-            // A compare-and-swap on another CTA's shared memory (m8-dsmem) polls that CTA's copy.
+            // A compare-and-swap on another CTA's shared memory polls that CTA's copy.
             self.smem_target = match peer {
                 Some(p) => Some(self.dsmem_target(p, t, "an atomic (atom.shared::cluster)")?),
                 None => None,

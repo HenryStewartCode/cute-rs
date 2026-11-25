@@ -16,7 +16,7 @@ pub struct SimModule<'k> {
     kernel: &'k Kernel,
     /// The bytes of each module global, in [`KernelIr::globals`](crate::ir::KernelIr) order.
     globals: Vec<Vec<u8>>,
-    /// The multicast parameters' replicas (m11-extern-distributed).
+    /// The multicast parameters' replicas.
     pub(super) multicast: Vec<exec::McGroup>,
 }
 
@@ -147,7 +147,7 @@ impl SimModule<'_> {
         opts: &SimOptions,
         pdl: Option<Option<exec::PdlPrimary>>,
     ) -> Result<(SimReport, Footprint), SimError> {
-        // m11-cute-ext-tma: a kernel with a device workspace takes it last.
+        // A kernel with a device workspace takes it last.
         crate::experimental::host_runtime::check_launch_args(self.kernel, &cfg, args).map_err(SimError::plain)?;
         let cooperative;
         let opts = if cfg.cooperative {

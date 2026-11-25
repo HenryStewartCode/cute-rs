@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! TMA descriptors that live in memory and that kernels modify (roadmap
-//! part m7-tensormap-update), for grouped and pointer-array GEMMs whose
+//! TMA descriptors that live in memory and that kernels modify, for grouped and pointer-array GEMMs whose
 //! groups each need their own tensor map: CuTe DSL's
 //! `cpasync.copy_tensormap`, `update_tma_descriptor`,
 //! `fence_tma_desc_acquire`, `fence_tma_desc_release` and

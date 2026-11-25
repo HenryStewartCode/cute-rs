@@ -65,7 +65,7 @@ pub fn group_bulk_copy_modes<S, D>(src: &Tensor<S>, dst: &Tensor<D>) -> (Tensor<
     (src.group_modes(0, src.rank()), dst.group_modes(0, dst.rank()))
 }
 
-// TMA (bulk tensor) copy atoms (roadmap part m7-tma-atom).
+// TMA (bulk tensor) copy atoms.
 
 pub use super::tma_atom::{
     TmaAtomInfo, TmaAtomOptions, TmaInfo, make_tiled_tma_atom, make_tiled_tma_atom_with, tma_partition,
@@ -171,7 +171,7 @@ impl From<CopyReduceBulkTensorTileS2GOp> for CopyOp {
 // ---- m7-tma-store and m7-cluster-copies ----
 
 pub use super::tma_copy::prefetch_descriptor;
-// In-kernel descriptor copies and updates (m7-tensormap-update).
+// In-kernel descriptor copies and updates.
 pub use super::tensormap::{
     TensormapField, copy_tensormap, cp_fence_tma_desc_release, fence_tma_desc_acquire, fence_tma_desc_release,
     tensormap_replace, update_tma_descriptor,
@@ -271,12 +271,11 @@ pub use super::tma_sm100::{prefetch_atom_aux, tma_partition_override};
 /// [`CopyOp::TmaLoadMode`] and [`CopyOp::TmaStoreMode`]).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum TmaOpMode {
-    /// `.im2col` loads and `.im2col_no_offs` stores (roadmap part m7-tma-im2col).
+    /// `.im2col` loads and `.im2col_no_offs` stores.
     Im2col,
-    /// `.tile::gather4` loads and `.tile::scatter4` stores (roadmap part m7-tma-sm100-modes).
+    /// `.tile::gather4` loads and `.tile::scatter4` stores.
     Rows4,
-    /// `.tile` with `.override::global_address` and `.override::global_dim_stride`
-    /// (roadmap part m7-tma-sm100-modes).
+    /// `.tile` with `.override::global_address` and `.override::global_dim_stride`.
     Override { no_fully_oob_tile: bool },
 }
 

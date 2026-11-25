@@ -71,7 +71,7 @@ pub struct LaunchBuilder<'a> {
     stream: CuStream,
     args: &'a [DeviceArg<'a>],
     events: LaunchEvents,
-    /// The kernel's device workspace, when launched with the kernel (m11-cute-ext-tma).
+    /// The kernel's device workspace, when launched with the kernel.
     workspace: Option<crate::experimental::host_runtime::WorkspaceDecl>,
 }
 

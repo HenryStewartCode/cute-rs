@@ -7,7 +7,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! Roadmap part m9-gemm-host-helpers: an accumulator fragment stored to shared memory through
+//! An accumulator fragment stored to shared memory through
 //! the atom `utils::sm90::get_smem_store_op` selects, `stmatrix` for a 16-bit D (sm_90) and
 //! the universal copy for f32 D (any target).
 

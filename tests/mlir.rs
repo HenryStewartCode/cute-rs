@@ -56,18 +56,18 @@ mod tensorop_gemm;
 #[allow(dead_code)]
 #[path = "../examples/warp_named_barrier.rs"]
 mod warp_named_barrier;
-// The TMA tutorials (m7-port-tma-tutorials).
+// The TMA tutorials.
 #[allow(dead_code)]
 #[path = "../examples/tma_copy.rs"]
 mod tma_copy;
 #[allow(dead_code)]
 #[path = "../examples/tma_transpose.rs"]
 mod tma_transpose;
-// The Hopper dense GEMM port (m8-port-hopper).
+// The Hopper dense GEMM port.
 #[allow(dead_code)]
 #[path = "../examples/hopper_gemm.rs"]
 mod hopper_gemm;
-// The Hopper persistent GEMM port (m9-hopper-persistent-gemm).
+// The Hopper persistent GEMM port.
 #[allow(dead_code, clippy::duplicate_mod)]
 #[path = "../examples/hopper_persistent_gemm.rs"]
 mod hopper_persistent_gemm;
@@ -3686,7 +3686,7 @@ fn grouped_gemm_example_ptx() {
     assert!(p.contains("mbarrier.test_wait.parity.shared") && !p.contains("shfl.sync"), "{p}");
 }
 
-/// The TMA tutorials' sm_90 PTX (roadmap part m7-port-tma-tutorials), with every installed
+/// The TMA tutorials' sm_90 PTX, with every installed
 /// LLVM (and `ptxas` when there is one): `tma_v0`'s copy has a TMA load to shared memory
 /// completing on an mbarrier (initialised, fenced, expecting the box's bytes), a TMA
 /// store and its bulk async-group; `tma_v1`'s transpose adds the shared-memory proxy fence
@@ -3727,7 +3727,7 @@ fn tma_tutorials_in_ptx() {
     }
 }
 
-/// The in-kernel tensor-map updates in the sm_90a PTX (roadmap part m7-tensormap-update),
+/// The in-kernel tensor-map updates in the sm_90a PTX,
 /// with every installed LLVM (LLVM 21 has no `nvvm.tensormap.replace`, which the inline
 /// PTX avoids) and `ptxas` when there is one; plain sm_90 refuses `tensormap.replace`.
 #[test]
@@ -3766,7 +3766,7 @@ fn tensormap_updates_in_ptx() {
     }
 }
 
-/// The Hopper dense GEMM port (roadmap part m8-port-hopper) in the sm_90a PTX of every
+/// The Hopper dense GEMM port in the sm_90a PTX of every
 /// installed LLVM, with `ptxas` when there is one: WGMMA, the multicast TMA loads of a 2x2
 /// cluster, the consumer release on a peer CTA's empty barrier (`mapa`, a cluster-scope
 /// arrival), `stmatrix`, the async-proxy fence before the TMA stores, and their bulk
@@ -3817,7 +3817,7 @@ fn hopper_gemm_in_ptx() {
     }
 }
 
-/// The TMA pipelines in sm_90a PTX (roadmap part m9-pipeline-tma), with every
+/// The TMA pipelines in sm_90a PTX, with every
 /// installed LLVM, and assembled by `ptxas` when there is one: `PipelineTmaAsync`
 /// arms each stage with `mbarrier.arrive.expect_tx` (in the lane `elect_one`
 /// picks), its multicast loads are `cp.async.bulk.tensor ... .multicast::cluster`,
@@ -3865,8 +3865,7 @@ fn tma_pipelines_in_ptx() {
     }
 }
 
-/// The Hopper persistent, warp-specialised GEMM in sm_90a PTX (roadmap part
-/// m9-hopper-persistent-gemm), with every installed LLVM, and assembled by
+/// The Hopper persistent, warp-specialised GEMM in sm_90a PTX, with every installed LLVM, and assembled by
 /// `ptxas` when there is one: the DMA warpgroup gives registers back
 /// (`setmaxnreg.dec`) and the MMA warpgroups take them (`setmaxnreg.inc`),
 /// the WGMMAs, the multicast TMA loads of a cluster, the TMA stores in bulk

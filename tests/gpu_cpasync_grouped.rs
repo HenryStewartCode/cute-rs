@@ -1,6 +1,5 @@
 //! `PipelineCpAsync`, `PipelineOrder`, the grouped GEMM scheduler and the
-//! contiguous group search on a real GPU (roadmap parts
-//! m9-pipeline-cp-async-order and m9-grouped-gemm-schedulers), each held to
+//! contiguous group search on a real GPU, each held to
 //! its plain-Rust check and bit for bit to the simulator. The feature
 //! kernels also run in `tests/gpu.rs` with the other sm_89 ones, and the
 //! `async_pipeline` example there. Needs the `cuda` feature; skipped (with

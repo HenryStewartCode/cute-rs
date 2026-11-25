@@ -2,8 +2,7 @@
 
 //! CuTe DSL's `TensorMapManager` (`cutlass/tensor_utils/tensormap.py`, with
 //! deprecated aliases in `cutlass.utils`): the life cycle of the per-group
-//! TMA descriptors of grouped and pointer-array GEMMs (roadmap part
-//! m7-tensormap-update), built on [`cpasync`](crate::cpasync)'s
+//! TMA descriptors of grouped and pointer-array GEMMs, built on [`cpasync`](crate::cpasync)'s
 //! [`copy_tensormap`](crate::cpasync::copy_tensormap),
 //! [`update_tma_descriptor`](crate::cpasync::update_tma_descriptor) and the
 //! tensormap-proxy fences.

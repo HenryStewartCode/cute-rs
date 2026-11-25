@@ -54,11 +54,11 @@ mod launch;
 mod memory;
 mod module;
 mod stream;
-// Several kernels in one module (m6b-multi-kernel).
+// Several kernels in one module.
 mod kernel_module;
 pub use kernel_module::CudaModule;
 mod tensor_map_encode;
-// m11-extern-distributed: load-time linking and multicast memory.
+// Load-time linking and multicast memory.
 mod distributed;
 pub use distributed::MulticastGroup;
 
@@ -687,7 +687,7 @@ impl CudaContext {
         self.load_image(ModuleImage::Ptx(kernel.ptx()), &jit, kernel.name(), use_cache)
     }
 
-    /// Load a compiled kernel ([`load_inner`](Self::load_inner)) and keep its signature on the
+    /// Load a compiled kernel (`load_inner`) and keep its signature on the
     /// function, so that [`CudaFunction::launch_builder`] and [`CudaFunction::global`] can
     /// check against it.
     pub fn load(&self, kernel: &CompiledKernel) -> Result<CudaFunction<'_>, CudaError> {
@@ -1202,7 +1202,7 @@ impl CudaFunction<'_> {
     /// The function's resources as the driver reports them
     /// (`cuFuncGetAttribute`: registers, local, shared and constant bytes,
     /// the block size limit, the PTX and binary versions). Spill counts are
-    /// not among them; [`ResourceUsage::from_jit_log`] reads them from a
+    /// not among them; `ResourceUsage::from_jit_log` reads them from a
     /// verbose JIT log.
     pub fn resource_usage(&self) -> Result<crate::diagnostics::ResourceUsage, CudaError> {
         Ok(crate::diagnostics::ResourceUsage {

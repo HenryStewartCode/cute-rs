@@ -9,15 +9,15 @@ mod ampere_sgemm;
 #[allow(dead_code)]
 #[path = "../examples/async_pipeline.rs"]
 mod async_pipeline;
-// The first Blackwell tutorial GEMM (m10-port-fp16-gemm).
-// The canonical Blackwell GEMM (m10-port-dense-gemm).
+// The first Blackwell tutorial GEMM.
+// The canonical Blackwell GEMM.
 #[allow(dead_code)]
 #[path = "../examples/blackwell_dense_gemm.rs"]
 mod blackwell_dense_gemm;
 #[allow(dead_code)]
 #[path = "../examples/blackwell_fp16_gemm.rs"]
 mod blackwell_fp16_gemm;
-// The first Blackwell tutorial NVFP4 GEMM (m10-port-nvfp4-gemm).
+// The first Blackwell tutorial NVFP4 GEMM.
 #[allow(dead_code)]
 #[path = "../examples/blackwell_nvfp4_gemm.rs"]
 mod blackwell_nvfp4_gemm;
@@ -33,7 +33,7 @@ mod cp_async_mbarrier_arrive;
 #[allow(dead_code)]
 #[path = "../examples/cta_norm.rs"]
 mod cta_norm;
-// The cute_ext foundation ports (m11-cute-ext-core).
+// The cute_ext foundation ports.
 #[allow(dead_code)]
 #[path = "../examples/cute_ext_memcpy.rs"]
 mod cute_ext_memcpy;
@@ -81,7 +81,7 @@ mod tvm_ffi_add;
 #[allow(dead_code)]
 #[path = "../examples/warp_named_barrier.rs"]
 mod warp_named_barrier;
-// The TMA tutorials (m7-port-tma-tutorials).
+// The TMA tutorials.
 #[allow(dead_code)]
 #[path = "../examples/tma_copy.rs"]
 mod tma_copy;
@@ -750,7 +750,7 @@ fn blackwell_fp16_gemm_0_ptx_for_sm100a() {
 }
 
 // ---------------------------------------------------------------------------------------
-// The canonical Blackwell GEMM, `dense_gemm.py` (m10-port-dense-gemm).
+// The canonical Blackwell GEMM, `dense_gemm.py`.
 // ---------------------------------------------------------------------------------------
 
 use blackwell_dense_gemm::{
@@ -862,7 +862,7 @@ fn blackwell_dense_gemm_in_mlir_and_ptx_for_sm100a() {
 }
 
 // ---------------------------------------------------------------------------------------
-// The Blackwell tutorial GEMMs 2, 3, 3.1 and 4 (m10-port-clc-clusters).
+// The Blackwell tutorial GEMMs 2, 3, 3.1 and 4.
 // ---------------------------------------------------------------------------------------
 
 use blackwell_fp16_gemm::{

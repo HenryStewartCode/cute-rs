@@ -9,7 +9,7 @@
 // That portion is under the BSD-3-Clause licence, and the rest of the file is cute-rs's own,
 // under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the licence text.
 
-//! The Blackwell pipelines and the TMEM allocator (roadmap part m10-umma-pipelines) on the
+//! The Blackwell pipelines and the TMEM allocator on the
 //! simulator: a warp-specialised 1-CTA GEMM (`PipelineTmaUmma` with 4 stages of TMA loads,
 //! `PipelineUmmaAsync` with 2 accumulator stages, `TmemAllocator` and `TmemBufferPool`)
 //! and its `PipelineAsyncUmma` variant with `cp.async` producer warps, both against plain

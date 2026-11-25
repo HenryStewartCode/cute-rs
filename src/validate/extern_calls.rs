@@ -1,5 +1,5 @@
 //! Validation of external device-function calls, standalone device functions and multimem
-//! instructions on multicast buffers (roadmap lane m11-extern-distributed).
+//! instructions on multicast buffers.
 
 use super::{ArchSpecific, Checker, Result, TargetRequirement};
 use crate::ir::{AsmInput, BufferId, DType, ExternParam, KernelIr, MemSpace, MultimemOp, Op, Param};

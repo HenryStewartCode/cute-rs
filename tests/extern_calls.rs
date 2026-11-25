@@ -1,5 +1,4 @@
-//! External device-function calls and standalone device functions (roadmap part
-//! m11-extern-ffi-device-fn): mangling, the simulator, MLIR, PTX with linked bitcode
+//! External device-function calls and standalone device functions: mangling, the simulator, MLIR, PTX with linked bitcode
 //! (`tests/data/extern_funcs.ll`, assembled with `llvm-as` at test time; skipped without it
 //! or without `mlir-opt`), and diagnostics. The GPU runs are in `tests/gpu_extern.rs`.
 

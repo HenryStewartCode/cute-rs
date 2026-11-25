@@ -68,7 +68,7 @@ use crate::smem_struct::StructLayout;
 use crate::tensor::{Ptr, SmemLayout, Tensor};
 use crate::value::{Int32, Numeric, Value};
 
-// m10-umma-pipelines: TMEM allocation in a kernel.
+// TMEM allocation in a kernel.
 mod tmem_alloc;
 pub use tmem_alloc::{
     TmemAllocator, TmemAllocatorOptions, TmemBufferPool, TmemColumns, TmemPoolSize, compute_tmem_cols_from_layout,

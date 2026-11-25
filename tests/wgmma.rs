@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! Warpgroup MMAs (roadmap part m8-wgmma-core): the feature kernels in the simulator,
+//! Warpgroup MMAs: the feature kernels in the simulator,
 //! descriptors, diagnostics and the MLIR.
 
 mod feature_kernels;
@@ -70,7 +70,7 @@ fn op_parameters_are_checked() {
     expect_panic(op(F32, F32, (64, 64, 16), smem), &["'ab_dtype' is f32", "Float16 or BFloat16"]);
     expect_panic(op(F16, F64, (64, 64, 16), smem), &["'acc_dtype' is f64"]);
     expect_panic(op(F16, F32, (64, 64, 32), smem), &["K is 32", "K = 16"]);
-    // A in registers is K-major (m8-wgmma-variants).
+    // A in registers is K-major.
     expect_panic(
         || {
             warpgroup::MmaF16BF16Op::new(F16, F32, (64, 64), OperandSource::RMEM, OperandMajorMode::MN, K);

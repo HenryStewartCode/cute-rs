@@ -8,7 +8,7 @@
 // That portion is under the BSD-3-Clause licence, and the rest of the file is cute-rs's own,
 // under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the licence text.
 
-//! cute_ext's pipelines (roadmap part m11-cute-ext-pipelines) on the simulator, against plain
+//! cute_ext's pipelines on the simulator, against plain
 //! Rust: a thread-kind GenericPipeline with try-wait tokens (also on the GPU with the `cuda`
 //! feature), a create_state_at retry sweep, TMA -> LD_SHARED with cute_ext's TMA loads,
 //! SM100_LAUNCH_CONTROL -> LD_SHARED, the circular-buffer accounting on thread kinds with

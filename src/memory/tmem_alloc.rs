@@ -9,8 +9,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text.
 
-//! Tensor-memory allocation inside a kernel (roadmap part
-//! m10-umma-pipelines): CuTe DSL's `cutlass.memory.TmemAllocator`, the
+//! Tensor-memory allocation inside a kernel: CuTe DSL's `cutlass.memory.TmemAllocator`, the
 //! [`TmemBufferPool`] it reserves, and the column counts of TMEM layouts and
 //! tensors ([`compute_tmem_cols_from_layout`], [`get_num_tmem_alloc_cols`]).
 

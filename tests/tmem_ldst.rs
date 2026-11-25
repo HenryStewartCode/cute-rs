@@ -1,4 +1,4 @@
-//! TMEM loads and stores (roadmap part m10-tmem-ld-st): the `tcgen05.ld`/`tcgen05.st` kernels
+//! TMEM loads and stores: the `tcgen05.ld`/`tcgen05.st` kernels
 //! in the simulator (every schedule), with `mlir-opt` and in the MLIR text; the simulator's
 //! misuse reports; and (where `ptxas` is on PATH) their sm_100a PTX.
 

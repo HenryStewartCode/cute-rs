@@ -3096,11 +3096,11 @@ pub fn sm90() -> Vec<Case> {
     .chain(tma_store_cases_sm90())
     .chain(tma_im2col_cases_sm90())
     .chain(cluster_copy_cases_sm90())
-    // Distributed shared memory (m8-dsmem).
+    // Distributed shared memory.
     .chain(dsmem_cases_sm90())
     // m9-gemm-host-helpers.
     .chain(gemm_helper_cases_sm90())
-    // The TMA pipelines (m9-pipeline-tma).
+    // The TMA pipelines.
     .chain(tma_pipeline_cases_sm90())
     .collect()
 }
@@ -4132,17 +4132,17 @@ pub fn sm86() -> Vec<Case> {
 pub fn sm100a() -> Vec<Case> {
     let mut cases =
         vec![redux_f32(), ue8m0_pairs(), mx_conversions(), ldmatrix_b8_forms(), ssa_fp4_fp6(), stmatrix_b8_forms()];
-    // m7-tma-sm100-modes: gather4, scatter4, byte-masked bulk stores, FP4/FP6 TMA formats.
+    // Gather4, scatter4, byte-masked bulk stores, FP4/FP6 TMA formats.
     cases.extend(tma_sm100_cases());
     cases
 }
 
-/// Blackwell kernels with tensor memory (roadmap part m10-tmem-core): simulated, compiled
+/// Blackwell kernels with tensor memory: simulated, compiled
 /// for sm_100a with `mlir-opt` and assembled by `tests/ptxas.rs`; `tests/gpu.rs` skips them
 /// (no GPU here runs sm_100).
 pub fn sm100() -> Vec<Case> {
     let mut cases = tmem_cases();
-    // m10-tmem-ld-st: TMEM loads and stores.
+    // TMEM loads and stores.
     cases.extend(tmem_ldst_cases());
     cases
 }
@@ -4151,13 +4151,13 @@ pub fn sm100() -> Vec<Case> {
 /// compiled for sm_90a, and assembled by `tests/ptxas.rs` and `tests/gpu.rs`.
 pub fn sm90a() -> Vec<Case> {
     let mut cases = vec![setmaxnreg_warp_specialized()];
-    // Warpgroup MMAs (roadmap part m8-wgmma-core): a few here (`tests/wgmma.rs` runs
+    // Warpgroup MMAs: a few here (`tests/wgmma.rs` runs
     // them all).
     cases.extend(wgmma_cases_sampled());
-    // The FP8, integer and register-A variants (m8-wgmma-variants; `tests/wgmma_variants.rs`
+    // The FP8, integer and register-A variants (`tests/wgmma_variants.rs`
     // runs them all).
     cases.extend(wgmma_variant_cases_sampled());
-    // In-kernel tensor-map updates (roadmap part m7-tensormap-update).
+    // In-kernel tensor-map updates.
     cases.extend(tensormap_cases_sm90a());
     cases
 }

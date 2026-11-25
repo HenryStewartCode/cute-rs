@@ -1,5 +1,4 @@
-//! The NVVM layer of CuTe DSL's `cutlass.experimental.primitives` (roadmap
-//! part m11-prims-nvvm-layer): the operations that have no `cute::arch`
+//! The NVVM layer of CuTe DSL's `cutlass.experimental.primitives`: the operations that have no `cute::arch`
 //! counterpart, and the map from every primitives name to the cute-rs
 //! function that does its job.
 //!

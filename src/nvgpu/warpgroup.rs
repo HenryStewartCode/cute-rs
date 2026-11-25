@@ -11,10 +11,8 @@
 
 //! CuTe DSL's `cute.nvgpu.warpgroup` (SM90 WGMMA): its shared-memory
 //! layout atoms ([`SmemLayoutAtomKind`], [`make_smem_layout_atom`]), the
-//! deprecated alias of [`OperandMajorMode`], and (roadmap part
-//! m8-wgmma-core) the F16/BF16 warpgroup MMA ([`MmaF16BF16Op`]) with its
-//! [`fence`], [`commit_group`] and [`wait_group`] protocol, and (roadmap
-//! part m8-wgmma-variants) the FP8 and 8-bit integer MMAs ([`MmaF8Op`],
+//! deprecated alias of [`OperandMajorMode`], and the F16/BF16 warpgroup MMA ([`MmaF16BF16Op`]) with its
+//! [`fence`], [`commit_group`] and [`wait_group`] protocol, and the FP8 and 8-bit integer MMAs ([`MmaF8Op`],
 //! [`MmaI8Op`]) and the register-sourced A ([`OperandSource::RMEM`]).
 //!
 //! The atoms are C++ CuTe's `GMMA::Layout_{MN,K}_{INTER,SW32,SW64,SW128}_Atom`
@@ -129,7 +127,7 @@ pub fn make_smem_layout_atom_dtype(kind: SmemLayoutAtomKind, element_type: DType
 }
 
 // ---------------------------------------------------------------------------
-// Warpgroup MMA (roadmap part m8-wgmma-core).
+// Warpgroup MMA.
 //
 // A WGMMA (`wgmma.mma_async`, sm_90a) multiplies a 64 x K tile of A by a
 // K x N tile of B into 64 x N accumulators spread over the 128 threads of a
@@ -694,7 +692,7 @@ pub(crate) fn mark_accumulators(storage: &Rc<RegisterStorage>, dtype: crate::ir:
 }
 
 /// Flag `storage`, of `dtype` registers, as holding register-sourced A
-/// operands of warpgroup MMAs (roadmap part m8-wgmma-variants).
+/// operands of warpgroup MMAs.
 pub(crate) fn mark_a_fragment(storage: &Rc<RegisterStorage>, dtype: crate::ir::DType) {
     if storage.wgmma_a.replace(true) {
         return;
@@ -871,7 +869,7 @@ pub(crate) fn gmma_desc_fields(
     let bytes = |elems: usize| -> Result<u32, String> {
         u32::try_from(elems * bits / 8).map_err(|_| format!("a byte offset of {} elements", elems))
     };
-    // m11-prims-descriptors-swizzle: the fields are encoded by the public
+    // The fields are encoded by the public
     // builder (`prims::WgmmaSmemDesc`; base offset 0). A swizzled K-major
     // layout has no leading offset, which CuTe sets to 1 unit (16 bytes).
     let lbo = if major == OperandMajorMode::K && ty != GmmaLayoutType::Interleave { 16 } else { bytes(lbo)? };

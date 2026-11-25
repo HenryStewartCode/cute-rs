@@ -5,7 +5,7 @@
 // NVIDIA CORPORATION & AFFILIATES, BSD-3-Clause; see THIRD-PARTY-NOTICES.md).
 
 //! The pipeline that hands cluster launch control responses from a cluster's
-//! scheduler warp to its consumers (roadmap part m10-clc-scheduling):
+//! scheduler warp to its consumers:
 //! [`PipelineClcFetchAsync`].
 
 use crate::arch::{MbarrierOptions, WARP_SIZE, mbarrier_arrive_with, mbarrier_init_fence, thread_idx};

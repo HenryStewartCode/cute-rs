@@ -1,4 +1,4 @@
-//! Tensor memory (roadmap part m10-tmem-core): the TMEM allocation kernels in the simulator
+//! Tensor memory: the TMEM allocation kernels in the simulator
 //! and with `mlir-opt`, sm_107's exclusive allocation, the target requirements and the
 //! build-time checks. (`tests/diagnostics.rs` has the simulator's misuse reports, and
 //! `tests/ptxas.rs` assembles the kernels for sm_100a.)

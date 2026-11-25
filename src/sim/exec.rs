@@ -63,16 +63,16 @@ type R<T = ()> = Result<T, SimError>;
 mod tensormap;
 // m10-tmem-core.
 mod tmem;
-// m10-umma-f16: tcgen05 MMAs and commits.
+// Tcgen05 MMAs and commits.
 mod umma;
-// m10-s2t-copies: tcgen05.cp.
+// Tcgen05.cp.
 mod tmem_cp;
 mod wgmma;
-// m10-sm120-blockscaled: block-scaled mma.sync and the shared block-scale arithmetic.
+// Block-scaled mma.sync and the shared block-scale arithmetic.
 mod blockscale;
-// m10-clc-scheduling: cluster launch control.
+// Cluster launch control.
 mod clc;
-// m11-extern-distributed: external calls and multimem.
+// External calls and multimem.
 mod distributed;
 pub(in crate::sim) use distributed::McGroup;
 pub use distributed::ld_reduce_word;
@@ -363,7 +363,7 @@ struct NamedState<'a> {
     /// waiters reached.
     all_threads: bool,
     site: Option<&'a Inst>,
-    /// m11-prims-nvvm-layer: the reduction of a `bar.red` use, the counts of
+    /// The reduction of a `bar.red` use, the counts of
     /// true and false predicates so far, and the arrived warps' result
     /// values (by warp key).
     red: Option<BarrierRedKind>,
@@ -416,7 +416,7 @@ enum FrameKind<'a> {
         all: Vec<usize>,
         iterations: u64,
     },
-    /// The traced body of a `Call` (m11-extern-distributed); at its end the
+    /// The traced body of a `Call`; at its end the
     /// lanes take its yields as the call's results.
     Call {
         inst: &'a Inst,
@@ -447,7 +447,7 @@ struct Group<'a> {
 /// An mbarrier's key in [`Machine::mbarriers`]: (block rank, buffer, byte).
 type MbarrierKey = (usize, u32, usize);
 
-/// m11-prims-nvvm-layer: the arrivals of one step at a `bar.red`: its true
+/// The arrivals of one step at a `bar.red`: its true
 /// and false predicates, and the arriving warps' result values (by key).
 type RedPart = (u32, u32, Vec<(usize, ValueId)>);
 
@@ -663,10 +663,9 @@ enum Trigger {
     /// `wgmma.wait_group` of that warp completes it.
     Wgmma,
     /// A `tcgen05.ld` (one warp's): the warp's `tcgen05.wait::ld` lands its
-    /// registers (roadmap part m10-tmem-ld-st).
+    /// registers.
     TmemLd,
-    /// A `tcgen05.mma` of a CTA's tensor-core pipe (roadmap part
-    /// m10-umma-f16): it lands as the CTA agent's write when the mbarrier
+    /// A `tcgen05.mma` of a CTA's tensor-core pipe: it lands as the CTA agent's write when the mbarrier
     /// phase its `tcgen05.commit` owes an arrival is observed (or at
     /// random before).
     Tcgen05Mma,
@@ -728,7 +727,7 @@ struct DeferredArrival {
     /// have landed as agent writes before it (0 otherwise).
     floor: u32,
     /// Owed by a `tcgen05.commit` (its MMAs) rather than by
-    /// `cp.async.mbarrier.arrive` (m10-cta-pair-pipelines: names the source
+    /// `cp.async.mbarrier.arrive` (names the source
     /// in the count-mismatch report).
     commit: bool,
 }
@@ -986,7 +985,7 @@ pub(super) struct Machine<'a> {
     setmaxnreg: HashMap<usize, BlockRegs<'a>>,
     /// The clusters that have not started yet, in launch order.
     queued: VecDeque<Vec<[u32; 3]>>,
-    /// m10-clc-scheduling: how many clusters at the front of `queued` have
+    /// How many clusters at the front of `queued` have
     /// launched (no `try_cancel` can cancel them), and the generator that
     /// launches them ([`SimOptions::clc_launch_seed`]).
     clc_launched: usize,
@@ -1002,10 +1001,10 @@ pub(super) struct Machine<'a> {
     cluster_arrival: Vec<Option<u64>>,
     /// By `(block rank, buffer, byte)`.
     mbarriers: HashMap<(usize, u32, usize), Mbarrier>,
-    /// m11-prims-nvvm-layer: the mbarriers invalidated by `mbarrier.inval`
+    /// The mbarriers invalidated by `mbarrier.inval`
     /// (and not initialised again since), with where.
     invalidated: HashMap<MbarrierKey, Loc>,
-    /// m11-prims-nvvm-layer: where each warp (by key) that executed `exit` did.
+    /// Where each warp (by key) that executed `exit` did.
     exit_sites: HashMap<usize, Loc>,
     clock: u64,
     loc: Option<Loc>,
@@ -1034,13 +1033,12 @@ pub(super) struct Machine<'a> {
     /// relaxed ones included (see [`Self::check_remote_mbarrier`]).
     init_clocks: Vec<Vec<u32>>,
     /// The block whose shared memory the access being executed reaches, when
-    /// it is another CTA's (distributed shared memory, roadmap part
-    /// m8-dsmem); `None`: the accessing thread's own.
+    /// it is another CTA's (distributed shared memory); `None`: the accessing thread's own.
     smem_target: Option<usize>,
     /// For each block, the accesses other CTAs of its cluster made to its
     /// shared memory: the latest own-clock value of each accessing warp's
     /// slot, and where. The block must not exit before they are ordered
-    /// before its exit (m8-dsmem).
+    /// before its exit.
     dsmem_log: HashMap<usize, HashMap<usize, (u32, crate::ir::Loc)>>,
     /// Each warp's clock at its last fence, which its strong writes publish
     /// (the PTX memory model's `fence; st.relaxed` release pattern).
@@ -1051,13 +1049,13 @@ pub(super) struct Machine<'a> {
     /// For each global buffer that non-coherent loads read, the bytes they
     /// read and the bytes the kernel wrote (for the whole launch).
     nc: Vec<Option<NcState>>,
-    /// The warpgroup MMAs' state (roadmap part m8-wgmma-core).
+    /// The warpgroup MMAs' state.
     wgmma: wgmma::State<'a>,
-    /// Tensor memory (m10-tmem-core).
+    /// Tensor memory.
     tmem: tmem::State<'a>,
-    /// Tensor maps written in memory and the tensormap proxy (m7-tensormap-update).
+    /// Tensor maps written in memory and the tensormap proxy.
     tmaps: tensormap::State,
-    /// The multicast buffers' replicas (m11-extern-distributed).
+    /// The multicast buffers' replicas.
     multicast: Vec<distributed::McGroup>,
 }
 
@@ -1110,7 +1108,7 @@ fn from_f32(ty: DType, x: f32) -> u64 {
 }
 
 /// A TF32 operand as the tensor core reads it (warp `mma.sync` and tcgen05
-/// `.kind::tf32`, m10-umma-dense-kinds): the Float32 value with its low 13
+/// `.kind::tf32`): the Float32 value with its low 13
 /// mantissa bits dropped (the top 19 bits kept).
 pub(super) fn tf32_truncate(x: f64) -> f64 {
     f32::from_bits((x as f32).to_bits() & 0xffff_e000) as f64
@@ -1772,7 +1770,7 @@ impl<'a> Machine<'a> {
     }
 
     /// Before thread `t` accesses (`what`) the shared memory of CTA `peer`
-    /// of its cluster (distributed shared memory, roadmap part m8-dsmem):
+    /// of its cluster (distributed shared memory):
     /// the launch has clusters, the rank is in the cluster, that CTA has not
     /// exited, and (another CTA's) is known to have started: some arrival of
     /// it at a cluster barrier (or a release it made) is ordered before the
@@ -3006,7 +3004,7 @@ impl<'a> Machine<'a> {
         }
         self.tmem_check_exit(block)?;
         let cta = format!("CTA {} ({})", block % self.cluster_size, self.block_name(block));
-        // Accesses of other CTAs to its shared memory (m8-dsmem) must be
+        // Accesses of other CTAs to its shared memory must be
         // ordered before its exit.
         if let Some(log) = self.dsmem_log.get(&block) {
             let mut entries: Vec<(&usize, &(u32, crate::ir::Loc))> = log.iter().collect();
@@ -3796,7 +3794,7 @@ impl<'a> Machine<'a> {
         (out, first)
     }
 
-    /// m11-prims-nvvm-layer: for hang and deadlock reports, the warps that
+    /// For hang and deadlock reports, the warps that
     /// executed `exit`, and where.
     fn exit_report(&self) -> Vec<String> {
         let w = self.warps_per_block;
@@ -4687,7 +4685,7 @@ impl<'a> Machine<'a> {
         for &t in active {
             let n = size / step;
             let (buffer, idx) = self.target(buffer, index, step, t, "atomic")?;
-            // Another CTA's shared memory (m8-dsmem).
+            // Another CTA's shared memory.
             self.smem_target = match peer {
                 Some(p) => {
                     let what = if result.is_some() {
@@ -5180,7 +5178,7 @@ impl<'a> Machine<'a> {
                 for &t in active {
                     let (b, idx) = self.target(*buffer, *index, size, t, "load")?;
                     space = ir.buffer(b).space;
-                    // Another CTA's shared memory (m8-dsmem).
+                    // Another CTA's shared memory.
                     self.smem_target = match attrs.peer {
                         Some(p) => Some(self.dsmem_target(p, t, "a load (ld.shared::cluster)")?),
                         None => None,
@@ -5757,7 +5755,7 @@ impl<'a> Machine<'a> {
                     // are outside the scope, so it orders nothing for them.
                     let release = !relaxed && (!remote || *scope == MemScopeKind::Cluster);
                     let k = self.clock_index(t);
-                    // m10-umma-pipelines: a releasing arrival (a pipeline's consumer_release)
+                    // A releasing arrival (a pipeline's consumer_release)
                     // with a TMEM load still in flight lets the stage be overwritten under it.
                     if !relaxed && let Some(at) = self.tmem_pending_load(k) {
                         return Err(self.err(
@@ -5793,7 +5791,7 @@ impl<'a> Machine<'a> {
                     if n > state.arrivals_left - owed {
                         let left = state.arrivals_left;
                         if state.deferred.iter().any(|d| d.commit) {
-                            // m10-cta-pair-pipelines: a commit's arrival is owed.
+                            // A commit's arrival is owed.
                             return Err(self.err(
                                 format!(
                                     "{n} arrival(s) at an mbarrier whose phase is waiting for {left}, {owed} of which \
@@ -5913,7 +5911,7 @@ impl<'a> Machine<'a> {
                     // `asked - 1` is over: otherwise the mbarrier may still be
                     // in that phase on hardware, where the parity names the
                     // phase before it and the wait succeeds at once.
-                    // m11-prims-nvvm-layer: a state token (the simulator's is
+                    // A state token (the simulator's is
                     // the phase its arrival was in) names its phase exactly.
                     let over = if *by_state { state.phase > raw } else { parity != state.phase & 1 };
                     let current = state.phase;
@@ -6123,7 +6121,7 @@ impl<'a> Machine<'a> {
                     self.account(MemSpace::Global, &[access], false);
                 }
             }
-            // A copy from this CTA's shared memory to a peer's (m7-cluster-copies): read from
+            // A copy from this CTA's shared memory to a peer's: read from
             // the source in the background until it lands, at the peer's wait.
             Op::CpAsyncBulk {
                 src,
@@ -6171,7 +6169,7 @@ impl<'a> Machine<'a> {
                     self.issue_to_mbarrier(*dst, block, vec![(di, data)], reads, key, t, what, true)?;
                 }
             }
-            // st.async (m7-cluster-copies): a store into a peer's shared memory that completes
+            // st.async: a store into a peer's shared memory that completes
             // on the peer's mbarrier, as a bulk copy does.
             Op::StAsync { buffer, index, values, mbar, mbar_index, peer, .. } => {
                 let what = "st.async";
@@ -6354,7 +6352,7 @@ impl<'a> Machine<'a> {
                     self.report.tensormap_prefetches += 1;
                 }
             }
-            // In-kernel tensor-map updates (m7-tensormap-update: exec/tensormap.rs).
+            // In-kernel tensor-map updates (exec/tensormap.rs).
             Op::TensormapReplace { addr, space, field, value } => {
                 self.progress();
                 self.tmap_replace(*addr, *space, *field, *value, active)?;
@@ -7116,7 +7114,7 @@ impl<'a> Machine<'a> {
     }
 
     /// The tensor map a TMA instruction (`what`) of thread `t` addresses, decoded, with its
-    /// `.override::*` operands applied (roadmap part m7-tma-sm100-modes), and the
+    /// `.override::*` operands applied, and the
     /// coordinates and im2col offsets it gives, checked against the descriptor's rank and
     /// the modes the simulator models (no interleave, no SM100 swizzle atoms).
     fn tma_issue_desc(&self, a: &TmaIssue<'_>, t: usize, what: &str) -> R<(crate::tma::TmaDesc, Vec<i64>, Vec<i64>)> {
@@ -7225,7 +7223,7 @@ impl<'a> Machine<'a> {
                 Some(t),
             ));
         };
-        // A descriptor in memory (m7-tensormap-update): its generic writes released to the
+        // A descriptor in memory: its generic writes released to the
         // tensormap proxy and acquired by this thread (prefetches are hints, unchecked).
         let written = if self.tmaps.enabled && !what.contains("prefetch") {
             self.tmap_check_read(db, dbyte, t, what)?
@@ -7441,8 +7439,7 @@ impl<'a> Machine<'a> {
     }
 
     /// A TMA load by thread `t` (`cp.async.bulk.tensor ... .mbarrier::complete_tx`), in any
-    /// access mode (`.tile`, `.im2col`, `.tile::gather4`; roadmap parts m7-tma-im2col and
-    /// m7-tma-sm100-modes): the elements the access names ([`TmaDesc::access_elements`],
+    /// access mode (`.tile`, `.im2col`, `.tile::gather4`): the elements the access names ([`TmaDesc::access_elements`],
     /// out-of-bounds ones filled with zeros, or NaNs with `nan_request_zero_fma`) land in
     /// shared memory from the destination's address in the descriptor's encoding (packed or
     /// padded for the sub-byte ones, whose padding is left unwritten) with its
@@ -7451,7 +7448,7 @@ impl<'a> Machine<'a> {
     /// phase (or at random), and accesses to its bytes before then are reported. With
     /// `mcast` (`.multicast::cluster`), one copy lands at the same offset in each CTA of the
     /// mask, counting down the mbarrier at the same offset in each. With `two_cta`
-    /// (`.cta_group::2`, roadmap part m10-cta-pair) each destination's bytes count down
+    /// (`.cta_group::2`) each destination's bytes count down
     /// the mbarrier at that offset in the even CTA of the destination's pair instead, so
     /// one CTA of a pair waits for both CTAs' halves of a 2-CTA MMA's operands.
     ///
@@ -7527,7 +7524,7 @@ impl<'a> Machine<'a> {
                 Some(t),
             ));
         }
-        // m10-cta-pair: the mbarrier of each destination's pair leader.
+        // The mbarrier of each destination's pair leader.
         let signalled = |block: usize| if two_cta { block & !1 } else { block };
         for &block in &targets {
             self.check_copy_mbarrier((signalled(block), mbar.0, mbyte), t, what)?;
@@ -7665,8 +7662,7 @@ impl<'a> Machine<'a> {
     }
 
     /// A TMA store by thread `t` (`cp.async.bulk.tensor ... .global.shared::cta ... .bulk_group`)
-    /// in any access mode (`.tile`, `.im2col_no_offs`, `.tile::scatter4`; roadmap parts
-    /// m7-tma-im2col and m7-tma-sm100-modes), or with `reduce` a reduce store
+    /// in any access mode (`.tile`, `.im2col_no_offs`, `.tile::scatter4`), or with `reduce` a reduce store
     /// (`cp.reduce.async.bulk.tensor`): the elements the access names
     /// ([`TmaDesc::access_elements`]) are read from the source through the descriptor's
     /// address-based swizzle (the inverse of a load's placement) and written to the tensor,
@@ -8594,7 +8590,7 @@ impl<'a> Machine<'a> {
         let w = self.warps_per_block;
         // (block, barrier id) -> (thread count, arriving warps)
         let mut arrivals: BTreeMap<(usize, usize), (Option<usize>, Vec<usize>)> = BTreeMap::new();
-        // m11-prims-nvvm-layer: a bar.red's true and false predicates, and
+        // A bar.red's true and false predicates, and
         // its arriving warps' result values, by (block, barrier id).
         let mut red_parts: BTreeMap<(usize, usize), RedPart> = BTreeMap::new();
         for &k in group {
@@ -8786,7 +8782,7 @@ impl<'a> Machine<'a> {
                     return Err(self.exit_error(inst, block, &arrived, &exited));
                 }
             }
-            // m11-prims-nvvm-layer: a bar.red's warps must all reduce the same way.
+            // A bar.red's warps must all reduce the same way.
             let red_kind = red.map(|r| r.0);
             if !state.arrived.is_empty() && state.red != red_kind {
                 let name = |k: Option<BarrierRedKind>| match k {
@@ -8866,7 +8862,7 @@ impl<'a> Machine<'a> {
         Ok(())
     }
 
-    /// m11-prims-nvvm-layer: the report of `what` on the mbarrier keyed by
+    /// The report of `what` on the mbarrier keyed by
     /// `key` if `mbarrier.inval` invalidated it.
     fn invalidated_error(&self, key: MbarrierKey, what: &str, t: usize) -> Option<SimError> {
         let at = self.invalidated.get(&key)?;
@@ -8881,7 +8877,7 @@ impl<'a> Machine<'a> {
         ))
     }
 
-    /// m11-prims-nvvm-layer: the mbarrier operations of [`MbarrierExtKind`].
+    /// The mbarrier operations of [`MbarrierExtKind`].
     fn mbarrier_ext(&mut self, inst: &'a Inst, active: &[usize]) -> R {
         use crate::ir::MbarrierExtKind as K;
         let Op::MbarrierExt { kind, result, buffer, index, value } = &inst.op else { unreachable!("an mbarrier op") };
@@ -8970,7 +8966,7 @@ impl<'a> Machine<'a> {
         Ok(())
     }
 
-    /// m11-prims-nvvm-layer: the warps of `group` execute `exit` (`inst`)
+    /// The warps of `group` execute `exit` (`inst`)
     /// with all their lanes: each ends as if it had reached the end of the
     /// kernel. An exit by part of a warp is not simulated.
     fn exit_warps(&mut self, inst: &'a Inst, group: &[usize]) -> R {

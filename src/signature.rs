@@ -947,7 +947,7 @@ pub(crate) fn writes_buffer(ir: &KernelIr, b: crate::ir::BufferId) -> bool {
                     f.direct |= *dst == b;
                     f.raw_or_asm_write |= matches!(ir.buffer(*dst).space, MemSpace::Raw(_));
                 }
-                // m7-tma-sm100-modes: an override store writes wherever its address points.
+                // An override store writes wherever its address points.
                 Op::TmaStore { overrides: Some(_), .. } => f.direct |= ir.buffer(b).space == MemSpace::Global,
                 // A TMA store writes the tensor its descriptor describes: any of the kernel's.
                 Op::TmaStore { .. } => {

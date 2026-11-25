@@ -7,7 +7,7 @@
 // cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! Warpgroup MMAs (roadmap part m8-wgmma-core), held to a plain Rust GEMM: single
+//! Warpgroup MMAs, held to a plain Rust GEMM: single
 //! warpgroup tiles `64 x N x 64` (four k-blocks of 16) for N of 8, 64, 128 and 256, in
 //! Float16 accumulated in Float32 or Float16 and BFloat16 accumulated in Float32, with
 //! K-major and MN-major operands in every SM90 shared-memory layout atom; shared

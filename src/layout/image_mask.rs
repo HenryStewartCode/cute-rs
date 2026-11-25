@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! Layout image masks (roadmap part m7-cluster-copies): the bit mask of the
+//! Layout image masks: the bit mask of the
 //! offsets a layout's mode reaches from a coordinate, as the multicast masks
 //! of cluster copies use ([`make_layout_image_mask`],
 //! [`create_tma_multicast_mask`]).

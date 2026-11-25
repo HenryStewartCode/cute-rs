@@ -1,4 +1,4 @@
-//! cute_ext's fragment-free TMA operations (roadmap part m11-cute-ext-tma):
+//! cute_ext's fragment-free TMA operations:
 //! [`tma_load`], [`tma_store`] and [`tma_reduce_store`] on whole tensors,
 //! with their descriptors made automatically.
 //!
@@ -248,7 +248,7 @@ pub fn tma_load_with<T: Numeric>(src: &Tensor<T>, dst: &Tensor<T>, mbar: &Ptr<u6
     issue(&plan, args, |args| {
         if opts.update_expect_tx {
             if cta_group == CtaGroup::TWO {
-                // m11-cute-ext-gemm: a 2SM load completes on the pair's leader
+                // A 2SM load completes on the pair's leader
                 // (even cluster rank), which receives both CTAs' tiles: the leader
                 // alone arms its barrier, for the pair's bytes, so that its phase
                 // cannot complete before the peer's tile has landed.

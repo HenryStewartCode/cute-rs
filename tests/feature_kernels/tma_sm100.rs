@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The SM100 TMA and bulk-copy forms (roadmap part m7-tma-sm100-modes), held to plain
+//! The SM100 TMA and bulk-copy forms, held to plain
 //! Rust: gather4 loads of rows an index tensor names (some past the tensor, zero-filled)
 //! and scatter4 stores to them, byte-masked bulk stores with several masks, FP4 and FP6
 //! loads through the packed (`.b4x16`) and padded (`.b4x16_p64`, `.b6x16_p32`) formats

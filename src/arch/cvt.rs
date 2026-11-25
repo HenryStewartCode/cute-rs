@@ -677,8 +677,7 @@ pub fn cvt_f32x2_to_ue8m0x2(src_vec2: [Float32; 2], round_up: bool) -> [crate::n
     bytes_of(cvt(CvtFn::F32x2ToUe8m0x2 { round_up }, args))
 }
 
-/// Four Float32 values to UE5M3 (CuTe DSL's `cute.arch.cvt_f32x4_to_fnv8e5m3x4`;
-/// roadmap part m10-ldred-packed-math): two `cvt.rp.satfinite.ue5m3x2.f32`,
+/// Four Float32 values to UE5M3 (CuTe DSL's `cute.arch.cvt_f32x4_to_fnv8e5m3x4`): two `cvt.rp.satfinite.ue5m3x2.f32`,
 /// each rounding a pair toward +infinity (as scale factors are rounded up)
 /// and giving the 8-bit values in order, element 0 first. UE5M3 is unsigned
 /// (5 exponent, 3 mantissa bits; no infinity, `0xff` the only NaN), so the

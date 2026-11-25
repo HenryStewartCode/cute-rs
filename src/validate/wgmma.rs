@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The validator's WGMMA checks (roadmap part m8-wgmma-core): each
+//! The validator's WGMMA checks: each
 //! instruction's operands, and where the asynchronous accumulators may go.
 //!
 //! A `wgmma.mma_async` writes its accumulators when a `wgmma.wait_group`

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The TMA pipeline with two kinds of consumer (roadmap part
-//! m10-cta-pair-pipelines): [`PipelineTmaMultiConsumersAsync`], whose stages
+//! The TMA pipeline with two kinds of consumer: [`PipelineTmaMultiConsumersAsync`], whose stages
 //! are filled by TMA loads and drained both by the `tcgen05` MMA warp and by
 //! ordinary threads reading the same shared memory, as in CuTe DSL's Mamba2
 //! SSD kernel.

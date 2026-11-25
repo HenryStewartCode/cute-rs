@@ -2,10 +2,9 @@
 
 //! Issuing TMA tile copies: [`copy`](crate::copy) with an atom from
 //! [`make_tiled_tma_atom`](crate::cpasync::make_tiled_tma_atom) on
-//! `CopyBulkTensorTileG2SOp` (roadmap part m7-tma-load), its multicast form
-//! `CopyBulkTensorTileG2SMulticastOp` (m7-cluster-copies),
-//! `CopyBulkTensorTileS2GOp` and `CopyReduceBulkTensorTileS2GOp`
-//! (m7-tma-store), and the prefetches of TMA boxes and descriptors
+//! `CopyBulkTensorTileG2SOp`, its multicast form
+//! `CopyBulkTensorTileG2SMulticastOp`,
+//! `CopyBulkTensorTileS2GOp` and `CopyReduceBulkTensorTileS2GOp`, and the prefetches of TMA boxes and descriptors
 //! ([`prefetch_atom`], [`prefetch_descriptor`]).
 //!
 //! The global side is the TMA tensor's partition from
@@ -91,7 +90,7 @@ fn boxes<T: Numeric>(
 }
 
 /// The instruction's coordinates (i32 values) and access mode for the TMA
-/// tensor's coordinate `leaves` of a box (roadmap part m7-tma-im2col): the
+/// tensor's coordinate `leaves` of a box: the
 /// leaves themselves for a tiled atom, padded to the descriptor's rank; an
 /// im2col atom's GEMM coordinate turned into the filter base and offsets.
 #[track_caller]
@@ -204,7 +203,7 @@ pub(crate) fn box_leaves<T: Numeric>(
 }
 
 /// A shared-memory element offset as the op's index: for packed sub-byte
-/// elements, the byte (a box starts at a whole byte; m7-tma-sm100-modes).
+/// elements, the byte (a box starts at a whole byte).
 fn packed_index<T: Numeric>(o: IndexExpr) -> IndexExpr {
     if T::DTYPE.is_sub_byte() {
         IndexExpr::quotient(IndexExpr::product(o, IndexExpr::Static(T::DTYPE.bits())), IndexExpr::Static(8))
@@ -218,7 +217,7 @@ fn packed_index<T: Numeric>(o: IndexExpr) -> IndexExpr {
 #[track_caller]
 fn check_smem<T: Numeric>(atom: &CopyAtom<T>, smem: &Tensor<T>, what: &str, role: &str, func: &str) {
     let info = atom.tma_info().expect("a TMA atom has its descriptor");
-    // This CTA's shared memory: not a map_dsmem_ptr tensor (m8-dsmem), whose
+    // This CTA's shared memory: not a map_dsmem_ptr tensor, whose
     // peer a TMA copy would drop.
     match (smem.memory_space(), smem.dsmem_peer()) {
         (Some(MemSpace::Shared), None) => {}
@@ -257,7 +256,7 @@ pub(crate) fn tma_copy<T: Numeric, S: CopyElem<T>, D: CopyElem<T>>(
     func: &str,
 ) {
     match atom.op() {
-        // m10-cta-pair: cta_group=CtaGroup::TWO loads for a CTA pair (`.cta_group::2`).
+        // Cta_group=CtaGroup::TWO loads for a CTA pair (`.cta_group::2`).
         CopyOp::TmaLoad { multicast, cta_group } => {
             tma_load(atom, src, dst, args, multicast, cta_group == CtaGroup::TWO, func)
         }
@@ -268,7 +267,7 @@ pub(crate) fn tma_copy<T: Numeric, S: CopyElem<T>, D: CopyElem<T>>(
             tma_load(atom, src, dst, args, multicast, cta_group == CtaGroup::TWO, func)
         }
         CopyOp::TmaStoreMode { mode: crate::cpasync::TmaOpMode::Im2col } => tma_store(atom, src, dst, args, None, func),
-        // m7-tma-sm100-modes: gather4, scatter4 and the overrides take auxiliary operands.
+        // Gather4, scatter4 and the overrides take auxiliary operands.
         op @ (CopyOp::TmaLoadMode { .. } | CopyOp::TmaStoreMode { .. }) => panic!(
             "{func}: the {op:?} atom takes an auxiliary operand (the index tensor of gather4 and scatter4, the residue \
              tensor of an override copy): copy with copy_aux(atom, (src, &[aux]), (dst, &[]), args), the partitions \
@@ -278,7 +277,7 @@ pub(crate) fn tma_copy<T: Numeric, S: CopyElem<T>, D: CopyElem<T>>(
     }
 }
 
-/// A TMA load, plain or multicast; with `two_cta` (m10-cta-pair) for a CTA
+/// A TMA load, plain or multicast; with `two_cta` for a CTA
 /// pair, its bytes counted on the mbarrier of the pair's even CTA.
 #[track_caller]
 fn tma_load<T: Numeric, S: CopyElem<T>, D: CopyElem<T>>(
@@ -309,7 +308,7 @@ fn tma_load<T: Numeric, S: CopyElem<T>, D: CopyElem<T>>(
     }
     let src: Tensor<Ident> = src.retyped();
     let dst: Tensor<T> = dst.retyped();
-    // m7-tma-sm100-modes: the padded formats write one byte slot per value (a u8 tensor).
+    // The padded formats write one byte slot per value (a u8 tensor).
     let padded = atom.tma_info().is_some_and(|i| i.data_type().is_padded());
     if padded != D::UNPACKED {
         panic!(

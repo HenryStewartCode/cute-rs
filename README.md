@@ -1,5 +1,7 @@
 # cute-rs
 
+[![CI](https://github.com/HenryStewartCode/cute-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/HenryStewartCode/cute-rs/actions/workflows/ci.yml)
+
 A CuTe-style GPU kernel DSL for Rust.
 
 You write GPU kernels as ordinary Rust, using the same building blocks as NVIDIA's

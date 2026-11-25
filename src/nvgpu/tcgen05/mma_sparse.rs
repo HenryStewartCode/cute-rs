@@ -9,7 +9,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! The 2:4 structured-sparse tcgen05 MMAs (roadmap part m10-sparse-umma):
+//! The 2:4 structured-sparse tcgen05 MMAs:
 //! CuTe DSL's `tcgen05.MmaF16BF16SparseOp` and `tcgen05.MmaFP8SparseOp`,
 //! `tcgen05.mma.sp.cta_group::N.kind::{f16,f8f6f4}` (PTX 8.6, sm_100a and
 //! its family).

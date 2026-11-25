@@ -11,7 +11,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! Shared-memory-to-TMEM copies (roadmap part m10-s2t-copies): CuTe DSL's
+//! Shared-memory-to-TMEM copies: CuTe DSL's
 //! `tcgen05.Cp128x256bOp`, `Cp128x128bOp`, `Cp4x256bOp`, `Cp4x32x128bOp`,
 //! `Cp2x64x128b0213Op` and `Cp2x64x128b0123Op` (`tcgen05.cp`), used through
 //! [`make_copy_atom`](crate::make_copy_atom), [`make_s2t_copy`],

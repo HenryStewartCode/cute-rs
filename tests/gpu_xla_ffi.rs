@@ -1,4 +1,4 @@
-//! The XLA FFI handler on a real GPU (m11-framework-exports): call frames and an API table
+//! The XLA FFI handler on a real GPU: call frames and an API table
 //! built by hand around device buffers, the handler called as XLA would call it, the results
 //! checked against the host's sum, plus the compile cache, aliasing, the stages and the
 //! diagnostics. Skipped (with a note) without an NVIDIA GPU or an `mlir-opt`:

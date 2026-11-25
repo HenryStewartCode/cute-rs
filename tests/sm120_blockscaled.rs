@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! Block-scaled `mma.sync` on SM120 (roadmap part m10-sm120-blockscaled): one-warp
+//! Block-scaled `mma.sync` on SM120: one-warp
 //! kernels for MXF4, NVFP4, MXF8 (both formats) and the mixed FP4 x FP8 forms on the
 //! simulator against plain Rust (bit-exact with UE8M0 scales, within a tolerance with UE4M3
 //! ones); a block-scaled GEMM tile placing the scale factors with the `utils::sm120` helpers

@@ -45,7 +45,7 @@ mod module;
 pub use module::{SimKernelModule, SimModule};
 mod printf;
 mod stream;
-// m11-extern-distributed: multicast replicas.
+// Multicast replicas.
 mod multicast;
 /// One 32-bit word of a simulated `multimem.ld_reduce` over the replicas' words, in replica order.
 pub use exec::ld_reduce_word as multimem_ld_reduce_word;
@@ -486,7 +486,7 @@ pub struct SimOptions {
     /// Which shape each cluster gets in a launch with a fallback cluster
     /// ([`LaunchConfig::fallback_cluster`]).
     pub cluster_shapes: ClusterShapes,
-    /// Cluster launch control (roadmap part m10-clc-scheduling): `None`, the
+    /// Cluster launch control: `None`, the
     /// default, keeps every cluster that has not started cancellable, so a
     /// `clusterlaunchcontrol.try_cancel` cancels the next one in launch
     /// order. With a seed, before each query a generator seeded with it
@@ -494,7 +494,7 @@ pub struct SimOptions {
     /// when a resident slot frees up and can no longer be cancelled), so
     /// that which clusters are left to cancel changes from run to run.
     pub clc_launch_seed: Option<u64>,
-    /// Roadmap part m11-prims-mma-forms: report a `tcgen05.mma` that reuses
+    /// Report a `tcgen05.mma` that reuses
     /// an operand from a collector buffer (`USE`, `LASTUSE`) after the
     /// shared memory it was filled from changed. On by default: the PTX ISA
     /// lets the hardware reload a collected operand from shared memory, so

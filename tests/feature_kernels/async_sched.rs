@@ -1,4 +1,4 @@
-//! `PipelineAsync` and its participants (roadmap part m9-pipeline-async),
+//! `PipelineAsync` and its participants,
 //! held to plain Rust. The hand-offs are built for sm_89, so that their
 //! waits spin on `mbarrier.test_wait` and the SM89 GPU runs them; the
 //! cluster one, whose arrivals go to a peer CTA, is sm_90.

@@ -1,6 +1,5 @@
 //! cute_ext's host runtime: the device workspace query (CuTe DSL's
-//! `AllocationRequirement` and `QueryDeviceWorkspaceFunc`, roadmap part
-//! m11-cute-ext-tma). Kernels here are ordinary
+//! `AllocationRequirement` and `QueryDeviceWorkspaceFunc`). Kernels here are ordinary
 //! [`Kernel::build`](crate::Kernel::build) closures, launched as any other.
 //!
 //! A kernel that needs scratch global memory of a size known only at launch

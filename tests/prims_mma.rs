@@ -8,7 +8,7 @@
 // That portion is under the BSD-3-Clause licence, and the rest of the file is cute-rs's own,
 // under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the licence text.
 
-//! Roadmap part m11-prims-mma-forms: the MMA forms only `cute::prims` issues, on the
+//! The MMA forms only `cute::prims` issues, on the
 //! simulator against plain Rust (exact on small integers): weight-stationary
 //! `tcgen05.mma.ws` for each kind and M (Layouts G, E, D), the B collector sequence fill ->
 //! use -> use -> lastuse with B overwritten after the fill, the same for the plain MMA's A

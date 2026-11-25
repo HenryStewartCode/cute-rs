@@ -11,8 +11,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! A reduced Blackwell mixed-input GEMM, ported from CuTe DSL's `mixed_input_gemm.py`
-//! (roadmap part m10-mixed-input): `C = (convert(A) [* scale]) B^T` with Int4 A, BFloat16 B
+//! A reduced Blackwell mixed-input GEMM, ported from CuTe DSL's `mixed_input_gemm.py`: `C = (convert(A) [* scale]) B^T` with Int4 A, BFloat16 B
 //! and a Float32 accumulator and C, on the helpers of [`cute::utils::mixed_input_helpers`].
 //!
 //! The warps play the example's roles: 0 to 3 the epilogue, 4 the MMA, 5 the TMA loads of A

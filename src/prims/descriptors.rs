@@ -12,7 +12,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! Typed MMA descriptors (roadmap part m11-prims-descriptors-swizzle; CuTe
+//! Typed MMA descriptors (CuTe
 //! DSL's `cutlass.experimental.primitives` descriptor types).
 //!
 //! Each type is a bit-level encoder with a `build` that checks every field

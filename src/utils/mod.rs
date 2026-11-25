@@ -19,7 +19,7 @@ mod contiguous_group_search;
 mod grouped_tile_scheduler;
 pub mod sm90;
 /// CuTe DSL's deprecated `cutlass.utils.block` spelling of
-/// [`crate::block`] (roadmap part m10-s2t-copies).
+/// [`crate::block`].
 pub mod block {
     /// The deprecated spelling of [`crate::block::block_copy`].
     #[deprecated(note = "use cute::block::block_copy")]
@@ -41,20 +41,20 @@ pub mod block {
 // m9-gemm-host-helpers.
 pub mod gemm;
 pub mod sm100;
-// m10-rubin-extras: the Rubin (SM107) helpers, CuTe DSL's rubin_helpers.
+// The Rubin (SM107) helpers, CuTe DSL's rubin_helpers.
 pub mod sm107;
-// m10-umma-kinds: the SM100 MMA and shared-memory layout helpers (in utils::sm100).
+// The SM100 MMA and shared-memory layout helpers (in utils::sm100).
 mod sm100_mma;
-// m10-sparse-umma: the sparse GEMM layouts.
+// The sparse GEMM layouts.
 mod sm100_sparse;
-// m10-cta-pair-pipelines: the SM100 TMA load op selection (in utils::sm100).
+// The SM100 TMA load op selection (in utils::sm100).
 mod sm100_tma;
-// m10-epilogue-helpers: the SM100 epilogue helpers (in utils::sm100 and utils::gemm::sm100).
+// The SM100 epilogue helpers (in utils::sm100 and utils::gemm::sm100).
 mod sm100_epilogue;
-// m10-mixed-input: cutlass.utils.mixed_input_helpers.
+// Cutlass.utils.mixed_input_helpers.
 pub mod mixed_input_helpers;
 mod tensormap;
-// m11-extern-distributed: cutlass.utils.distributed.
+// Cutlass.utils.distributed.
 pub mod distributed;
 mod tile_scheduler;
 // m10-clc-scheduling.
@@ -63,7 +63,7 @@ pub use clc_tile_scheduler::{
     ClcDynamicPersistentTileScheduler, ClcDynamicPersistentTileSchedulerOptions,
     ClcDynamicPersistentTileSchedulerParams,
 };
-// m10-port-clc-clusters: preferred and fallback cluster shapes.
+// Preferred and fallback cluster shapes.
 mod mixed_cluster;
 pub use mixed_cluster::{
     ClusterArm, check_cluster_shape_in_arm, check_mixed_cluster_shapes, current_cluster_arm, is_preferred_cluster,
@@ -73,7 +73,7 @@ pub use mixed_cluster::{
 mod blockscaled_layout;
 mod epilogue_tile;
 
-// In-memory TMA descriptors (m7-tensormap-update).
+// In-memory TMA descriptors.
 pub use tensormap::{TensorMapManager, TensorMapUpdateMode};
 // m10-umma-layouts.
 pub use blockscaled_layout::{BlockScaledBasicChunk, Sm103BlockScaledBasicChunk, tile_atom_to_shape_sf};
@@ -91,7 +91,7 @@ pub use tile_scheduler::{
     StaticPersistentTileScheduler, WorkTileInfo, swizzle_and_rasterize,
 };
 
-// The grouped GEMM schedulers (m9-grouped-gemm-schedulers).
+// The grouped GEMM schedulers.
 pub use contiguous_group_search::{
     ContiguousGGSearchState, ContiguousGroupWorkTileInfo, contiguous_group_search,
     create_initial_contiguous_group_search_state, make_contiguous_group_work_tile_info,
@@ -103,7 +103,7 @@ pub use grouped_tile_scheduler::{
     create_initial_search_state,
 };
 
-// m10-umma-pipelines: the deprecated `cutlass.utils` names of the TMEM allocator.
+// The deprecated `cutlass.utils` names of the TMEM allocator.
 /// Deprecated name of [`memory::TmemAllocator`](crate::memory::TmemAllocator).
 #[deprecated(note = "use cute::memory::TmemAllocator")]
 pub type TmemAllocator = crate::memory::TmemAllocator;

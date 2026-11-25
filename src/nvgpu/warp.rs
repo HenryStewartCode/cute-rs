@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! CuTe DSL's `cute.nvgpu.warp` block-scaled MMA operations (roadmap part
-//! m10-sm120-blockscaled): warp-level `mma.sync ... .block_scale` on
+//! CuTe DSL's `cute.nvgpu.warp` block-scaled MMA operations: warp-level `mma.sync ... .block_scale` on
 //! GeForce Blackwell (the sm_120a and sm_121a chips with PTX ISA 8.7, and
 //! the sm_120f family with 8.8).
 //!

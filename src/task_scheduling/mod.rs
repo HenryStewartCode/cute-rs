@@ -66,7 +66,7 @@
 //!    The schedule prints as a listing, which the tests compare with
 //!    expected text.
 //!
-//! 3. **Tasks and the manager** (part m11-ts-task-manager). A [`Task`]
+//! 3. **Tasks and the manager**. A [`Task`]
 //!    binds a schedule to a warp range (optionally with a `setmaxnreg`
 //!    budget) and names the resources it consumes and produces. The
 //!    [`TaskManager`] owns the resources and a [`ResourceDependencyGraph`]
@@ -88,8 +88,7 @@
 //!    built-in and seeded interleaving) reports deadlocks and races with
 //!    the task, step and line.
 //!
-//! 4. **Memory, groups and Task Scheduling's pipelines** (part
-//!    m11-ts-memory-groups). Resources declare memory
+//! 4. **Memory, groups and Task Scheduling's pipelines**. Resources declare memory
 //!    ([`SmemAllocation`], [`TmemAllocation`]); the declarative
 //!    [`SmemAllocator`] lays every requirement and the barriers of every
 //!    pipeline without storage out as one block on the host (largest
@@ -115,8 +114,7 @@
 //!    edges), group arrival counts, TMEM capacity and pipelines left
 //!    without barrier storage.
 //!
-//! 5. **The end-to-end GEMM** (part m11-ts-gemm-example,
-//!    `examples/ts_gemm_simple.rs`, the port of
+//! 5. **The end-to-end GEMM** (`examples/ts_gemm_simple.rs`, the port of
 //!    `02_gemm_simple_ts/01_fp16_bf16_gemm_3.py`) added what that tutorial
 //!    needs: compile-time work arguments ([`Work::constexpr_input`],
 //!    [`ArgSource::constexpr`], [`WorkArgs::constexpr`]; CuTe DSL's

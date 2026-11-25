@@ -1,4 +1,4 @@
-//! TMA descriptors as kernel parameters (roadmap part m7-tma-descriptor) on the simulator
+//! TMA descriptors as kernel parameters on the simulator
 //! and in the emitted code: hidden descriptors computed at launch from a tensor parameter,
 //! host-bound ones, grid-constant parameters read through their generic address, and the
 //! build- and launch-time checks.

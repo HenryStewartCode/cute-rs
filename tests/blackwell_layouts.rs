@@ -1,4 +1,4 @@
-//! Roadmap part m10-umma-layouts: the SM100 shared-memory layout atoms
+//! The SM100 shared-memory layout atoms
 //! (`tcgen05.make_smem_layout_atom`, `make_sparse_smem_layout_atom`),
 //! `tcgen05.tile_to_mma_shape`, the UMMA shared-memory descriptors and
 //! their decoder, the block-scaled scale-factor layouts, the TMEM

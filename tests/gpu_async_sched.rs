@@ -1,6 +1,5 @@
 //! `PipelineAsync`'s token kernel, `PipelineEmpty`, `HardwareInfo` and the
-//! static persistent tile schedulers on a real GPU (roadmap parts
-//! m9-pipeline-async and m9-persistent-schedulers). The hand-off feature
+//! static persistent tile schedulers on a real GPU. The hand-off feature
 //! kernels run in `tests/gpu.rs` with the other sm_89 feature kernels.
 //! Needs the `cuda` feature; skipped (with a note) without an NVIDIA GPU or
 //! an `mlir-opt`:

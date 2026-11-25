@@ -1,4 +1,4 @@
-//! TMA's im2col mode (roadmap part m7-tma-im2col) and the SM100 modes (m7-tma-sm100-modes):
+//! TMA's im2col mode and the SM100 modes:
 //! the feature kernels in the simulator, their descriptors, MLIR and diagnostics.
 
 mod feature_kernels;

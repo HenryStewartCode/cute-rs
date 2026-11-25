@@ -1,5 +1,4 @@
-//! `PipelineCpAsync` and `PipelineOrder` (roadmap part
-//! m9-pipeline-cp-async-order), held to plain Rust. Built for sm_89, so
+//! `PipelineCpAsync` and `PipelineOrder`, held to plain Rust. Built for sm_89, so
 //! their waits spin on `mbarrier.test_wait` and the SM89 GPU runs them.
 
 use cute::pipeline::{

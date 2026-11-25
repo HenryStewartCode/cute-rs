@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 //! The TMA load operation of a Blackwell GEMM operand for a cluster shape
-//! and an MMA (roadmap part m10-cta-pair-pipelines; CuTe DSL's
+//! and an MMA (CuTe DSL's
 //! `cutlass.utils.blackwell_helpers.cluster_shape_to_tma_atom_A`, `_B` and
 //! `_SFB`): whether the load multicasts and whether it serves a CTA pair.
 //! Plain host code, run when a kernel is configured.

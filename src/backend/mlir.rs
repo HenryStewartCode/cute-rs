@@ -34,7 +34,7 @@ use crate::ir::{
 use crate::tensor::AddressSpace;
 
 mod wgmma;
-// m11-extern-distributed: external calls, device functions and multimem.
+// External calls, device functions and multimem.
 mod extern_calls;
 // m10-tmem-core.
 mod tcgen05;
@@ -115,7 +115,7 @@ struct Emitter<'a> {
     /// Each shared buffer's start in the window, by buffer (`None` for the
     /// other spaces): [`SharedMemoryLayout::starts`](crate::ir::SharedMemoryLayout).
     window_starts: Vec<Option<usize>>,
-    /// The kernel loads or stores tensor memory (m10-tmem-ld-st): thread
+    /// The kernel loads or stores tensor memory: thread
     /// synchronisations get the tcgen05 thread-sync fences.
     tcgen05_fences: bool,
 }
@@ -701,8 +701,7 @@ impl Emitter<'_> {
     }
 
     /// The `.shared::cluster` address (an i64, `mapa`) of element `index`
-    /// (counting `ty`s) of shared buffer `b` in CTA `rank` of the cluster
-    /// (roadmap part m8-dsmem). `mapa` is inline PTX: NVVM's `mapa` op gives
+    /// (counting `ty`s) of shared buffer `b` in CTA `rank` of the cluster. `mapa` is inline PTX: NVVM's `mapa` op gives
     /// a pointer of the shared space in LLVM 21 and of the cluster space
     /// (7) in LLVM 23.
     fn dsmem_address(&mut self, indent: usize, b: BufferId, ty: DType, index: ValueId, rank: ValueId) -> String {
@@ -716,8 +715,7 @@ impl Emitter<'_> {
         remote
     }
 
-    /// A load into `values` or store of them to another CTA's shared memory
-    /// (roadmap part m8-dsmem): at the `mapa` address, a plain access as an
+    /// A load into `values` or store of them to another CTA's shared memory: at the `mapa` address, a plain access as an
     /// LLVM load or store through a `.shared::cluster` pointer (address
     /// space 7, which LLVM 21 lowers to `ld.shared::cluster` and
     /// `st.shared::cluster`), one with memory attributes as
@@ -774,7 +772,7 @@ impl Emitter<'_> {
     ) {
         let vt = self.ir.dtype(value);
         let (space, addr) = match peer {
-            // Another CTA's shared memory (m8-dsmem): `.shared::cluster`.
+            // Another CTA's shared memory: `.shared::cluster`.
             Some(rank) => (
                 MemSpace::Raw(AddressSpace::Dsmem),
                 self.dsmem_address(indent, buffer, ty.access_elem(vt), index, rank),
@@ -1178,8 +1176,7 @@ impl Emitter<'_> {
         values.iter().map(|&v| (self.v(v), self.ir.dtype(v))).collect()
     }
 
-    /// The operands of a TMA instruction's `.override::*` qualifiers (roadmap part
-    /// m7-tma-sm100-modes), appended to `operands`: the qualifiers, and the text that goes
+    /// The operands of a TMA instruction's `.override::*` qualifiers, appended to `operands`: the qualifiers, and the text that goes
     /// inside the tensor-map brackets before the coordinates (`$a, ` with the address
     /// only; `$a, {sizes}, {lower strides}, $upper, ` with the attributes, the sizes and
     /// upper strides as 16-bit registers).
@@ -2258,8 +2255,7 @@ impl Emitter<'_> {
                     i,
                 )
             }
-            // Bulk copies with a cache hint, a multicast mask or a peer CTA (roadmap parts
-            // m7-tma-store and m7-cluster-copies): inline PTX with a memory clobber.
+            // Bulk copies with a cache hint, a multicast mask or a peer CTA: inline PTX with a memory clobber.
             Op::CpAsyncBulk {
                 src,
                 src_index,
@@ -2385,7 +2381,7 @@ impl Emitter<'_> {
                 } else {
                     (m32, "")
                 };
-                // m7-tma-sm100-modes: gather4 gives five coordinates of a 2-D tensor map.
+                // Gather4 gives five coordinates of a 2-D tensor map.
                 let n = if mode.is_rows4() { 2 } else { coords.len() };
                 let slots: Vec<String> = (0..coords.len()).map(|k| format!("${}", 3 + k)).collect();
                 let mut operands = vec![d32, self.v(*desc), m32];
@@ -2396,7 +2392,7 @@ impl Emitter<'_> {
                     types.push("i32");
                     constraints.push("r");
                 }
-                // m7-tma-im2col: the im2col offsets (i16) follow the mbarrier.
+                // The im2col offsets (i16) follow the mbarrier.
                 let mut offsets = String::new();
                 if let crate::ir::TmaMode::Im2col { offsets: o } = mode {
                     let mut s = Vec::new();
@@ -2408,7 +2404,7 @@ impl Emitter<'_> {
                     }
                     offsets = format!(", {{{}}}", s.join(", "));
                 }
-                // m7-tma-sm100-modes: the override operands, inside the brackets before the
+                // The override operands, inside the brackets before the
                 // coordinates.
                 let (over_quals, over_ops, wide_mask) = match overrides {
                     Some(o) => {
@@ -2485,7 +2481,7 @@ impl Emitter<'_> {
                         mode.ptx()
                     ),
                 };
-                // m7-tma-sm100-modes: the override operands inside the brackets, before the
+                // The override operands inside the brackets, before the
                 // braced coordinates (`[tmap, gAddr, {sizes}, {strides}, upper, {coords}]`).
                 let (over_quals, coord_text) = match overrides {
                     Some(o) => {
@@ -2515,7 +2511,7 @@ impl Emitter<'_> {
                 let mut inputs = vec![(self.v(*desc), DType::I64)];
                 inputs.extend(coords.iter().map(|c| (self.v(*c), DType::I32)));
                 let slots: Vec<String> = (0..coords.len()).map(|k| format!("${}", 1 + k)).collect();
-                // m7-tma-im2col: the im2col offsets follow the brackets.
+                // The im2col offsets follow the brackets.
                 let mut offsets = String::new();
                 if let crate::ir::TmaMode::Im2col { offsets: o } = mode {
                     let s: Vec<String> = (0..o.len()).map(|k| format!("${}", inputs.len() + k)).collect();
@@ -2533,7 +2529,7 @@ impl Emitter<'_> {
                 let inputs = [(self.v(*desc), DType::I64)];
                 self.asm_memory(indent, inst, "prefetch.tensormap [$0];", &inputs);
             }
-            // m7-tensormap-update: inline PTX, as CuTe DSL emits it (LLVM 21 has no
+            // Inline PTX, as CuTe DSL emits it (LLVM 21 has no
             // nvvm.tensormap.replace, and no LLVM has tensormap.cp_fenceproxy).
             Op::TensormapReplace { addr, space, field, value } => {
                 let (ss, at) = match space {
@@ -2589,7 +2585,7 @@ impl Emitter<'_> {
                 );
                 self.asm_memory(indent, inst, &template, &inputs);
             }
-            // m10-clc-scheduling: LLVM 21's NVVM has no cluster launch control ops (LLVM 23
+            // LLVM 21's NVVM has no cluster launch control ops (LLVM 23
             // does), so inline PTX; the query keeps the .b128 response inside one statement.
             Op::ClcTryCancel { buffer, index, elem, mbar, mbar_index, multicast } => {
                 let a = self.address(indent, *buffer, *elem, *index);

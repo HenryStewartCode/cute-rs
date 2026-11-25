@@ -10,7 +10,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! Distributed shared memory (roadmap part m8-dsmem), held to plain Rust in clusters of
+//! Distributed shared memory, held to plain Rust in clusters of
 //! two and four CTAs: a ring in which each CTA writes the next one's shared memory
 //! through `map_dsmem_ptr` and reads its own after a cluster barrier, then reads the
 //! next one's with `ld.shared::cluster` (`cute::load` with `SharedSpace::Cluster`); a

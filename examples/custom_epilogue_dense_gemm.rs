@@ -9,7 +9,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! The custom EFC GEMM (`custom_epilogue_dense_gemm.py`, roadmap part m10-port-efc): an
+//! The custom EFC GEMM (`custom_epilogue_dense_gemm.py`): an
 //! epilogue with two read and two written tensors,
 //!
 //! ```text

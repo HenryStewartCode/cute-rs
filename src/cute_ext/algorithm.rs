@@ -73,7 +73,7 @@ pub fn partition_and_copy<T: Numeric>(thr_copy: &ThrCopy<T>, src: &Tensor<T>, ds
         }
         _ => src.clone(),
     };
-    // m11-cute-ext-gemm: a tcgen05 TMEM load's (store's) register operand is
+    // A tcgen05 TMEM load's (store's) register operand is
     // the thread's partition of the destination (source) as it is: the
     // TMEM side's values span the warp's lanes, which a retile would
     // broadcast the registers over.

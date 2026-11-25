@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! CuTe DSL's SM100 MMA and shared-memory layout helpers (roadmap part
-//! m10-umma-kinds; `cutlass.utils` from `blackwell_helpers`): the tiled
+//! CuTe DSL's SM100 MMA and shared-memory layout helpers (`cutlass.utils` from `blackwell_helpers`): the tiled
 //! tcgen05 MMA for a pair of operand types ([`make_trivial_tiled_mma`]), the
 //! layout atom for an operand's majorness and tile ([`get_smem_layout_atom_ab`]),
 //! and the staged shared-memory layouts of an operand
@@ -84,7 +83,7 @@ pub fn make_trivial_tiled_mma(
     make_tiled_mma(atom, Layout::col_major((1, 1, 1)))
 }
 
-// m10-umma-blockscaled: the block-scaled dispatchers.
+// The block-scaled dispatchers.
 
 /// UE8M0 scale factors for the 32-element vectors (MXF4, MXF8F6F4).
 #[track_caller]
@@ -99,7 +98,7 @@ fn check_e8m0(what: &str, sf_dtype: DType, sf_vec_size: usize) {
 /// The tiled block-scaled tcgen05 MMA (CuTe DSL's
 /// `make_blockscaled_trivial_tiled_mma(a_dtype, b_dtype, a_leading_mode,
 /// b_leading_mode, sf_dtype, sf_vec_size, cta_group, mma_tiler_mn,
-/// a_source)`, roadmap part m10-umma-blockscaled), one atom of instruction
+/// a_source)`), one atom of instruction
 /// shape `(mma_tiler_mn.0, mma_tiler_mn.1, K)`:
 ///
 /// | A and B                     | sf_vec_size | operation           | K  |

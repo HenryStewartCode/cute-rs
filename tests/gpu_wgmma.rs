@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The host- and device-side parts of the warpgroup MMAs (roadmap part m8-wgmma-core)
+//! The host- and device-side parts of the warpgroup MMAs
 //! that run on any GPU: the shared-memory matrix descriptors `make_fragment_a/b` builds,
 //! held to the PTX ISA's canonical layouts worked out by hand (the MMAs themselves need
 //! sm_90a: `tests/wgmma.rs` simulates them and assembles them for sm_90a). Needs the

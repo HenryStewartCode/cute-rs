@@ -1,4 +1,4 @@
-//! `stmatrix` atoms and `setmaxnreg` (roadmap part m8-stmatrix-setmaxnreg): the emitted
+//! `stmatrix` atoms and `setmaxnreg`: the emitted
 //! NVVM per LLVM version, the PTX of each installed toolchain, the simulator's register
 //! budgets, and the diagnostics. The feature kernels (`tests/feature_kernels/stmatrix.rs`)
 //! check the results against the PTX ISA's fragment tables.
@@ -156,7 +156,7 @@ fn stmatrix_m16n8_must_be_transposed() {
         });
     });
     assert!(msg.contains("stores 16-bit elements"), "{msg}");
-    // 32-bit elements (m10-epilogue-helpers) go one to a register, untransposed only.
+    // 32-bit elements go one to a register, untransposed only.
     let msg = build_panic(|| {
         Kernel::build("wide_transposed", || {
             let _ = make_copy_atom::<f32>(CopyOp::StMatrix { num: 4, trans: true });

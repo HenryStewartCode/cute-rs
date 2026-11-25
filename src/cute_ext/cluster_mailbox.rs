@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! cute_ext's DSMEM cluster mailbox (roadmap part m11-cute-ext-sched-tmem;
-//! CuTe DSL's `cutlass.cute.experimental.cluster_mailbox`): a typed payload
+//! cute_ext's DSMEM cluster mailbox (CuTe DSL's `cutlass.cute.experimental.cluster_mailbox`): a typed payload
 //! one CTA writes into the shared memory of its pair's peer with
 //! `st.async`, delivered through a pipeline stage of the peer.
 //!

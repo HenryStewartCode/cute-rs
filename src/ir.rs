@@ -1223,7 +1223,7 @@ pub fn atomic_inst_name(
     use crate::tensor::AddressSpace;
     let space = match space {
         MemSpace::Shared | MemSpace::Raw(AddressSpace::Smem) => ".shared",
-        // Another CTA's shared memory (m8-dsmem).
+        // Another CTA's shared memory.
         MemSpace::Raw(AddressSpace::Dsmem) => ".shared::cluster",
         // A generic address: no state space.
         MemSpace::Raw(AddressSpace::Generic) => "",
@@ -1240,8 +1240,7 @@ pub enum BulkDirection {
     /// Shared to global memory (`cp.async.bulk.global.shared::cta`).
     S2G,
     /// From this CTA's shared memory to a peer CTA's of its cluster
-    /// (`cp.async.bulk.shared::cluster.shared::cta`, roadmap part
-    /// m7-cluster-copies).
+    /// (`cp.async.bulk.shared::cluster.shared::cta`).
     S2S,
 }
 
@@ -1598,7 +1597,7 @@ pub struct MemAttrs {
     pub non_coherent: bool,
     /// The 64-bit operand of `.L2::cache_hint`.
     pub cache_policy: Option<ValueId>,
-    /// Distributed shared memory (roadmap part m8-dsmem): the rank (an
+    /// Distributed shared memory: the rank (an
     /// Int32) of the CTA of the cluster whose shared memory the access
     /// reaches, at the offset it has in the buffer of this CTA (`mapa`, then
     /// `.shared::cluster`). Shared buffers only.
@@ -1728,8 +1727,7 @@ pub enum BarrierKind {
     ArriveUnaligned,
 }
 
-/// The reduction of a `barrier.cta.red` (`bar.red`; roadmap part
-/// m11-prims-nvvm-layer).
+/// The reduction of a `barrier.cta.red` (`bar.red`).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum BarrierRedKind {
     /// `.popc.u32`: how many participating threads' predicates are true.
@@ -1983,7 +1981,7 @@ impl MmaKind {
     }
 }
 
-// m10-sm120-blockscaled: SM120 warp-level block-scaled mma.sync kinds.
+// SM120 warp-level block-scaled mma.sync kinds.
 
 /// A warp-level block-scaled `mma.sync` (sm_120a, PTX ISA 8.7): its A and B
 /// formats and its scale-factor vector size. With FP4 (`F4E2M1FN`) A and B
@@ -2755,8 +2753,7 @@ impl MxKind {
     }
 }
 
-/// The arithmetic of a [`CvtFn::Packed`] instruction (roadmap part
-/// m10-ldred-packed-math): PTX's packed `.f32x2` operations (sm_100, PTX
+/// The arithmetic of a [`CvtFn::Packed`] instruction: PTX's packed `.f32x2` operations (sm_100, PTX
 /// 8.6) and the Rubin-only mixed-precision ones (sm_107f, PTX 9.4). A pair of
 /// Float32 values is a `u64` (element 0 in the low half) and a pair of
 /// Float16 or BFloat16 values an `i32`; each element is computed on its own.
@@ -2826,7 +2823,7 @@ pub enum CvtFn {
     /// `cvt.{rz,rp}.satfinite.ue8m0x2.f32`: two Float32 values to UE8M0
     /// (`round_up` picks `.rp`), packed into an Int16.
     F32x2ToUe8m0x2 { round_up: bool },
-    /// `cvt.rp.satfinite.ue5m3x2.f32` (roadmap part m10-ldred-packed-math):
+    /// `cvt.rp.satfinite.ue5m3x2.f32`:
     /// two Float32 values to UE5M3 (`FloatNV8E5M3FNU`), rounded toward +inf
     /// and saturating to the largest finite value (PTX ISA 9.4), packed into
     /// an Int16 with element 0 in the low byte (PTX takes element 1 first).
@@ -2851,7 +2848,7 @@ pub enum CvtFn {
     MxToF16x2 { from: MxKind, relu: bool },
     /// A packed arithmetic instruction ([`PackedOp`]) with a rounding mode
     /// (`None`: no `.rnd`, which PTX lets ptxas fuse; computed as `.rn`) and
-    /// `ftz` (m10-ldred-packed-math). Pure.
+    /// `ftz`. Pure.
     Packed { op: PackedOp, rnd: Option<RoundingMode>, ftz: bool },
 }
 
@@ -3598,7 +3595,7 @@ pub enum Op {
         sem: MemoryOrder,
         scope: MemoryScope,
         /// Distributed shared memory: the CTA rank, as for
-        /// [`MemAttrs::peer`] (roadmap part m8-dsmem).
+        /// [`MemAttrs::peer`].
         peer: Option<ValueId>,
     },
     /// A reduction (`red{.sem}{.scope}{.space}.op.type`): an atomic
@@ -3655,7 +3652,7 @@ pub enum Op {
         /// m11-prims-nvvm-layer: `parity` is an i64 state token from an
         /// arrival (`mbarrier.{try,test}_wait`, no `.parity`).
         state: bool,
-        /// m11-prims-nvvm-layer: the `suspendTimeHint` (i32, nanoseconds) of
+        /// The `suspendTimeHint` (i32, nanoseconds) of
         /// a `try_wait`.
         time_limit: Option<ValueId>,
     },
@@ -3717,7 +3714,7 @@ pub enum Op {
         pending: u32,
         read: bool,
     },
-    /// A TMA tile load (roadmap part m7-tma-load):
+    /// A TMA tile load:
     /// `cp.async.bulk.tensor.{N}d.shared::cluster.global.tile.mbarrier::complete_tx::bytes[.L2::cache_hint]`
     /// of the box at `coords` (one i32 per dimension of the descriptor, in its
     /// order) of the tensor map at the generic address `desc` (an i64) into
@@ -3736,17 +3733,15 @@ pub enum Op {
         mbar_index: ValueId,
         cache_policy: Option<ValueId>,
         box_bytes: u32,
-        /// `.multicast::cluster` with this i16 CTA mask (roadmap part
-        /// m7-cluster-copies): the box lands at the same offset in every CTA
+        /// `.multicast::cluster` with this i16 CTA mask: the box lands at the same offset in every CTA
         /// of the mask, and counts down the mbarrier at the same offset in
         /// each.
         mcast_mask: Option<ValueId>,
-        /// The access mode (roadmap parts m7-tma-im2col and
-        /// m7-tma-sm100-modes): `.tile` unless an im2col or gather4 atom.
+        /// The access mode: `.tile` unless an im2col or gather4 atom.
         mode: TmaMode,
-        /// `.override::*` operands (roadmap part m7-tma-sm100-modes).
+        /// `.override::*` operands.
         overrides: Option<TmaOverride>,
-        /// `.cta_group::2` (roadmap part m10-cta-pair, a load for the CTA
+        /// `.cta_group::2` (a load for the CTA
         /// pair of a 2-CTA tcgen05 MMA): the box lands in the issuing CTA
         /// (or the CTAs of the mask), and its bytes count down the mbarrier
         /// at the same offset in the even CTA of each destination's pair
@@ -3755,7 +3750,7 @@ pub enum Op {
         two_cta: bool,
     },
     // ---- m7-tma-store and m7-cluster-copies ----
-    /// A TMA tile store (roadmap part m7-tma-store):
+    /// A TMA tile store:
     /// `cp.async.bulk.tensor.{N}d.global.shared::cta.tile.bulk_group[.L2::cache_hint]`
     /// of the box at element `src_index` of `src` (its unswizzled start;
     /// the descriptor's swizzle says where each byte is read) to the box at
@@ -3774,7 +3769,7 @@ pub enum Op {
         box_bytes: u32,
         /// The access mode: `.tile`, `.im2col_no_offs` or `.tile::scatter4`.
         mode: TmaMode,
-        /// `.override::*` operands (roadmap part m7-tma-sm100-modes).
+        /// `.override::*` operands.
         overrides: Option<TmaOverride>,
     },
     /// `cp.async.bulk.prefetch.tensor.{N}d.L2.global{mode} [desc, coords]`:
@@ -3790,7 +3785,7 @@ pub enum Op {
     PrefetchTensormap {
         desc: ValueId,
     },
-    // In-kernel tensor-map updates (roadmap part m7-tensormap-update).
+    // In-kernel tensor-map updates.
     /// `tensormap.replace.tile.{field}{.ss}.b1024.{b32|b64} [addr], {ord,}
     /// value`: replace one field of the 128-byte tensor map at `addr` (an
     /// `i64` global or generic address, or an `i32` shared one, as `space`
@@ -3846,8 +3841,7 @@ pub enum Op {
     FenceProxy {
         kind: ProxyKind,
     },
-    /// `fence.acq_rel.{scope}`, or with `sc` `fence.sc.{scope}` (`membar`;
-    /// m11-prims-nvvm-layer).
+    /// `fence.acq_rel.{scope}`, or with `sc` `fence.sc.{scope}` (`membar`).
     Fence {
         scope: FenceScope,
         sc: bool,
@@ -4046,7 +4040,7 @@ pub enum Op {
         from: crate::tensor::AddressSpace,
         to: crate::tensor::AddressSpace,
     },
-    // WGMMA (roadmap parts m8-wgmma-core and m8-wgmma-variants).
+    // WGMMA.
     /// `wgmma.mma_async.sync.aligned.m64n{N}k{K}.{acc}.{a}.{b}` (see
     /// [`WgmmaKind`]): `d = a * b + (scale_d ? c : 0)` over a warpgroup, B
     /// read from shared memory through the 64-bit matrix descriptor
@@ -4089,7 +4083,7 @@ pub enum Op {
         inputs: Vec<ValueId>,
         complete: Vec<bool>,
     },
-    // m11-extern-distributed: external device-function calls and multimem.
+    // External device-function calls and multimem.
     /// A call of external device function `callee` ([`KernelIr::externs`]):
     /// CuTe DSL's `cute.extern` / `cute.ffi` call, `func.call` in MLIR.
     /// `args` follow the declaration's parameters: values, and for pointer
@@ -4115,7 +4109,7 @@ pub enum Op {
         values: Vec<ValueId>,
         results: Vec<ValueId>,
     },
-    // m10-tmem-core: tensor memory.
+    // Tensor memory.
     /// A `tcgen05` instruction (sm_100), one family for all of them: see
     /// [`Tcgen05Inst`] for what `buffer` and `args` hold. `two_cta` is
     /// `.cta_group::2` (a CTA pair) rather than `.cta_group::1`;
@@ -4127,7 +4121,7 @@ pub enum Op {
         buffer: Option<BufferId>,
         args: Vec<ValueId>,
     },
-    // m10-tmem-ld-st: loads and stores between tensor memory and registers.
+    // Loads and stores between tensor memory and registers.
     /// `tcgen05.ld.sync.aligned.<shape>.x<num>{.pack::16b}.b32 {results},
     /// [taddr]{, half_split}` (sm_100a): `results` are the elements the
     /// 32-bit registers hold (`shape.registers(num)` registers, each of `32 /
@@ -4137,13 +4131,13 @@ pub enum Op {
     /// `tcgen05.wait::ld`. The `.16x32bx2` half split is
     /// [`TmemShape::half_split`].
     ///
-    /// m10-ldred-packed-math: with `red`, the `tcgen05.ld.red` form (PTX ISA
+    /// With `red`, the `tcgen05.ld.red` form (PTX ISA
     /// 8.8: sm_110a, the sm_103f and sm_110f families), which also reduces
     /// each thread's loaded values to one Float32 ([`TmemLdRed`]); the
     /// results are then Float32 values and `pack` is false. The reduction
     /// is as pending as the data.
     ///
-    /// m10-rubin-extras: with `sp`, the `.spcompress` form (PTX ISA 9.4:
+    /// With `sp`, the `.spcompress` form (PTX ISA 9.4:
     /// sm_107a): `results` are only the compressed data ([`TmemLdSpCompress`]).
     Tcgen05Ld {
         results: Vec<ValueId>,
@@ -4165,7 +4159,7 @@ pub enum Op {
         num: u32,
         unpack: bool,
     },
-    // m10-umma-f16: tcgen05 MMAs and their commits.
+    // Tcgen05 MMAs and their commits.
     /// One warp-level issue of `tcgen05.mma.cta_group::1.kind::<kind>
     /// [taddr], desc_a, desc_b, idesc, enable_input_d` (sm_100a): executed by
     /// a converged warp, whose lane `elect` (the Bool of an `elect.sync`)
@@ -4175,7 +4169,7 @@ pub enum Op {
     /// instruction descriptor is `kind.idesc()`, fixed when the kernel is
     /// built.
     ///
-    /// m10-umma-kinds: with `kind.a_tmem`, `desc_a` is A's TMEM address
+    /// With `kind.a_tmem`, `desc_a` is A's TMEM address
     /// (i32, the `[a-tmem]` form). `idesc`, when given, is the instruction
     /// descriptor as a runtime u32 (the constant bits OR the runtime
     /// negate bits); `disable_lane`, when not empty, the
@@ -4189,16 +4183,16 @@ pub enum Op {
         elect: ValueId,
         idesc: Option<ValueId>,
         disable_lane: Vec<ValueId>,
-        /// m10-umma-blockscaled: the TMEM addresses (i32) of the scale
+        /// The TMEM addresses (i32) of the scale
         /// factors of A and B (`[sfa-tmem]`, `[sfb-tmem]`) of a block-scaled
         /// kind (`kind.scale`); their scale-factor IDs (the byte of each
         /// 32-bit column the first factor is in) are in `idesc`.
         sf: Option<(ValueId, ValueId)>,
-        /// m10-sparse-umma: the TMEM address (i32) of the sparsity metadata
+        /// The TMEM address (i32) of the sparsity metadata
         /// (`[sp-meta-tmem]`) of a sparse kind (`kind.sparse`); its
         /// selector is in `idesc`'s bits 0-1.
         meta: Option<ValueId>,
-        /// m11-prims-mma-forms: the `zero-column-mask-desc` (u64) of a
+        /// The `zero-column-mask-desc` (u64) of a
         /// `.ws` MMA (`kind.prims.ws`).
         zero_col_mask: Option<ValueId>,
     },
@@ -4213,7 +4207,7 @@ pub enum Op {
         mask: Option<ValueId>,
         two_cta: bool,
     },
-    // m10-s2t-copies: shared-memory-to-TMEM copies.
+    // Shared-memory-to-TMEM copies.
     /// One warp-level issue of `tcgen05.cp.cta_group::{1,2}.<shape> [taddr],
     /// s-desc` (sm_100a): executed by a converged warp, whose lane `elect`
     /// (the Bool of an `elect.sync`) issues the instruction. `taddr` is the
@@ -4230,7 +4224,7 @@ pub enum Op {
         desc: ValueId,
         elect: ValueId,
     },
-    // m10-sm120-blockscaled: SM120 warp-level block-scaled mma.sync.
+    // SM120 warp-level block-scaled mma.sync.
     /// `mma.sync.aligned.<shape>.row.col.kind::<kind>.block_scale.scale_vec::<n>X.f32.<a>.<b>.f32.<sf>
     /// d, a, b, c, sfa, {0, 0}, sfb, {0, 0}` (sm_120a): executed by a converged
     /// warp. `a` and `b` are the operand registers (u32; see
@@ -4247,7 +4241,7 @@ pub enum Op {
         sfa: ValueId,
         sfb: ValueId,
     },
-    // m11-prims-mma-forms: SM120 warp-level sparse block-scaled mma.
+    // SM120 warp-level sparse block-scaled mma.
     /// `mma.sp::ordered_metadata.sync.aligned.m16n8k{64,128}.row.col.kind::<kind>.block_scale.scale_vec::<n>X.f32.<a>.<b>.f32.<sf>
     /// d, a, b, c, e, 0, sfa, {bid-a, tid-a}, sfb, {bid-b, tid-b}`
     /// (sm_120a): executed by a converged warp. `a` (4 u32 registers, the
@@ -4264,7 +4258,7 @@ pub enum Op {
         sfa: ValueId,
         sfb: ValueId,
     },
-    // m10-clc-scheduling: cluster launch control.
+    // Cluster launch control.
     /// `clusterlaunchcontrol.try_cancel.async.shared::cta.mbarrier::complete_tx::bytes{.multicast::cluster::all}.b128
     /// [resp], [mbar]` (sm_100, PTX 8.6; the multicast form sm_100a): take a
     /// still-queued cluster of the grid off the launch queue. The 16-byte
@@ -4290,7 +4284,6 @@ pub enum Op {
         elem: DType,
         results: [ValueId; 4],
     },
-    // Roadmap part m11-prims-nvvm-layer.
     /// `barrier.cta.red.{popc.u32,and.pred,or.pred}.aligned id{, count}, pred`
     /// (`bar.red`): a `bar.sync` at named barrier `id` that also reduces the
     /// participating threads' predicates `pred` (Bool) and returns the
@@ -4383,7 +4376,7 @@ pub struct TmemLdRed {
 }
 
 /// The 2:4 compression of an [`Op::Tcgen05Ld`] (`tcgen05.ld{.red}.spcompress`,
-/// PTX ISA 9.4, sm_107a; roadmap part m10-rubin-extras): of every four
+/// PTX ISA 9.4, sm_107a): of every four
 /// consecutive Float32 values a thread loads, the two the row operation `op`
 /// prefers (the larger for `max`, the smaller for `min`, by absolute value
 /// for the `abs` forms; a NaN is the least preferred unless `nan`, the most;
@@ -4399,8 +4392,7 @@ pub struct TmemLdSpCompress {
     pub nan: bool,
 }
 
-/// The shapes of `tcgen05.cp` (PTX ISA 9.7.18.9.2, roadmap part
-/// m10-s2t-copies), with their broadcast (multicast) qualifiers: the
+/// The shapes of `tcgen05.cp` (PTX ISA 9.7.18.9.2), with their broadcast (multicast) qualifiers: the
 /// source is `rows` rows of `row_bits` bits in shared memory, written to
 /// `broadcast()` TMEM lane groups.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -4488,7 +4480,7 @@ impl TmemCpShape {
 }
 
 /// The data-movement shapes of `tcgen05.ld` and `tcgen05.st` (PTX ISA
-/// 9.7.18.2.3, roadmap part m10-tmem-ld-st).
+/// 9.7.18.2.3).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum TmemShape {
     /// `.16x64b`: 16 lanes of 64 bits per repetition.
@@ -4584,7 +4576,7 @@ impl TmemShape {
     }
 }
 
-/// The instructions of [`Op::Tcgen05`] (roadmap part m10-tmem-core).
+/// The instructions of [`Op::Tcgen05`].
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Tcgen05Inst {
     /// `tcgen05.alloc.cta_group::{1,2}.sync.aligned.shared::cta.b32 [dst],
@@ -4602,7 +4594,7 @@ pub enum Tcgen05Inst {
     /// (i32), just loaded by `retrieve_tmem_ptr`, lies in a live allocation of
     /// the CTA. The backend emits nothing for it.
     CheckAddress,
-    /// `tcgen05.wait::ld.sync.aligned` (roadmap part m10-tmem-ld-st): the
+    /// `tcgen05.wait::ld.sync.aligned`: the
     /// warp's earlier `tcgen05.ld`s have completed. Warp-collective.
     WaitLd,
     /// `tcgen05.wait::st.sync.aligned`: the warp's earlier `tcgen05.st`s
@@ -4646,8 +4638,7 @@ impl Tcgen05Inst {
     }
 }
 
-/// The data kinds of `tcgen05.mma` (PTX ISA 9.7.18.10, `.kind`): F16
-/// (roadmap part m10-umma-f16), and TF32, I8 and F8F6F4 (m10-umma-dense-kinds)
+/// The data kinds of `tcgen05.mma` (PTX ISA 9.7.18.10, `.kind`): F16, and TF32, I8 and F8F6F4
 /// on the same machinery.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum UmmaDataKind {
@@ -4694,7 +4685,7 @@ impl UmmaDataKind {
         }
     }
 
-    /// m10-umma-blockscaled: whether the kind is block-scaled (its
+    /// Whether the kind is block-scaled (its
     /// instruction descriptor is CuTe C++'s `InstrDescriptorBlockScaled`).
     pub fn is_block_scaled(self) -> bool {
         matches!(self, UmmaDataKind::Mxf8f6f4 | UmmaDataKind::Mxf4 | UmmaDataKind::Mxf4Nvf4)
@@ -4714,7 +4705,7 @@ impl UmmaDataKind {
             (UmmaDataKind::F8F6F4 | UmmaDataKind::Mxf8f6f4, DType::F6E2M3FN) => Some(3),
             (UmmaDataKind::F8F6F4 | UmmaDataKind::Mxf8f6f4, DType::F6E3M2FN) => Some(4),
             (UmmaDataKind::F8F6F4 | UmmaDataKind::Mxf8f6f4, DType::F4E2M1FN) => Some(5),
-            // m10-umma-blockscaled: packed E2M1 (CuTe C++'s MXF4Format::E2M1).
+            // Packed E2M1 (CuTe C++'s MXF4Format::E2M1).
             (UmmaDataKind::Mxf4 | UmmaDataKind::Mxf4Nvf4, DType::F4E2M1FN) => Some(1),
             _ => None,
         }
@@ -4739,11 +4730,11 @@ impl UmmaDataKind {
     }
 }
 
-/// One `tcgen05.mma` instruction (roadmap part m10-umma-f16): shape `m x n
+/// One `tcgen05.mma` instruction: shape `m x n
 /// x k` (K: 32 bytes of the operand type), A and B of types `a` and `b`
 /// from shared memory, accumulated in `acc` in TMEM; A and B are MN-major
 /// when `trans_a` and `trans_b` are set. `two_cta` is `.cta_group::2`.
-/// With `a_tmem` (roadmap part m10-umma-kinds) A comes from tensor memory
+/// With `a_tmem` A comes from tensor memory
 /// (the `[a-tmem]` form, always K-major).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct UmmaKind {
@@ -4757,22 +4748,21 @@ pub struct UmmaKind {
     pub trans_b: bool,
     pub two_cta: bool,
     pub a_tmem: bool,
-    /// m10-umma-blockscaled: the scale factors of a block-scaled kind.
+    /// The scale factors of a block-scaled kind.
     pub scale: Option<UmmaScale>,
     /// m10-sparse-umma: `tcgen05.mma.sp`, A 2:4 structured sparse (stored
     /// compressed, half of K), with metadata in tensor memory.
     pub sparse: bool,
-    /// m10-rubin-umma: the Rubin (sm_107) forms: the doubled K and the
+    /// The Rubin (sm_107) forms: the doubled K and the
     /// collector-buffer qualifiers.
     pub sm107: Option<Sm107Umma>,
-    /// m11-prims-mma-forms: the forms and modifiers only `cute::prims`
+    /// The forms and modifiers only `cute::prims`
     /// issues (weight-stationary `.ws`, `.collector::a`, `.ashift`,
     /// `scale-input-d`).
     pub prims: UmmaPrims,
 }
 
-/// The parts of a `tcgen05.mma` only `cute::prims` issues (roadmap part
-/// m11-prims-mma-forms). The default is none of them.
+/// The parts of a `tcgen05.mma` only `cute::prims` issues. The default is none of them.
 ///
 /// * `thread_issue`: issued by each thread that executes it (a prims call
 ///   inside `elect_one`), not by a warp that elects a lane (`gemm`).
@@ -4795,7 +4785,7 @@ pub struct UmmaPrims {
     pub scale_input_d: Option<u8>,
 }
 
-/// CuTe DSL's `tcgen05.CollectorOp` (roadmap part m10-rubin-umma): what a
+/// CuTe DSL's `tcgen05.CollectorOp`: what a
 /// Rubin `tcgen05.mma` does with the collector buffer of its A or B operand
 /// (PTX `.collector::a::<op>` and `.collector::b::<op>`). `FILL` reads the
 /// operand from shared memory and keeps a copy in the collector; `USE`
@@ -4830,7 +4820,7 @@ impl CollectorOp {
     }
 }
 
-/// The Rubin parts of a `tcgen05.mma` (roadmap part m10-rubin-umma):
+/// The Rubin parts of a `tcgen05.mma`:
 /// `wide_k`, K doubled (`.kind::f8f6f4` and `.kind::mxf8f6f4` K = 64,
 /// `.kind::mxf4nvf4` K = 128), and the collector usage of A and B.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
@@ -4840,8 +4830,7 @@ pub struct Sm107Umma {
     pub collector_b: CollectorOp,
 }
 
-/// The scale factors of a block-scaled `tcgen05.mma` (roadmap part
-/// m10-umma-blockscaled): their type (`F8E8M0FNU` or `F8E4M3FN`), the K
+/// The scale factors of a block-scaled `tcgen05.mma`: their type (`F8E8M0FNU` or `F8E4M3FN`), the K
 /// elements each scales (`vec`, 16 or 32), and whether the instruction is
 /// the sm_103a K = 96 form (`.block16` / `.block32`).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -4854,25 +4843,25 @@ pub struct UmmaScale {
 impl UmmaKind {
     /// K: 32 bytes of the operand type (as it is held in shared memory);
     /// 96 for the sm_103a K = 96 forms.
-    /// m10-sparse-umma: twice that for a sparse kind (A stores half).
+    /// Twice that for a sparse kind (A stores half).
     pub fn k(&self) -> usize {
         let k = if self.scale.is_some_and(|s| s.k96) { 96 } else { self.kind.k() };
-        // m10-rubin-umma: the Rubin forms double it.
+        // The Rubin forms double it.
         let k = if self.sm107.is_some_and(|r| r.wide_k) { 2 * k } else { k };
         if self.sparse { 2 * k } else { k }
     }
 
-    /// m10-sparse-umma: K of A as stored (compressed for a sparse kind).
+    /// K of A as stored (compressed for a sparse kind).
     pub fn a_k(&self) -> usize {
         if self.sparse { self.k() / 2 } else { self.k() }
     }
 
-    /// m10-sparse-umma: the sparse instruction descriptor's flag (bit 2)
+    /// The sparse instruction descriptor's flag (bit 2)
     /// and the metadata selector field (bits 0-1, CuTe C++'s `sparse_id2_`).
     pub const SPARSE_BIT: u32 = 2;
     pub const SPARSE_ID2_MASK: u32 = 3;
 
-    /// m10-umma-blockscaled: the scale factors per row of A (column of B)
+    /// The scale factors per row of A (column of B)
     /// one instruction reads, K / the vector size.
     pub fn scale_factors(&self) -> usize {
         self.scale.map_or(0, |s| self.k() / s.vec as usize)
@@ -4895,7 +4884,7 @@ impl UmmaKind {
     /// bits 15 and 16, `N >> 3` in bits 17-22 and `M >> 4` in bits 24-28.
     /// Panics on a type the kind does not take.
     ///
-    /// m10-umma-blockscaled: a block-scaled kind has CuTe C++'s
+    /// A block-scaled kind has CuTe C++'s
     /// `InstrDescriptorBlockScaled` (ported from
     /// include/cute/arch/mma_sm100_desc.hpp): no accumulator format (it is
     /// Float32), the B and A scale-factor IDs in bits 4-5 and 29-30 (0
@@ -4903,7 +4892,7 @@ impl UmmaKind {
     /// (UE4M3 0, UE8M0 1) and K = 96 in bit 31.
     #[track_caller]
     pub fn idesc(&self) -> u32 {
-        // m11-prims-descriptors-swizzle: the bits are packed by the public
+        // The bits are packed by the public
         // builders (`prims::Tcgen05InstrDesc`, `Tcgen05MxInstrDesc`,
         // `Tcgen05MxOmmaInstrDesc`), which check each field.
         use crate::prims::descriptors as d;
@@ -4917,12 +4906,12 @@ impl UmmaKind {
         let fail = |e: String| -> u32 { panic!("tcgen05.mma.kind::{} instruction descriptor: {e}", self.kind.ptx()) };
         let bits = |b: d::Bits<u32>| b.as_static().expect("a descriptor of constants");
         if let Some(sc) = self.scale {
-            // m10-rubin-umma: UE5M3 is format 2 of the 2-bit field (bits 23-24) of
+            // UE5M3 is format 2 of the 2-bit field (bits 23-24) of
             // CuTe C++'s Sm107MXF4NVF4InstrDescriptor.
             let scale_format = d::MxScaleFormat::for_dtype(sc.sf)
                 .unwrap_or_else(|| panic!("tcgen05.mma: no scale-factor format for {}", sc.sf));
             if self.kind == UmmaDataKind::Mxf8f6f4 {
-                // m10-rubin-umma: K = 64 of .kind::mxf8f6f4 is bit 31.
+                // K = 64 of .kind::mxf8f6f4 is bit 31.
                 let f = d::Tcgen05MxInstrDescFields {
                     sparse: self.sparse,
                     a_format: fmt(self.a),
@@ -4937,7 +4926,7 @@ impl UmmaKind {
                 };
                 return d::Tcgen05MxInstrDesc::build(&f).map_or_else(fail, |x| bits(x.bits()));
             }
-            // m10-rubin-umma: K = 128 of .kind::mxf4nvf4 is the K-size value 2 (bit 3
+            // K = 128 of .kind::mxf4nvf4 is the K-size value 2 (bit 3
             // set, bit 31 clear); the other K = 128 and the sm_103a K = 96 are 1.
             let k_dim = match (wide, self.kind) {
                 (true, UmmaDataKind::Mxf4Nvf4) => 2,
@@ -4969,16 +4958,16 @@ impl UmmaKind {
             b_major: major(self.trans_b),
             n: self.n,
             m: self.m,
-            // m10-rubin-umma: K = 64 of .kind::f8f6f4 (CuTe C++'s make_sm107_instr_desc).
+            // K = 64 of .kind::f8f6f4 (CuTe C++'s make_sm107_instr_desc).
             k_dim: wide,
-            // m11-prims-mma-forms: B reuse of the .ws forms.
+            // B reuse of the .ws forms.
             max_shift: self.prims.max_shift,
             ..Default::default()
         };
         d::Tcgen05InstrDesc::build(&f).map_or_else(fail, |x| bits(x.bits()))
     }
 
-    /// m11-prims-mma-forms: why this combination of form and modifiers is
+    /// Why this combination of form and modifiers is
     /// no `tcgen05.mma` the PTX ISA defines (or cute-rs models), if it is
     /// not: the `.ws` shapes (`cta_group::1`, M of 32, 64 or 128, N of 64,
     /// 128 or 256, the dense kinds), `.ashift` (A in TMEM, M of 128 or 256,
@@ -5071,7 +5060,7 @@ impl UmmaKind {
         None
     }
 
-    /// m10-rubin-umma: the dense instruction descriptor's K-size bit (29).
+    /// The dense instruction descriptor's K-size bit (29).
     pub const K64_BIT: u32 = 29;
 
     /// The instruction's name with its qualifiers.
@@ -5079,7 +5068,7 @@ impl UmmaKind {
         let wide = self.sm107.is_some_and(|r| r.wide_k);
         let vec32 = self.scale.is_some_and(|s| s.vec == 32);
         let scale = match (self.kind, self.scale.is_some_and(|s| s.k96)) {
-            // m10-rubin-umma: K = 128 names the vector size (CuTe C++'s SM107_MMA_MXF4NVF4_SS).
+            // K = 128 names the vector size (CuTe C++'s SM107_MMA_MXF4NVF4_SS).
             (UmmaDataKind::Mxf4Nvf4, _) if wide && vec32 => ".block_scale.block32",
             (UmmaDataKind::Mxf4Nvf4, _) if wide => ".block_scale.block16",
             (UmmaDataKind::Mxf8f6f4, _) => ".block_scale",
@@ -5089,7 +5078,7 @@ impl UmmaKind {
             (UmmaDataKind::Mxf4Nvf4, true) => ".block_scale.block16",
             _ => "",
         };
-        // m10-rubin-umma: the collector qualifiers (DISCARD, the default, is not written).
+        // The collector qualifiers (DISCARD, the default, is not written).
         let mut collect = String::new();
         // m11-prims-mma-forms: .ashift, then the collector usage (verified against LLVM 23's
         // NVPTX printer: `.kind::tf32.ashift.collector::a::lastuse`, `.collector::b2::use`).
@@ -5120,7 +5109,7 @@ impl UmmaKind {
         )
     }
 
-    /// The instruction descriptor's negate-A bit (13; m10-umma-kinds).
+    /// The instruction descriptor's negate-A bit (13).
     pub const NEGATE_A_BIT: u32 = 13;
     /// The instruction descriptor's negate-B bit (14).
     pub const NEGATE_B_BIT: u32 = 14;
@@ -5132,8 +5121,7 @@ impl UmmaKind {
     }
 }
 
-/// One `wgmma.mma_async` instruction (roadmap parts m8-wgmma-core and
-/// m8-wgmma-variants): shape `m64nNkK`, operands of types `a` and `b`
+/// One `wgmma.mma_async` instruction: shape `m64nNkK`, operands of types `a` and `b`
 /// accumulated in `acc`:
 ///
 /// | A, B                          | accumulator | K  |
@@ -5934,7 +5922,7 @@ pub struct KernelIr {
     /// [`Inst::scope`].
     pub scopes: Vec<crate::profiling::NameScope>,
     /// The device workspace the kernel takes as its last argument, if any
-    /// ([`crate::experimental::host_runtime`], roadmap part m11-cute-ext-tma).
+    /// ([`crate::experimental::host_runtime`]).
     pub workspace: Option<crate::experimental::host_runtime::WorkspaceDecl>,
     /// The Float `+`, `-` and `*` results that must not be contracted into `fma` (built in
     /// an exact scope, such as the precise [`math`](crate::math) functions'), whatever
@@ -6076,7 +6064,7 @@ impl KernelIr {
 }
 
 // ---------------------------------------------------------------------------
-// m11-extern-distributed: external device functions, standalone device
+// External device functions, standalone device
 // functions and multimem instructions.
 // ---------------------------------------------------------------------------
 

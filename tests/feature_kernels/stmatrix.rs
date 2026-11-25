@@ -8,7 +8,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! `stmatrix` atoms and `setmaxnreg` (roadmap part m8-stmatrix-setmaxnreg): every form
+//! `stmatrix` atoms and `setmaxnreg`: every form
 //! held to a Rust model of the PTX ISA's fragment tables, a dense-GEMM-style epilogue, and a
 //! warp-specialised kernel that moves registers between warpgroups.
 

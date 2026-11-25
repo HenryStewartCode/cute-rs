@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! cute_ext's scheduler pipelines, DSMEM cluster mailbox and TMEM accumulator buffering
-//! (roadmap part m11-cute-ext-sched-tmem): host tests of the b32 payload codec and of the
+//! cute_ext's scheduler pipelines, DSMEM cluster mailbox and TMEM accumulator buffering: host tests of the b32 payload codec and of the
 //! accumulator planner (hand-computed tables, and the configuration of CuTe DSL's
 //! `cute_ext/blackwell/dense_gemm/dense_block_scaled_gemm.py` with its defaults), then on the
 //! simulator against plain Rust: a CLCPipeline handing out tiles on a small grid, a

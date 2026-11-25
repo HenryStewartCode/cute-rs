@@ -8,7 +8,8 @@
 #
 # Run it from the repository root, on Linux with an NVIDIA driver. It
 #   1. installs what is missing: Rust (rustup, into ~/.cargo) and mlir-opt (LLVM 22 from
-#      apt.llvm.org, unless CUTE_MLIR_OPT or /workspace/llvm-22 provides one);
+#      apt.llvm.org, unless CUTE_MLIR_OPT or /workspace/llvm-22 provides one; LLVM_VERSION=23 picks
+#      another LLVM);
 #   2. builds the tests once, in release, with the `cuda` feature;
 #   3. runs the architecture's own suite first (tests/gpu_hopper.rs on sm_90,
 #      tests/gpu_blackwell.rs on sm_10x) with CUTE_RS_EXPECT_SM set, so that those tests fail
@@ -25,6 +26,7 @@
 set -uo pipefail
 
 QUICK=0 BENCH=1 FULL=1
+LLVM_VERSION=${LLVM_VERSION:-22} # the LLVM whose mlir-opt is installed when none is found
 for arg in "$@"; do
     case "$arg" in
         --quick) QUICK=1 FULL=0 ;;
@@ -71,21 +73,21 @@ if ! command -v cargo >/dev/null; then
 fi
 
 if [ -z "${CUTE_MLIR_OPT:-}" ]; then
-    for c in /workspace/llvm-22/bin/mlir-opt /usr/lib/llvm-22/bin/mlir-opt; do
+    for c in "/workspace/llvm-$LLVM_VERSION/bin/mlir-opt" "/usr/lib/llvm-$LLVM_VERSION/bin/mlir-opt"; do
         [ -x "$c" ] && { export CUTE_MLIR_OPT="$c"; break; }
     done
 fi
 if [ -z "${CUTE_MLIR_OPT:-}" ]; then
-    log "installing mlir-opt (LLVM 22, apt.llvm.org)"
+    log "installing mlir-opt (LLVM $LLVM_VERSION, apt.llvm.org)"
     SUDO=""; [ "$(id -u)" -ne 0 ] && SUDO=sudo
     CODENAME=$(. /etc/os-release && echo "${VERSION_CODENAME:-noble}")
     {
         $SUDO apt-get update -qq && $SUDO apt-get install -y -qq wget gnupg ca-certificates &&
         wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | $SUDO tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc >/dev/null &&
-        echo "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME-22 main" | $SUDO tee /etc/apt/sources.list.d/llvm-22.list >/dev/null &&
-        $SUDO apt-get update -qq && $SUDO apt-get install -y -qq mlir-22-tools llvm-22
+        echo "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME-$LLVM_VERSION main" | $SUDO tee /etc/apt/sources.list.d/llvm-$LLVM_VERSION.list >/dev/null &&
+        $SUDO apt-get update -qq && $SUDO apt-get install -y -qq "mlir-$LLVM_VERSION-tools" "llvm-$LLVM_VERSION"
     } >"$OUT/apt.log" 2>&1 || { log "FAILED: mlir-opt install (see apt.log)"; exit 1; }
-    export CUTE_MLIR_OPT=/usr/lib/llvm-22/bin/mlir-opt
+    export CUTE_MLIR_OPT="/usr/lib/llvm-$LLVM_VERSION/bin/mlir-opt"
 fi
 
 # The JIT disk cache refuses world-writable directories (network volumes): keep it local.

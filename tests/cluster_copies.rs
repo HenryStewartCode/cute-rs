@@ -1,4 +1,4 @@
-//! Copies across the CTAs of a cluster (roadmap part m7-cluster-copies): multicast
+//! Copies across the CTAs of a cluster: multicast
 //! masks over every CTA rank of 2x1, 2x2 and 4x2 clusters, the feature kernels under
 //! seeded schedules and random completion, the simulator's reports of misuse, and the
 //! MLIR and PTX the copies lower to.

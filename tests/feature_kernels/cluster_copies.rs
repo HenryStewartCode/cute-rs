@@ -10,7 +10,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! Copies across the CTAs of a cluster (roadmap part m7-cluster-copies), held to plain
+//! Copies across the CTAs of a cluster, held to plain
 //! Rust: multicast masks from a cluster layout (`make_layout_image_mask`,
 //! `create_tma_multicast_mask`); a GEMM-style load in 2x1 and 2x2 clusters where A is
 //! multicast along N and B along M, each CTA loading its share of the tiles it shares

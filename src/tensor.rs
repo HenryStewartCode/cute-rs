@@ -38,7 +38,7 @@
 //! [`make_identity_tensor`]) hold coordinates instead of data, and are used
 //! to compute predicates for partial tiles. As in CuTe, a coordinate tensor
 //! is an origin (an arithmetic tuple) and a layout, usually with scaled-basis
-//! strides ([`make_identity_layout`](crate::make_identity_layout)): the
+//! strides ([`make_identity_layout`]): the
 //! element at `c` is the origin plus the tuple the layout maps `c` to
 //! ([`Tensor::coord`]). Slicing, tiling and partitioning act on the layout
 //! and fold what they fix into the origin, so the extents may be runtime
@@ -187,15 +187,14 @@ pub(crate) enum Engine {
         buffer: BufferId,
         space: MemSpace,
         /// A tensor in another CTA's shared memory (made from a
-        /// [`map_dsmem_ptr`](crate::map_dsmem_ptr) pointer, roadmap part
-        /// m8-dsmem): that CTA's rank in the cluster.
+        /// [`map_dsmem_ptr`](crate::map_dsmem_ptr) pointer): that CTA's rank in the cluster.
         peer: Option<ValueId>,
     },
     Register(Rc<RegisterStorage>),
     /// A coordinate tensor: CuTe's arithmetic-tuple iterator, the origin
     /// that the tuple the layout gives is added to.
     ArithTuple(Coord),
-    /// A WGMMA shared-memory operand (roadmap part m8-wgmma-core): CuTe's
+    /// A WGMMA shared-memory operand: CuTe's
     /// GMMA descriptor iterator. `desc` (a Uint64) describes the operand's
     /// first MMA tile; element `i` is `desc` plus the layout's offset of
     /// `i`, in units of 16 bytes ([`crate::nvgpu::warpgroup`]).
@@ -216,8 +215,7 @@ pub(crate) struct RegisterStorage {
     /// `warpgroup::fence` and `wait_group` fence ([`crate::nvgpu::warpgroup`]).
     pub(crate) wgmma_acc: std::cell::Cell<bool>,
     /// The fragment holds the register-sourced A operands of warpgroup
-    /// MMAs, which `warpgroup::fence` fences (roadmap part
-    /// m8-wgmma-variants).
+    /// MMAs, which `warpgroup::fence` fences.
     pub(crate) wgmma_a: std::cell::Cell<bool>,
 }
 
@@ -312,7 +310,7 @@ pub struct Tensor<T> {
     pub(crate) layout: Layout,
     pub(crate) offset: IndexExpr,
     pub(crate) inner: TensorInner,
-    /// The predication origin (roadmap part m11-cute-ext-core): for a
+    /// The predication origin: for a
     /// tensor viewed from a global-memory tensor, the origin's shape and the
     /// view operations since, which [`crate::experimental`]'s copies replay
     /// on an identity tensor to bound their accesses.
@@ -353,8 +351,7 @@ pub(crate) enum PredOrigin {
     Lost,
 }
 
-/// The layout, offset and inner function of a predication origin tensor
-/// (roadmap part m11-cute-ext-tma).
+/// The layout, offset and inner function of a predication origin tensor.
 pub(crate) struct OriginRoot {
     pub(crate) layout: Layout,
     pub(crate) offset: IndexExpr,
@@ -549,8 +546,7 @@ impl<T> Tensor<T> {
         Tensor { origin: Some(PredOrigin::fresh(self.layout.shape())), ..self.clone() }
     }
 
-    /// The predication origin this tensor was viewed from, as a tensor
-    /// (roadmap part m11-cute-ext-tma): the origin's engine, layout, offset
+    /// The predication origin this tensor was viewed from, as a tensor: the origin's engine, layout, offset
     /// and inner, without an origin of its own. `None` without a tracked
     /// origin.
     pub(crate) fn origin_root(&self) -> Option<Tensor<T>> {
@@ -797,7 +793,7 @@ impl<T> Tensor<T> {
     }
 
     /// The buffer of a memory tensor and, for one in another CTA's shared
-    /// memory, that CTA's rank (roadmap part m8-dsmem).
+    /// memory, that CTA's rank.
     pub(crate) fn buffer_and_peer(&self) -> Option<(BufferId, Option<ValueId>)> {
         match self.engine {
             Engine::Memory { buffer, peer, .. } => Some((buffer, peer)),
@@ -955,7 +951,7 @@ impl<T: Numeric> Tensor<T> {
     }
 
     /// Element `i` (in the layout's index order), or zero for a register
-    /// never written (roadmap part m11-cute-ext-core: the current values of
+    /// never written (the current values of
     /// `experimental::elementwise`'s outputs).
     #[track_caller]
     pub(crate) fn load_or_zero(&self, i: usize) -> Value<T> {
@@ -1316,7 +1312,7 @@ pub fn increment_coord(coord: impl Into<SliceCoord>, shape: impl Into<Shape>) ->
 }
 
 /// Panic, naming `what`, if it is in another CTA's shared memory (`peer`):
-/// the instruction asking reaches only this CTA's (roadmap part m8-dsmem).
+/// the instruction asking reaches only this CTA's.
 #[track_caller]
 pub(crate) fn refuse_dsmem(peer: Option<ValueId>, what: &str) {
     if peer.is_some() {
@@ -1329,7 +1325,7 @@ pub(crate) fn refuse_dsmem(peer: Option<ValueId>, what: &str) {
 }
 
 /// A load of `n` contiguous elements at `off`, from the shared memory of CTA `peer` of the cluster
-/// when given (roadmap part m8-dsmem).
+/// when given.
 #[track_caller]
 pub(crate) fn load_vector_in<T: Numeric>(
     buffer: BufferId,
@@ -1342,7 +1338,7 @@ pub(crate) fn load_vector_in<T: Numeric>(
 }
 
 /// A store of contiguous elements at `off`, into the shared memory of CTA `peer` of the cluster
-/// when given (roadmap part m8-dsmem).
+/// when given.
 #[track_caller]
 pub(crate) fn store_vector_in(buffer: BufferId, off: IndexExpr, values: &[ValueId], peer: Option<ValueId>) {
     let index = index_operand(off);
@@ -1655,8 +1651,7 @@ pub struct Ptr<T> {
     pub(crate) space: MemSpace,
     pub(crate) offset: IndexExpr,
     pub(crate) swizzle: Option<Swizzle>,
-    /// A distributed-shared-memory pointer ([`map_dsmem_ptr`](crate::map_dsmem_ptr),
-    /// roadmap part m8-dsmem): the rank (an Int32) of the CTA of the cluster
+    /// A distributed-shared-memory pointer ([`map_dsmem_ptr`](crate::map_dsmem_ptr)): the rank (an Int32) of the CTA of the cluster
     /// whose shared memory it points into, at the offset `buffer` has here.
     pub(crate) peer: Option<ValueId>,
     pub(crate) _t: PhantomData<fn() -> T>,
@@ -1824,7 +1819,7 @@ impl<T: Numeric> Ptr<T> {
 
     /// [`Ptr::parts`] and the peer CTA of a distributed-shared-memory
     /// pointer, for the instructions that reach another CTA's shared memory
-    /// (loads, stores, atomics and reductions; roadmap part m8-dsmem).
+    /// (loads, stores, atomics and reductions).
     #[track_caller]
     pub(crate) fn parts_dsmem(&self) -> (BufferId, IndexExpr, Option<ValueId>) {
         if let Some(sw) = self.swizzle
@@ -2491,7 +2486,7 @@ pub fn make_coord_tensor(origin: impl Into<Coord>, layout: Layout) -> Tensor<Ide
 
 /// A tensor whose element at coordinate `c` is `c` itself (CuTe DSL's
 /// `cute.make_identity_tensor`): the coordinate tensor of origin 0 over
-/// [`make_identity_layout`](crate::make_identity_layout)`(shape)`. The shape
+/// [`make_identity_layout`]`(shape)`. The shape
 /// may have any rank and nesting, and runtime extents
 /// (`make_identity_tensor(m_a.shape())`, as CuTe DSL's
 /// `make_identity_tensor(mA.shape)`). Its elements are hierarchical
@@ -2586,8 +2581,7 @@ impl<T: Numeric> Carry for Tensor<T> {
         let loc = std::panic::Location::caller();
         for i in 0..storage.len() {
             // Warpgroup-MMA accumulators not yet written start as zeros (an
-            // MMA that does not accumulate ignores them; roadmap part
-            // m8-wgmma-variants).
+            // MMA that does not accumulate ignores them).
             if storage.wgmma_acc.get() && storage.peek(i).is_none() {
                 let zero = builder::with(|b| b.constant(crate::ir::Literal::zero(T::DTYPE), loc));
                 storage.write(i, zero);

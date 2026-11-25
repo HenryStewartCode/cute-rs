@@ -1,5 +1,4 @@
-//! The base DSL's swizzle on shared-memory byte addresses (roadmap part
-//! m11-prims-descriptors-swizzle; CuTe DSL's `cutlass.Swizzle`,
+//! The base DSL's swizzle on shared-memory byte addresses (CuTe DSL's `cutlass.Swizzle`,
 //! `apply_swizzle`, `load_swizzled` and `store_swizzled`).
 //!
 //! [`ByteSwizzle`] is a frozen `(bbits, mbase, sshift)` descriptor that acts

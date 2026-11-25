@@ -56,7 +56,7 @@
 //! a multiple of 256.
 //!
 //! The tutorial's second step, `fp16_gemm_1.py`, is the configuration
-//! [`FP16_GEMM_1`] of the same kernel (roadmap part m10-cta-pair-pipelines):
+//! [`FP16_GEMM_1`] of the same kernel:
 //! a `(2, 1, 1)` cluster whose CTA pair runs `256x256x16` MMAs
 //! (`CtaGroup::TWO`) on `(256, 256, 64)` tiles with 7 A/B stages. Each CTA
 //! loads its half of A and of B (multicast TMA loads, masks from
@@ -68,7 +68,7 @@
 //! as `(2, 2, 1)`, which multicasts A across N) only change
 //! `cluster_shape_mnk`.
 //!
-//! The tutorial's next steps (roadmap part m10-port-clc-clusters) are the configurations of
+//! The tutorial's next steps are the configurations of
 //! one warp-specialized kernel, [`Fp16GemmWsConfig::build`] (192 threads: epilogue warps 0
 //! to 3, MMA warp 4, TMA warp 5, and scheduler warp 6 with CLC):
 //! - [`FP16_GEMM_2`] (`fp16_gemm_2.py`): TMA, MMA and epilogue warp specialization on the
@@ -88,7 +88,7 @@
 //!   memory is allocated once for both (`smem_merge_branch_allocs`).
 //!
 //! Differences from the Python of these steps: the epilogue is the packaged
-//! `epilogue_tma_store` (m10-epilogue-helpers), as in `blackwell_dense_gemm`, so the
+//! `epilogue_tma_store`, as in `blackwell_dense_gemm`, so the
 //! accumulator's consumers are the epilogue warps (one arrival each); the leader CTA's MMA
 //! warp issues a k-block at a time; every configuration publishes its barriers with one
 //! cluster arrive and wait (`fp16_gemm_3.py`'s order) and drains the accumulator pipeline
@@ -102,7 +102,7 @@
 //! clusters and CLC have run only in the simulator, whose CLC queue hands out clusters of
 //! the canceller's own shape.
 //!
-//! The epilogue is a hook (roadmap part m10-epilogue-helpers): [`Fp16GemmConfig::build_with`]
+//! The epilogue is a hook: [`Fp16GemmConfig::build_with`]
 //! takes the declaration of C and a closure that drains the accumulator
 //! ([`EpilogueCtx`] holds what the mainloop leaves it), so that the packaged epilogues of
 //! `cute::utils::gemm::sm100` run on the same mainloop; [`Fp16GemmConfig::build`] is the
@@ -555,7 +555,7 @@ pub fn kernel<C>(
     tmem.free(&tmem_ptr, 0);
 }
 
-/// What the mainloop leaves the epilogue (roadmap part m10-epilogue-helpers).
+/// What the mainloop leaves the epilogue.
 pub struct EpilogueCtx<'a> {
     pub cfg: &'a Fp16GemmConfig,
     pub tiled_mma: &'a TiledMma,
@@ -636,7 +636,7 @@ pub fn tutorial_epilogue(ctx: &EpilogueCtx, m_c_mnl: &Tensor<IoDtype>) {
 
 // ---------------------------------------------------------------------------------------
 // fp16_gemm_2, 3, 3_1 and 4: warp specialization, persistent tile schedulers, cluster
-// launch control and preferred clusters (roadmap part m10-port-clc-clusters).
+// launch control and preferred clusters.
 // ---------------------------------------------------------------------------------------
 
 /// How the warp-specialized kernel's CTAs find their tiles.

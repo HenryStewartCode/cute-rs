@@ -36,7 +36,7 @@ mod tensorop_gemm;
 #[allow(dead_code)]
 #[path = "../examples/warp_named_barrier.rs"]
 mod warp_named_barrier;
-// The TMA tutorials (m7-port-tma-tutorials).
+// The TMA tutorials.
 #[allow(dead_code)]
 #[path = "../examples/tma_copy.rs"]
 mod tma_copy;
@@ -134,7 +134,7 @@ fn registered() -> Vec<(Case, &'static [Arch])> {
     kernels.extend(feature_kernels::sm89().into_iter().map(|c| (c, &SM89_AND_NEWER[..])));
     kernels.extend(feature_kernels::mma_sparse().into_iter().map(|c| (c, &EVERY_ARCH[..])));
     kernels.extend(feature_kernels::sm100a().into_iter().map(|c| (c, &SM100A[..])));
-    // Tensor memory (m10-tmem-core).
+    // Tensor memory.
     kernels.extend(feature_kernels::sm100().into_iter().map(|c| (c, &SM100A[..])));
     // setmaxnreg on sm_90a.
     kernels.extend(feature_kernels::sm90a().into_iter().map(|c| (c, &[Arch::Sm90a][..])));
@@ -322,7 +322,7 @@ fn single_warp_pipeline_assembles_for_every_ptx87_target() {
     }
 }
 
-/// m7-tma-store and m7-cluster-copies: the TMA store, reduction, prefetch, cache-hint,
+/// The TMA store, reduction, prefetch, cache-hint,
 /// multicast, peer-copy and `st.async` kernels assemble for sm_90 and sm_90a (they are
 /// also among the registered kernels; this runs them alone, for the lane's checks).
 #[test]
@@ -357,8 +357,8 @@ fn tma_store_and_cluster_copy_kernels_assemble_for_sm90() {
     eprintln!("assembled {count} kernel/target pairs with {}", ptxas.display());
 }
 
-/// The im2col kernels (m7-tma-im2col) for sm_90 and sm_90a, and the gather4, scatter4,
-/// byte-masked and FP4/FP6 kernels (m7-tma-sm100-modes) for sm_100a (ptxas 12.8 takes PTX
+/// The im2col kernels for sm_90 and sm_90a, and the gather4, scatter4,
+/// byte-masked and FP4/FP6 kernels for sm_100a (ptxas 12.8 takes PTX
 /// up to 8.7; the sm_107f override kernels have no assembler yet).
 #[test]
 fn tma_mode_kernels_assemble_for_their_targets() {
@@ -395,7 +395,7 @@ fn tma_mode_kernels_assemble_for_their_targets() {
     eprintln!("assembled {count} kernel/target pairs with {}", ptxas.display());
 }
 
-/// m10-tmem-core: the TMEM allocation kernels assemble for sm_100a, and their PTX has the
+/// The TMEM allocation kernels assemble for sm_100a, and their PTX has the
 /// tcgen05 instructions (also among the registered kernels; this runs them alone).
 #[test]
 fn tmem_kernels_assemble_for_sm100a() {

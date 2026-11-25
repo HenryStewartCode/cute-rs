@@ -1,5 +1,4 @@
-//! Software-pipelined loops, `for_range_pipelined` (roadmap part
-//! m9-range-prefetch-stages, CuTe DSL's `cutlass.range(.., prefetch_stages=S)`):
+//! Software-pipelined loops, `for_range_pipelined` (CuTe DSL's `cutlass.range(.., prefetch_stages=S)`):
 //! the rotated order of produce and consume calls for every small distance,
 //! trip count and step (static and runtime bounds); `tensorop_gemm`'s
 //! mainloop rotated by the helper against the hand-rotated one; a single warp

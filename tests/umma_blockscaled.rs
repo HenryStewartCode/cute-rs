@@ -10,7 +10,7 @@
 // That portion is under the BSD-3-Clause licence, and the rest of the file is cute-rs's own,
 // under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the licence text.
 
-//! The block-scaled tcgen05 MMAs (roadmap part m10-umma-blockscaled): GEMM tiles on the
+//! The block-scaled tcgen05 MMAs: GEMM tiles on the
 //! simulator for MXF8F6F4, MXF4, NVF4 (UE4M3 and UE8M0 scales) and the sm_103a K = 96
 //! forms, with M = 128 on one CTA and M = 256 and 128 on a CTA pair, several N, the scale
 //! factors staged into TMEM by `tcgen05.cp` in the layout written out below (row `32 c + l`
@@ -703,7 +703,7 @@ fn block_scaled_ptx() {
     }
 }
 
-// m10-port-nvfp4-gemm: the SM100 shared-memory and TMEM scale-factor layouts of
+// The SM100 shared-memory and TMEM scale-factor layouts of
 // cute::utils (make_smem_layout_sfa/sfb, make_tmem_layout_sfa/sfb), checked here against
 // the placements written out by hand; examples/blackwell_nvfp4_gemm.rs checks them on
 // the simulator end to end.

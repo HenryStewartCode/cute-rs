@@ -1,4 +1,4 @@
-//! The Blackwell mixed-input GEMM helpers (roadmap part m10-mixed-input): the host selectors
+//! The Blackwell mixed-input GEMM helpers: the host selectors
 //! and validity checks, the Int4 conversions on the simulator against plain Rust, and the
 //! reduced `mixed_input_gemm.py` port (`examples/blackwell_mixed_input_gemm.rs`) against a CPU
 //! reference, with its sm_100a PTX assembled by `ptxas` when it is on PATH.

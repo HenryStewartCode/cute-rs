@@ -11,7 +11,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! The helpers of a Blackwell mixed-input GEMM (roadmap part m10-mixed-input; CuTe DSL's
+//! The helpers of a Blackwell mixed-input GEMM (CuTe DSL's
 //! `cutlass.utils.mixed_input_helpers`). In such a GEMM, transform warps convert a narrow A
 //! operand (Int4 or 8-bit, optionally scaled) to the MMA's type and store it into tensor
 //! memory (A K-major, for a TS-UMMA) or shared memory (A MN-major), from where the MMA warp

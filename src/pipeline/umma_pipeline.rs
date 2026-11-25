@@ -10,7 +10,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text.
 
-//! The Blackwell pipelines (roadmap part m10-umma-pipelines), whose one side
+//! The Blackwell pipelines, whose one side
 //! is the `tcgen05` MMA warp and arrives with `tcgen05.commit`:
 //! [`PipelineTmaUmma`] (TMA loads feeding the MMAs), [`PipelineAsyncUmma`]
 //! (ordinary threads feeding the MMAs) and [`PipelineUmmaAsync`] (the MMAs'
@@ -18,8 +18,7 @@
 //!
 //! Each takes the cluster as a `(V, M, N, L)` layout; a `V` mode of size 2
 //! (a CTA pair running `cta_group::2` MMAs) makes the commits
-//! `cta_group::2`. In a CTA pair (roadmap part m10-cta-pair-pipelines,
-//! simulated by `tests/cta_pair_pipelines.rs` and the `blackwell_fp16_gemm`
+//! `cta_group::2`. In a CTA pair (simulated by `tests/cta_pair_pipelines.rs` and the `blackwell_fp16_gemm`
 //! example's `fp16_gemm_1` configuration):
 //!
 //! * [`PipelineTmaUmma`]: only the even CTA (`block_idx.x % V == 0`) arms the
@@ -575,7 +574,7 @@ impl Pipeline for PipelineAsyncUmma {
     /// Every producer thread arrives on the stage's full barrier. In a 2-CTA cluster the
     /// arrival goes to the leading CTA of the pair as a release at cluster scope
     /// (`mbarrier.arrive.release.cluster` through `mapa`), so that the peer's writes of the
-    /// stage are ordered before the leader's MMA reads them (m10-mixed-input; CuTe DSL
+    /// stage are ordered before the leader's MMA reads them (CuTe DSL
     /// arrives at CTA scope, as `PipelineTmaAsync`'s docs discuss).
     #[track_caller]
     fn producer_commit<S: StageState>(&self, state: &S) {

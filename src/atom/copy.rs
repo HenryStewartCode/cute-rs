@@ -100,7 +100,7 @@ pub enum CopyOp {
     /// `SM90_U32x{1,2,4}_STSM_N` and `SM90_U16x{2,4,8}_STSM_T` (those of
     /// `ldmatrix` with source and destination swapped). A 32-bit element
     /// type goes one element to a register, untransposed only (Blackwell
-    /// epilogues of Float32 D, m10-epilogue-helpers).
+    /// epilogues of Float32 D).
     StMatrix { num: usize, trans: bool },
     /// CuTe DSL's `cute.nvgpu.warp.StMatrix16x8x8bOp(transpose=True,
     /// num_matrices)`: `stmatrix.sync.aligned.m16n8.x{num}.trans.shared.b8`
@@ -140,18 +140,16 @@ pub enum CopyOp {
     /// SM90; CuTe DSL's `cpasync.CopyBulkG2SOp`, or with `multicast`
     /// `cpasync.CopyBulkG2SMulticastOp`, `.multicast::cluster`): `bits` as
     /// for [`CopyOp::BulkS2G`]. It takes `mbar_ptr` (and with `multicast`
-    /// `mcast_mask`) and an optional `cache_policy`. Not elected (roadmap
-    /// part m7-cluster-copies).
+    /// `mcast_mask`) and an optional `cache_policy`. Not elected.
     BulkG2S { bits: usize, multicast: bool },
     /// A bulk copy from this CTA's shared memory to a peer CTA's
     /// (`cp.async.bulk.shared::cluster.shared::cta.mbarrier::complete_tx::bytes`,
     /// SM90; CuTe DSL's `cpasync.CopyBulkS2SOp`): it takes `mbar_ptr` and
     /// `cta_rank`, maps the destination and the mbarrier to that CTA
-    /// (`mapa`) and counts its bytes down the peer's mbarrier. Not elected
-    /// (roadmap part m7-cluster-copies).
+    /// (`mapa`) and counts its bytes down the peer's mbarrier. Not elected.
     BulkS2S { bits: usize },
     /// Loads from shared memory into registers carrying memory attributes
-    /// (CuTe DSL's `cute.nvgpu.CopyS2ROp`, roadmap part m8-dsmem): `bits` as
+    /// (CuTe DSL's `cute.nvgpu.CopyS2ROp`): `bits` as
     /// for [`CopyOp::G2R`]. With [`SharedSpace::Cluster`] the source is
     /// another CTA's shared memory (a tensor from a
     /// [`map_dsmem_ptr`](crate::map_dsmem_ptr) pointer: `ld.shared::cluster`,
@@ -160,7 +158,7 @@ pub enum CopyOp {
     /// Stores from registers into shared memory carrying memory attributes
     /// (CuTe DSL's `cute.nvgpu.CopyR2SOp`), as [`CopyOp::S2R`] loads.
     R2S { bits: usize, attrs: R2SAttrs },
-    /// CuTe DSL's `cpasync.CopyDsmemStoreOp` (roadmap part m8-dsmem): an
+    /// CuTe DSL's `cpasync.CopyDsmemStoreOp`: an
     /// asynchronous store from registers into another CTA's shared memory,
     /// `st.async.shared::cluster.mbarrier::complete_tx::bytes{.v2,.v4}.b32`
     /// (sm_90, PTX 8.1), whose bytes count down that CTA's mbarrier. `bits`
@@ -184,8 +182,7 @@ pub enum CopyOp {
     /// A TMA reduce store
     /// ([`cpasync::CopyReduceBulkTensorTileS2GOp`](crate::cpasync::CopyReduceBulkTensorTileS2GOp)).
     TmaReduce(crate::cpasync::ReductionKind),
-    /// A TMA load in another access mode (roadmap parts m7-tma-im2col and
-    /// m7-tma-sm100-modes): im2col
+    /// A TMA load in another access mode: im2col
     /// ([`cpasync::CopyBulkTensorIm2ColG2SOp`](crate::cpasync::CopyBulkTensorIm2ColG2SOp),
     /// its multicast form), gather4
     /// ([`cpasync::CopyBulkTensor2DGather4G2SOp`](crate::cpasync::CopyBulkTensor2DGather4G2SOp),
@@ -198,18 +195,17 @@ pub enum CopyOp {
     /// scatter4 ([`cpasync::CopyBulkTensor2DScatter4S2GOp`](crate::cpasync::CopyBulkTensor2DScatter4S2GOp))
     /// or with overrides ([`cpasync::CopyBulkTensorTileS2GOverrideOp`](crate::cpasync::CopyBulkTensorTileS2GOverrideOp)).
     TmaStoreMode { mode: crate::cpasync::TmaOpMode },
-    /// CuTe DSL's `cpasync.CopyBulkS2GByteMaskOp` (roadmap part
-    /// m7-tma-sm100-modes): [`CopyOp::BulkS2G`] writing only the bytes of each
+    /// CuTe DSL's `cpasync.CopyBulkS2GByteMaskOp`: [`CopyOp::BulkS2G`] writing only the bytes of each
     /// 16-byte chunk that [`CopyArgs::byte_mask`] selects
     /// (`cp.async.bulk.global.shared::cta.bulk_group.cp_mask`, sm_100).
     BulkS2GByteMask { bits: usize },
-    /// A TMEM load (roadmap part m10-tmem-ld-st): `tcgen05.ld` of `shape`,
+    /// A TMEM load: `tcgen05.ld` of `shape`,
     /// `.x<num>`, `.pack::16b` with `pack`, from a TMEM tensor into a
     /// register fragment ([`tcgen05::Ld32x32bOp`](crate::nvgpu::tcgen05::Ld32x32bOp)
     /// and its peers). Warp-collective; the registers are undefined until
     /// [`fence_view_async_tmem_load`](crate::fence_view_async_tmem_load).
     TmemLoad { shape: crate::ir::TmemShape, num: u32, pack: bool },
-    /// A TMEM load with a row reduction (roadmap part m10-ldred-packed-math):
+    /// A TMEM load with a row reduction:
     /// `tcgen05.ld.red` of `.16x32bx2` or `.32x32b`, `.x<num>`, loading
     /// Float32 values into a register fragment and reducing each thread's
     /// values with `red` (PTX `min`/`max`, `.abs`, and `.NaN` with `nan`) into
@@ -219,8 +215,7 @@ pub enum CopyOp {
     /// `half_split_off` is the immediate column offset of `.16x32bx2`'s second
     /// access (0: as many columns as the first spans).
     TmemLoadRed { shape: crate::ir::TmemShape, num: u32, red: crate::ir::TmemLoadRedOp, nan: bool, half_split_off: u32 },
-    /// A TMEM load with 2:4 sparse compression (roadmap part
-    /// m10-rubin-extras): `tcgen05.ld{.red}.spcompress.32x32b.x<num>`
+    /// A TMEM load with 2:4 sparse compression: `tcgen05.ld{.red}.spcompress.32x32b.x<num>`
     /// (`with_red` for the `.red` form, which also reduces the thread's
     /// values with `red`), loading Float32 values and keeping two of every
     /// four as `red` prefers (`nan`: a NaN is preferred). Issued with
@@ -236,7 +231,7 @@ pub enum CopyOp {
     /// peers). Warp-collective; in flight until
     /// [`fence_view_async_tmem_store`](crate::fence_view_async_tmem_store).
     TmemStore { shape: crate::ir::TmemShape, num: u32, unpack: bool },
-    /// A shared-memory-to-TMEM copy (roadmap part m10-s2t-copies):
+    /// A shared-memory-to-TMEM copy:
     /// `tcgen05.cp` of `shape`, `.cta_group::2` with `two_cta`
     /// ([`tcgen05::Cp128x256bOp`](crate::nvgpu::tcgen05::Cp128x256bOp) and
     /// its peers). The source is a tensor of shared-memory descriptors
@@ -642,13 +637,13 @@ impl<T: Numeric> CopyAtom<T> {
                 (Layout::new(32, 1), src, dst.clone(), dst)
             }
             CopyOp::StMatrix { num, trans } if T::DTYPE.bits() == 32 => {
-                // m10-epilogue-helpers: CuTe C++'s SM90_U32x{1,2,4}_STSM_N on 32-bit elements, one per
+                // CuTe C++'s SM90_U32x{1,2,4}_STSM_N on 32-bit elements, one per
                 // register: each lane holds one element of each 8x4 matrix (a row of an 8x8 matrix of
                 // 16-bit elements is four 32-bit ones). A transposed store moves 16-bit elements
                 // across rows, which 32-bit elements do not survive.
                 assert!(
                     !trans,
-                    "cute: StMatrix8x8x16bOp stores 32-bit elements ({}) only untransposed: a transposed stmatrix                      moves 16-bit halves",
+                    "cute: StMatrix8x8x16bOp stores 32-bit elements ({}) only untransposed: a transposed stmatrix moves 16-bit halves",
                     T::DTYPE
                 );
                 let shared = match num {
@@ -1417,12 +1412,12 @@ pub trait CopyElem<T>: 'static {
     #[doc(hidden)]
     const COORDINATES: bool;
     /// Whether the operand is the one-byte-per-value shared memory of a padded
-    /// FP4/FP6 TMA load (roadmap part m7-tma-sm100-modes).
+    /// FP4/FP6 TMA load.
     #[doc(hidden)]
     const UNPACKED: bool = false;
 }
 
-// m7-tma-sm100-modes: a TMA load of FP4 or FP6 values through an unpacking format
+// A TMA load of FP4 or FP6 values through an unpacking format
 // (`internal_type` 8-bit) writes 16-byte slots of 16 values, so its shared-memory operand
 // is a `u8` tensor with one element per value.
 impl CopyElem<crate::numeric::F4E2M1FN> for u8 {
@@ -1454,7 +1449,7 @@ impl<T: Numeric> CopyElem<T> for Ident {
 /// chunks are unrolled when the kernel is built, so the extents of both
 /// tensors must be static; a tensor in global memory with runtime extents
 /// is copied one tile at a time, its rest modes sliced away (by a
-/// [`for_range`](crate::for_range) over a runtime number of tiles), or with
+/// [`for_range`] over a runtime number of tiles), or with
 /// [`CopyArgs::unroll_factor`], which loops over the rest modes. Strides
 /// and offsets may be runtime values.
 ///
@@ -1500,7 +1495,7 @@ pub fn copy_if<T: Numeric>(atom: &impl AsCopyAtom<T>, pred: &Tensor<bool>, src: 
 /// | the others | none | |
 ///
 /// `byte_mask` belongs to [`CopyBulkS2GByteMaskOp`](crate::cpasync::CopyBulkS2GByteMaskOp),
-/// which needs it (m7-tma-sm100-modes). A field an atom does not take
+/// which needs it. A field an atom does not take
 /// panics when the kernel is built.
 #[derive(Clone, Debug, Default)]
 pub struct CopyArgs<'a> {
@@ -1606,7 +1601,7 @@ impl<'a> CopyArgs<'a> {
         panic!(
             "cute: copy: tma_multicast=(cluster_shape={cluster_shape:?}, multicast_dim={multicast_dim:?}) is the \
              block API's multicast (cute::block::block_copy), which is not supported yet; for a multicast TMA load \
-             use a multicast atom and pass mcast_mask (roadmap part m7-cluster-copies)"
+             use a multicast atom and pass mcast_mask"
         )
     }
 
@@ -1792,7 +1787,7 @@ pub struct AuxOperand {
     layout: Layout,
     /// The element type, or `None` for coordinates.
     dtype: Option<DType>,
-    /// The tensor itself, for the operands an atom reads (m7-tma-sm100-modes): an
+    /// The tensor itself, for the operands an atom reads: an
     /// `Int32` index tensor, or a coordinate tensor.
     index: Option<Tensor<i32>>,
     coords: Option<Tensor<Ident>>,
@@ -1848,7 +1843,7 @@ pub fn copy_aux<'a, T: Numeric, S: CopyElem<T>, D: CopyElem<T>>(
         copy_front(atom, src.0, dst.0, &_args, "copy_aux");
         return;
     }
-    // m7-tma-sm100-modes: gather4, scatter4 and the overrides.
+    // Gather4, scatter4 and the overrides.
     if let CopyOp::TmaLoadMode { mode, .. } | CopyOp::TmaStoreMode { mode } = atom.op
         && mode != crate::cpasync::TmaOpMode::Im2col
     {
@@ -1862,7 +1857,7 @@ pub fn copy_aux<'a, T: Numeric, S: CopyElem<T>, D: CopyElem<T>>(
     );
 }
 
-/// A gather4/scatter4 or override copy (roadmap part m7-tma-sm100-modes): one
+/// A gather4/scatter4 or override copy: one
 /// auxiliary operand on the global side.
 #[track_caller]
 fn aux_tma_copy<T: Numeric, S: CopyElem<T>, D: CopyElem<T>>(
@@ -2797,7 +2792,7 @@ fn emit_chunk<T: Numeric>(
                 }
                 _ => (MemAttrs::default(), MemAttrs::default()),
             };
-            // A tensor in another CTA's shared memory (m8-dsmem): its accesses
+            // A tensor in another CTA's shared memory: its accesses
             // carry the peer.
             let (load_attrs, store_attrs) = (
                 MemAttrs { peer: src.buffer_and_peer().and_then(|(_, p)| p), ..load_attrs },
@@ -3058,8 +3053,7 @@ fn tmem_load_chunk<T: Numeric>(
 /// One call of a TMEM load-reduce atom (CuTe DSL's
 /// `cute.copy_atom_call(atom, src, [data, stat])` on a
 /// [`tcgen05::LdRed32x32bOp`](crate::nvgpu::tcgen05::LdRed32x32bOp) or
-/// [`LdRed16x32bx2Op`](crate::nvgpu::tcgen05::LdRed16x32bx2Op) atom;
-/// roadmap part m10-ldred-packed-math): `tcgen05.ld.red` of the atom's TMEM
+/// [`LdRed16x32bx2Op`](crate::nvgpu::tcgen05::LdRed16x32bx2Op) atom): `tcgen05.ld.red` of the atom's TMEM
 /// view `src` (the layout [`make_tmem_copy`](crate::nvgpu::tcgen05::make_tmem_copy)
 /// partitions give one warp, with its address in the pointer) into `dsts`:
 /// the register fragment of the loaded Float32 values, then a register
@@ -3112,7 +3106,7 @@ pub fn copy_atom_call<T: Numeric>(atom: &CopyAtom<T>, src: &Tensor<T>, dsts: &[&
 /// `cute.copy_atom_call(atom, src, [cdata, mdata{, red}])` on a
 /// [`tcgen05::LdSPCompress32x32bOp`](crate::nvgpu::tcgen05::LdSPCompress32x32bOp)
 /// or [`LdRedSPCompress32x32bOp`](crate::nvgpu::tcgen05::LdRedSPCompress32x32bOp)
-/// atom; roadmap part m10-rubin-extras): `tcgen05.ld{.red}.spcompress.32x32b`
+/// atom): `tcgen05.ld{.red}.spcompress.32x32b`
 /// of the atom's TMEM view `src` (one `.x<num>` warp-wide chunk, the layout
 /// [`make_tmem_copy`](crate::nvgpu::tcgen05::make_tmem_copy) partitions give
 /// one warp). Each thread loads `num` Float32 values and keeps two of every
@@ -3343,7 +3337,7 @@ fn check_shared_side<T: Numeric>(t: &Tensor<T>, ss: SharedSpace, name: &str, ver
     }
 }
 
-/// A [`CopyOp::DsmemStore`] copy (roadmap part m8-dsmem): registers to the
+/// A [`CopyOp::DsmemStore`] copy: registers to the
 /// distributed-shared-memory tensor `dst`, one `st.async` of `bits` bits
 /// (0: the widest of 128, 64 and 32 the tensors allow) per chunk, each
 /// counting its bytes down the mbarrier `args.mbar_ptr` (a
@@ -3436,7 +3430,7 @@ fn dsmem_store_copy<T: Numeric>(bits: usize, src: &Tensor<T>, dst: &Tensor<T>, a
     }
 }
 
-// m10-s2t-copies: shared-memory-to-TMEM copies.
+// Shared-memory-to-TMEM copies.
 
 /// A copy with an S2T atom ([`CopyOp::TmemCp`]): `src` is a tensor of
 /// shared-memory descriptors ([`get_s2t_smem_desc_tensor`](crate::nvgpu::tcgen05::get_s2t_smem_desc_tensor)),

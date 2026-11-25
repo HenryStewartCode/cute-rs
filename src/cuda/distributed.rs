@@ -1,5 +1,4 @@
-//! Linking PTX modules at load time, and multicast memory (roadmap lane
-//! m11-extern-distributed).
+//! Linking PTX modules at load time, and multicast memory.
 //!
 //! [`CudaContext::load_linked`] links several PTX modules with the driver's JIT linker
 //! (`cuLinkCreate`, `cuLinkAddData` with `CU_JIT_INPUT_PTX`, `cuLinkComplete`) and loads the

@@ -8,8 +8,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! The activation EFC GEMM (`activation_custom_epilogue_dense_gemm.py`, roadmap part
-//! m10-port-efc), after the Ada FP8 GEMM epilogue:
+//! The activation EFC GEMM (`activation_custom_epilogue_dense_gemm.py`), after the Ada FP8 GEMM epilogue:
 //!
 //! ```text
 //! Aux = (alpha * scale_a * scale_b) * acc + (beta * scale_c) * C + bias

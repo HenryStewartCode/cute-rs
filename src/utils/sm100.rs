@@ -16,8 +16,7 @@
 //! Every check returns a [`CantImplement`] (CuTe DSL's `CantImplementError`)
 //! with CuTe DSL's message, so a tuning loop can skip the configuration.
 //!
-//! Also CuTe DSL's SM100 sizing helpers (`cutlass.utils.sm100`, roadmap part
-//! m10-umma-layouts): the TMEM columns of one accumulator stage
+//! Also CuTe DSL's SM100 sizing helpers (`cutlass.utils.sm100`): the TMEM columns of one accumulator stage
 //! ([`compute_acc_tmem_cols_per_stage`]) and the epilogue subtile
 //! ([`compute_epilogue_tile_size`], whose layout form is
 //! [`compute_epilogue_tile_shape`](super::compute_epilogue_tile_shape)).
@@ -227,7 +226,7 @@ pub fn check_gemm_tma_alignment_str(
     Ok(())
 }
 
-// ---- SM100 sizing helpers (m10-umma-layouts) ----
+// ---- SM100 sizing helpers ----
 /// The TMEM columns one accumulator stage spans, before the allocation's
 /// 32-column minimum and power-of-two rounding (CuTe DSL's
 /// `cutlass.utils.sm100.compute_acc_tmem_cols_per_stage`). `cta_tile_m` is
@@ -344,26 +343,26 @@ pub(crate) fn epilogue_n_minimums(
     (n_min_d, n_min_c)
 }
 
-// m10-umma-kinds: the tiled tcgen05 MMA and the shared-memory layout heuristics.
+// The tiled tcgen05 MMA and the shared-memory layout heuristics.
 pub use super::sm100_mma::{
     get_smem_layout_atom_ab, make_smem_layout, make_smem_layout_a, make_smem_layout_b, make_smem_layout_c,
     make_trivial_tiled_mma,
 };
 
-// m10-cta-pair-pipelines: the TMA load operation for a cluster shape and MMA.
+// The TMA load operation for a cluster shape and MMA.
 pub use super::sm100_tma::{
     Sm100TmaLoadOp, cluster_shape_to_tma_atom_a, cluster_shape_to_tma_atom_b, cluster_shape_to_tma_atom_sfb,
 };
 
-// m10-umma-blockscaled: the block-scaled tiled MMAs.
+// The block-scaled tiled MMAs.
 pub use super::sm100_mma::{make_blockscaled_trivial_tiled_mma, sm103_make_blockscaled_trivial_tiled_mma};
 
-// m10-epilogue-helpers: the TMEM load and shared-memory store selection and the epilogue layouts.
+// The TMEM load and shared-memory store selection and the epilogue layouts.
 pub use super::sm100_epilogue::{
     TmemLoadChoice, get_smem_layout_atom_epi, get_smem_store_op, get_tmem_load_op, make_smem_layout_epi,
     select_smem_store_op, select_tmem_load_op,
 };
-// m10-sparse-umma: the sparse GEMM element types and layouts.
+// The sparse GEMM element types and layouts.
 pub use super::sm100_sparse::{
     make_sparse_a_dtype, make_sparse_e_dtype, make_sparse_gmem_layout_e, make_sparse_smem_layout_a,
     make_sparse_smem_layout_e, make_sparse_tmem_layout_e, make_tensor_e_atom_layout,

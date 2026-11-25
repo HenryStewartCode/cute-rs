@@ -27,7 +27,7 @@ pub use crate::tma::{
 
 /// The transfer format of a tensor map (CuTe DSL's `TensorMapDataFormat`): the element
 /// type's own encoding, raw bytes, the flush-to-zero `f32` and TF32 forms that tensor
-/// reductions use, and the FP4/FP6 forms of SM100 (roadmap part m7-tma-sm100-modes):
+/// reductions use, and the FP4/FP6 forms of SM100:
 /// `B4X16` packed, `B4X16_P64` and `B6X16_P32` padded to 16-byte slots.
 #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
@@ -288,7 +288,7 @@ mod tests {
         // The swizzle span: 128 halves are 256 bytes, wider than 128.
         let e = create_tensor_map_tiled(0x10000, DType::F16, &[128, 256], &[16], &[128, 8], &opts).unwrap_err();
         assert!(e.contains("at most 128 bytes, got 256"), "{e}");
-        // FP4 (m7-tma-sm100-modes): packed by default, padded with B4X16_P64.
+        // FP4: packed by default, padded with B4X16_P64.
         let m =
             create_tensor_map_tiled(0x10000, DType::F4E2M1FN, &[128], &[], &[32], &TensorMapOptions::new()).unwrap();
         assert_eq!(m.desc().data_type, TensorMapDataType::f416u4_align8b);

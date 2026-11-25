@@ -1,5 +1,5 @@
 //! cute_ext's TMA operations with automatic descriptors, TMAStorePipeline and the device
-//! workspace (roadmap part m11-cute-ext-tma), simulated against plain Rust: a TMA load ->
+//! workspace, simulated against plain Rust: a TMA load ->
 //! shared memory -> TMA store round trip over a tensor with ragged edges, a multicast load in
 //! a 2-CTA cluster, reduce stores (add, max), a TMAStorePipeline epilogue (2 stages, 4 writer
 //! warps and a TMA warp), a pointer-array style kernel whose descriptors the kernel builds in

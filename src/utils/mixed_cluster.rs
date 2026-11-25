@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 //! Kernels for launches with a preferred and a fallback cluster shape
-//! (roadmap part m10-port-clc-clusters; CuTe DSL's `is_preferred_cluster`
+//! (CuTe DSL's `is_preferred_cluster`
 //! and the fallback params of its tile schedulers).
 //!
 //! Since CUDA 12.8 (Blackwell), a launch may name two cluster shapes

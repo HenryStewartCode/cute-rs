@@ -14,14 +14,14 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! tcgen05 MMAs (roadmap part m10-umma-f16): CuTe DSL's
+//! tcgen05 MMAs: CuTe DSL's
 //! `tcgen05.MmaF16BF16Op` with its [`CtaGroup`], [`OperandSource`] and
 //! [`Field`] enums, and [`commit`].
 //!
 //! A tcgen05 MMA is issued by one thread for the whole CTA, so the
 //! "threads" of a tcgen05 [`TiledMma`](crate::TiledMma) are CTAs: its
 //! `thr_id` has size 1, and `get_slice(0)` partitions whole per-CTA tiles;
-//! with `CtaGroup::TWO` (m10-cta-pair) it has size 2, and
+//! with `CtaGroup::TWO` it has size 2, and
 //! `get_slice(rank_in_pair)` partitions each CTA's half.
 //! A and B are shared-memory descriptor fragments
 //! ([`TiledMma::make_fragment_a`](crate::TiledMma::make_fragment_a)), the
@@ -44,7 +44,7 @@ use crate::value::{Int16, Numeric, Value};
 
 /// Where the A operand of a tcgen05 MMA comes from (CuTe DSL's
 /// `tcgen05.OperandSource`): shared memory through a descriptor, or tensor
-/// memory (the `_TS` forms, roadmap part m10-umma-kinds).
+/// memory (the `_TS` forms).
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum OperandSource {
@@ -64,10 +64,10 @@ pub enum OperandSource {
 ///
 /// A and B may each be K-major or MN-major. The atom takes the runtime
 /// field [`Field::ACCUMULATE`] (`false` until set: the first MMA of a tile
-/// overwrites D). With `CtaGroup::TWO` (roadmap part m10-cta-pair) the even
+/// overwrites D). With `CtaGroup::TWO` the even
 /// CTA of a cluster pair issues one MMA for both CTAs: M of 128 or 256, N
 /// of 16 to 256 in steps of 16, each CTA holding half of A's rows and half
-/// of B's rows in its shared memory and its half of D in its TMEM. With `OperandSource::TMEM` (m10-umma-kinds) A is
+/// of B's rows in its shared memory and its half of D in its TMEM. With `OperandSource::TMEM` A is
 /// a K-major TMEM tensor ([`TiledMma::make_fragment_a`](crate::TiledMma::make_fragment_a)).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct MmaF16BF16Op {
@@ -170,7 +170,7 @@ impl MmaF16BF16Op {
 /// The instruction shape `(M, N)` of a tcgen05 MMA for its `cta_group`
 /// (the PTX ISA's shapes for `.kind::f16`, `tf32`, `i8` and `f8f6f4`):
 /// with `CtaGroup::ONE` M is 64 or 128 and N a multiple of 8 from 8 to 256;
-/// with `CtaGroup::TWO` (a CTA pair, roadmap part m10-cta-pair) M is 128 or
+/// with `CtaGroup::TWO` (a CTA pair) M is 128 or
 /// 256 and N a multiple of 16 from 16 to 256. An 8-bit MN-major B doubles
 /// N's step (16, or 32 for a pair). Returns `(M, N)`.
 #[track_caller]
@@ -200,7 +200,7 @@ pub(super) fn check_instruction_shape(
     (m, n)
 }
 
-/// m10-cta-pair: a CTA pair's MMA reads A from shared memory. (CUTLASS's
+/// A CTA pair's MMA reads A from shared memory. (CUTLASS's
 /// 2-SM MMAs with A in tensor memory duplicate A in both CTAs' TMEM, a
 /// layout cute-rs does not model yet.)
 #[track_caller]
@@ -212,7 +212,7 @@ pub(super) fn check_pair_a_source(name: &str, cta_group: CtaGroup, a_src: Operan
     );
 }
 
-/// m10-umma-kinds: the checks of A in tensor memory (`a_src` TMEM, the
+/// The checks of A in tensor memory (`a_src` TMEM, the
 /// `[a-tmem]` form): A is K-major there (a transposed A comes from shared
 /// memory), and of the F8F6F4 formats only 8-bit A is modelled in TMEM.
 #[track_caller]
@@ -249,11 +249,11 @@ impl From<MmaF16BF16Op> for MmaAtom {
 /// sm_100a): one arrival on the mbarrier at `mbar_ptr` once every tcgen05
 /// MMA the executing thread issued before has completed; with `mask` (a
 /// 16-bit mask of CTA ranks, from
-/// [`create_tma_multicast_mask`](crate::create_tma_multicast_mask)) on the
+/// `create_tma_multicast_mask`) on the
 /// mbarrier at the same offset of each CTA it names. It is not elected:
 /// every thread that executes it commits, so wrap it in
 /// [`elect_one`](crate::elect_one), in the warp that called
-/// [`gemm`](crate::gemm). With `CtaGroup::TWO` (m10-cta-pair) it tracks
+/// [`gemm`](crate::gemm). With `CtaGroup::TWO` it tracks
 /// the CTA-pair MMAs the thread issued; the leader CTA commits with a mask
 /// naming both CTAs of the pair so that each CTA's mbarrier hears of the
 /// completion (without the peer's bit the peer's waiters wait forever).
@@ -315,7 +315,7 @@ pub(crate) fn make_umma_desc_fragment<T: Numeric>(
     if tile.size() > 0 && tile.rank() == 2 && tile.mode(0).size() != mn {
         fail(format!("the operand's MMA tile {tile} does not have the instruction's {mn} rows"));
     }
-    // m10-sparse-umma: B of a sparse MMA spans twice the canonical K (64 bytes); its descriptor
+    // B of a sparse MMA spans twice the canonical K (64 bytes); its descriptor
     // fields are those of the first half.
     let tile = if halve_k && tile.rank() == 2 {
         let k = tile.mode(1);
@@ -323,7 +323,7 @@ pub(crate) fn make_umma_desc_fragment<T: Numeric>(
     } else {
         tile
     };
-    // m10-rubin-umma: a Rubin MMA's descriptors have the sm_107 encoding whatever the target.
+    // A Rubin MMA's descriptors have the sm_107 encoding whatever the target.
     let enc = if sm107 {
         UmmaDescEncoding::Sm107
     } else {
@@ -384,7 +384,7 @@ pub(crate) fn tmem_frg_1sm_layout(m: usize, n: usize, rest: &[usize], bits: usiz
     restride.compose(&logical)
 }
 
-/// m10-cta-pair: the TMEM accumulator layout of one CTA's half of a
+/// The TMEM accumulator layout of one CTA's half of a
 /// `cta_group::2` MMA, `m` (64 or 128, half the pair's M) rows by `n`
 /// columns tiled over `rest` (CuTe C++'s `UMMA::tmem_frg_2sm<T>`, the
 /// interleaved allocation): for `m` = 128 (a pair M of 256, the PTX ISA's
@@ -404,7 +404,7 @@ pub(crate) fn tmem_frg_2sm_layout(m: usize, n: usize, rest: &[usize], bits: usiz
     restride.compose(&logical)
 }
 
-/// m10-umma-kinds: the TMEM layout of a `cta_group::1` MMA's A operand of
+/// The TMEM layout of a `cta_group::1` MMA's A operand of
 /// `m` rows (64 or 128) and `k` columns tiled over `rest` (MMA_M, MMA_K,
 /// ...), on elements of `bits` bits packed `32 / bits` to a 32-bit column
 /// (CuTe C++'s `UMMA::tmem_frg_1sm<T, T, TmemAllocMode::NonInterleaved>`):

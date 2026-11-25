@@ -1,5 +1,5 @@
 //! MLIR for external device-function calls, standalone device functions and multimem
-//! instructions (roadmap lane m11-extern-distributed).
+//! instructions.
 //!
 //! An external function is a `func.func private` prototype in the `gpu.module`, marked
 //! `passthrough = ["convergent"]` unless it opted out, and a call is `func.call`, with

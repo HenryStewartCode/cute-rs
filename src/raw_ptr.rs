@@ -189,7 +189,7 @@ impl<T: Numeric> Ptr<T> {
     #[track_caller]
     fn byte_offset(&self, what: &str) -> IndexExpr {
         // The integer address of another CTA's shared memory is not modelled
-        // (roadmap part m8-dsmem: a follow-up).
+        // (a follow-up).
         crate::tensor::refuse_dsmem(self.peer, &format!("{what} of the pointer {self:?}"));
         let bits = T::DTYPE.storage_bits();
         if bits >= 8 {

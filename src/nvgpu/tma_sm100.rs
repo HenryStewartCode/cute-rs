@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The SM100 TMA modes with auxiliary operands (roadmap part m7-tma-sm100-modes):
+//! The SM100 TMA modes with auxiliary operands:
 //! gather4 loads and scatter4 stores, which take an index tensor, and the override
 //! copies, which take the global tensor's tile and a residue tensor.
 //!

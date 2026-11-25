@@ -2842,8 +2842,7 @@ pub trait Tileable: Sized {
     fn with_layout(&self, layout: Layout) -> Self;
     /// The object rebuilt with `layout`, which the caller computed as
     /// `f(self.layout_ref())` (outside `f`, so that its panics report the
-    /// caller's line). A tensor also records `f` on its predication origin
-    /// (roadmap part m11-cute-ext-core), so the view functions of the
+    /// caller's line). A tensor also records `f` on its predication origin, so the view functions of the
     /// algebra go through this rather than [`with_layout`](Self::with_layout).
     #[track_caller]
     fn map_layout<F: Fn(&Layout) -> Layout + 'static>(&self, layout: Layout, f: F) -> Self {

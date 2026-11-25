@@ -1,5 +1,4 @@
-//! The static persistent tile schedulers (roadmap part
-//! m9-persistent-schedulers) on the simulator: every CTA of a persistent
+//! The static persistent tile schedulers on the simulator: every CTA of a persistent
 //! grid records the tiles it visits, for many schedules, and the record is
 //! held to a plain-Rust model; the runtime scheduler stops at a runtime
 //! bound; the grid sizing and the swizzled layouts match CuTe DSL's rules.

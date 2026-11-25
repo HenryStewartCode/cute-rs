@@ -1,5 +1,5 @@
 //! Low-level primitives (CuTe DSL's `cutlass.experimental.primitives` and
-//! `cutlass.base_dsl.swizzle`; roadmap part m11-prims-descriptors-swizzle).
+//! `cutlass.base_dsl.swizzle`).
 //!
 //! * [`descriptors`]: typed bit-level encoders for the operand and
 //!   instruction descriptors of `wgmma.mma_async` and `tcgen05.mma`
@@ -11,13 +11,13 @@
 //!   ([`ByteSwizzle`], CuTe DSL's `cutlass.Swizzle`) with
 //!   [`apply_swizzle`], [`load_swizzled`] and [`store_swizzled`].
 //!
-//! * [`mma`] (roadmap part m11-prims-mma-forms): the MMA forms no CuTe
+//! * [`mma`]: the MMA forms no CuTe
 //!   atom has: weight-stationary [`tcgen05_mma_ws`] and
 //!   [`tcgen05_mma_ws_sp`], [`tcgen05_mma`] with `.collector::a`,
 //!   `.ashift` and `scale-input-d`, [`tcgen05_mma_sp_block_scale`] and the
 //!   SM120 warp-level [`mma_sp_block_scale`].
 //!
-//! * [`nvvm`] (roadmap part m11-prims-nvvm-layer): the operations no
+//! * [`nvvm`]: the operations no
 //!   `cute::arch` function covers (`bar.red`, the rest of the mbarrier
 //!   family, `nanosleep`, `pmevent`, `exit`, `dp4a`, `st.bulk`,
 //!   `tcgen05.shift`, ...) and the table from each primitives name to the

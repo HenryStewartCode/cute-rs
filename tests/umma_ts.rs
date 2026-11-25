@@ -8,8 +8,7 @@
 // That portion is under the BSD-3-Clause licence, and the rest of the file is cute-rs's own,
 // under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the licence text.
 
-//! tcgen05 MMAs with A in tensor memory and the runtime modifiers (roadmap part
-//! m10-umma-kinds): TS-UMMA tiles (A written with `tcgen05.st`, then `wait::st`) for F16 and
+//! tcgen05 MMAs with A in tensor memory and the runtime modifiers: TS-UMMA tiles (A written with `tcgen05.st`, then `wait::st`) for F16 and
 //! Int8 on the simulator against plain Rust; NEGATE_A/NEGATE_B toggled inside a
 //! `for_range_carry` loop; a disable-output-lane mask leaving TMEM lanes as they were; the
 //! diagnostics; the sm_100a PTX (assembled by `ptxas` when it is on PATH); and the host

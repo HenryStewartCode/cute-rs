@@ -13,7 +13,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! The Rubin (sm_107) tcgen05 MMAs (roadmap part m10-rubin-umma): CuTe
+//! The Rubin (sm_107) tcgen05 MMAs: CuTe
 //! DSL's `tcgen05.SM107MmaFP8Op` (`.kind::f8f6f4`, K = 32 or 64),
 //! `SM107BlockScaledMmaMXF8F6F4Op` (`.kind::mxf8f6f4.block_scale`, K = 64)
 //! and `SM107MmaMXF4NVF4Op` (`.kind::mxf4nvf4.block_scale.block16` or

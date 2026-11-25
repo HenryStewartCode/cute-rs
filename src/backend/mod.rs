@@ -8,7 +8,7 @@ mod options;
 mod passes;
 mod stage;
 mod toolchain;
-// Several kernels in one module (m6b-multi-kernel).
+// Several kernels in one module.
 mod module;
 pub use module::{CompiledModule, KernelModule, ModuleError};
 
@@ -17,7 +17,7 @@ use std::fmt::Write;
 pub use artifacts::{Artifact, ArtifactNote};
 pub use cache::{CacheStats, CachedKernel, KernelCache, cache_stats};
 pub use cudatools::{CudaTools, ENV_PTXAS, JitOption, Tool, jit_options_for_ptxas_flags, ptxas_max_ptx};
-// m11-extern-distributed: relocatable device code.
+// Relocatable device code.
 pub(crate) use cudatools::run_ptxas;
 pub use mlir::{MlirOptions, emit_mlir};
 pub(crate) use options::parse_bool;
@@ -247,7 +247,7 @@ impl Kernel {
                 }
                 r => r?,
             };
-            // m11-prims-mma-forms: an intrinsic the NVPTX backend does not know becomes a call
+            // An intrinsic the NVPTX backend does not know becomes a call
             // of an external function, which nothing can link.
             if let Some(why) = unknown_intrinsic(&ptx) {
                 return Err(CompileError::Unsupported(format!("kernel `{}`: {why}", self.name())));
@@ -349,7 +349,7 @@ impl Kernel {
 
 /// The bitcode files to link into a module of `irs` compiled with `options`: the kernels'
 /// external functions' sources, then the options' `link_libraries`, without repeats. Each
-/// must exist (m11-extern-distributed).
+/// must exist.
 fn link_libraries(irs: &[&KernelIr], options: &CompileOptions) -> Result<Vec<PathBuf>, CompileError> {
     let mut out: Vec<PathBuf> = Vec::new();
     let from_kernels = irs.iter().flat_map(|ir| ir.link_libraries.iter().map(move |p| (p, Some(ir.name.as_str()))));
@@ -382,7 +382,7 @@ fn ptx_reason_text(arch: Arch, why: Option<&str>) -> String {
     why.map_or_else(|| format!("its target, {}", arch.chip()), str::to_string)
 }
 
-/// m11-prims-mma-forms: the diagnostic for PTX that declares an `llvm.*`
+/// The diagnostic for PTX that declares an `llvm.*`
 /// function (`.extern .func ... llvm.nvvm.<name>`): what `llc` makes of a
 /// call to an intrinsic it does not know (a misspelt
 /// `llvm.call_intrinsic` name, or one newer than the backend), which no
@@ -405,7 +405,7 @@ fn nvvm_needs(ir: &crate::ir::KernelIr) -> Option<(u32, &'static str)> {
             let need = match &inst.op {
                 Op::Mma { kind, .. } if kind.is_fp8() => Some((23, "an FP8 mma.sync")),
                 Op::Mma { kind, .. } if kind.is_sparse() => Some((22, "mma.sp")),
-                // m10-sm120-blockscaled: nvvm.mma.block_scale arrived in LLVM 22.
+                // Nvvm.mma.block_scale arrived in LLVM 22.
                 Op::MmaBlockScaled { .. } => Some((22, "a block-scaled mma.sync")),
                 // LLVM 21's nvvm.ldmatrix has only .m8n8.b16; LLVM 22 adds
                 // the shape and element-type attributes.
@@ -877,8 +877,7 @@ pub fn dump(ir: &KernelIr) -> String {
     out
 }
 
-/// A TMA instruction's access mode in a dump: nothing for `.tile` (m7-tma-im2col and
-/// m7-tma-sm100-modes).
+/// A TMA instruction's access mode in a dump: nothing for `.tile`.
 fn tma_mode_text(mode: &crate::ir::TmaMode) -> String {
     match mode {
         crate::ir::TmaMode::Tile => String::new(),

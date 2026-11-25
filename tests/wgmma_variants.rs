@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The warpgroup MMA variants (roadmap part m8-wgmma-variants): FP8, 8-bit integer and
+//! The warpgroup MMA variants: FP8, 8-bit integer and
 //! register-sourced A MMAs in the simulator, `make_trivial_tiled_mma`, diagnostics and
 //! the MLIR and PTX.
 

@@ -1,5 +1,4 @@
-//! cute_ext's low-level pipeline operations (roadmap part
-//! m11-cute-ext-pipelines; CuTe DSL's `cutlass.cute.experimental.core`
+//! cute_ext's low-level pipeline operations (CuTe DSL's `cutlass.cute.experimental.core`
 //! pipeline functions): [`create_pipeline`] and the operations on the
 //! [`RawPipeline`] it returns, [`get_arrival_count`], and the
 //! circular-buffer layer ([`create_circular_buffer_pipeline`] and the

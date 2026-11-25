@@ -95,7 +95,7 @@ pub mod aot;
 pub mod arch;
 pub mod atom;
 pub mod backend;
-// m10-s2t-copies: CuTe DSL's cutlass.block.
+// CuTe DSL's cutlass.block.
 pub mod block;
 mod builder;
 pub mod control;
@@ -129,7 +129,7 @@ pub mod sim;
 mod smem_struct;
 pub mod tensor;
 pub mod tensor_ssa;
-// m11-ts-resources: Task Scheduling (resources, pipeline configs, work queues, schedule capture).
+// Task Scheduling (resources, pipeline configs, work queues, schedule capture).
 pub mod task_scheduling;
 pub mod testing;
 pub mod tvm_ffi;
@@ -189,7 +189,7 @@ pub use arch::{
     fma_packed_bf16x2, fma_packed_f16x2, sext_unpacked_i4_i8_intrinsic, sext_unpacked_i4x4_to_i8x4, sub_packed_bf16x2,
     sub_packed_f16x2,
 };
-// m10-ldred-packed-math: packed f32x2 arithmetic and the Rubin mixed-precision forms.
+// Packed f32x2 arithmetic and the Rubin mixed-precision forms.
 #[allow(deprecated)]
 pub use arch::exp_packed_f32x2;
 pub use arch::{
@@ -313,7 +313,7 @@ pub use value::{Assumable, assume, get_divisibility};
 pub use value::{pack, unpack};
 pub use vector::{Vector, VectorIndex, VectorOperand, VectorShape, VectorSlice, VectorSliceItem};
 
-// TMA descriptors and host tensor maps (roadmap part m7-tma-descriptor).
+// TMA descriptors and host tensor maps.
 pub mod tensor_map;
 pub mod tma;
 pub use tensor_map::{TensorMap, TensorMapDataFormat, create_tensor_map_tiled, create_tensor_map_tiled_from_view};
@@ -322,25 +322,24 @@ pub use tma::{
     TensorMapSwizzle, TmaDesc, TmaDescSpec, TmaDescriptor, param_tensormap, tma_descriptor,
 };
 
-// stmatrix atoms and warpgroup register reallocation (roadmap part m8-stmatrix-setmaxnreg).
+// stmatrix atoms and warpgroup register reallocation.
 #[allow(deprecated)]
 pub use arch::{setmaxregister_decrease, setmaxregister_increase, warpgroup_reg_alloc, warpgroup_reg_dealloc};
 pub use ir::StMatrixForm;
 
-// TMA tile loads, cute.copy's keyword arguments and runtime atom fields (roadmap part
-// m7-tma-load).
+// TMA tile loads, cute.copy's keyword arguments and runtime atom fields.
 pub use atom::copy::{AuxOperand, CopyArgs, CopyElem, copy_aux};
 pub use atom::fields::MmaField;
 
-// TMA stores, reductions, L2 cache hints and prefetches (roadmap part m7-tma-store); multicast
-// masks, multicast and peer-CTA copies, st.async (roadmap part m7-cluster-copies).
+// TMA stores, reductions, L2 cache hints and prefetches; multicast
+// masks, multicast and peer-CTA copies, st.async.
 pub use arch::{prefetch_tensormap, store_async_dsmem};
 pub use layout::make_layout_image_mask;
 pub use nvgpu::tma_copy::prefetch_atom;
-// Warpgroup MMA (roadmap part m8-wgmma-core).
+// Warpgroup MMA.
 pub use atom::mma::MmaFragmentInput;
 pub use ir::WgmmaKind;
-// WGMMA variants and distributed shared memory (roadmap parts m8-wgmma-variants, m8-dsmem).
+// WGMMA variants and distributed shared memory.
 pub use arch::map_dsmem_ptr;
 pub use atom::copy::{R2SAttrs, S2RAttrs};
 
@@ -349,57 +348,57 @@ pub mod prelude {
     pub use crate::*;
 }
 
-// Several kernels in one module (m6b-multi-kernel).
+// Several kernels in one module.
 pub use aot::ExportedModule;
 pub use backend::{CompiledModule, KernelModule, ModuleError};
 pub use sim::SimKernelModule;
 
-// m11-extern-distributed: external device functions, standalone device functions and
+// External device functions, standalone device functions and
 // cutlass.utils.distributed.
 pub mod ffi;
 pub use ffi::{BitCode, CallArg, DeviceFunction, ExternFn, ExternOverloads};
 
-// m9-range-prefetch: software-pipelined loops (cutlass.range prefetch_stages).
+// Software-pipelined loops (cutlass.range prefetch_stages).
 pub use control::{Prefetch, for_range_pipelined};
 pub use sim::MulticastReplicas;
 
-// Blackwell layout atoms, UMMA descriptors and sizing helpers (roadmap part m10-umma-layouts).
+// Blackwell layout atoms, UMMA descriptors and sizing helpers.
 #[allow(deprecated)]
 pub use arch::{SM100_TMEM_CAPACITY_COLUMNS, SM100_TMEM_MIN_ALLOC_COLUMNS};
 pub use arch::{get_max_tmem_alloc_cols, get_min_tmem_alloc_cols, is_tmem_allocation_exclusive};
 pub use nvgpu::tcgen05;
 
-// Tensor memory (roadmap part m10-tmem-core).
+// Tensor memory.
 pub use arch::{
     TmemAddressSlot, alloc_tmem, dealloc_tmem, find_tmem_tensor_col_offset, relinquish_tmem_alloc_permit,
     retrieve_tmem_ptr,
 };
-// TMEM waits and tcgen05 fences (roadmap part m10-tmem-ld-st).
+// TMEM waits and tcgen05 fences.
 pub use arch::{
     TmemOpKind, fence_view_async_tmem_load, fence_view_async_tmem_op, fence_view_async_tmem_store,
     tcgen05_fence_after_thread_sync, tcgen05_fence_before_thread_sync,
 };
 
-// tcgen05 UMMA (F16/BF16) into TMEM and tcgen05.commit (roadmap part m10-umma-f16):
+// tcgen05 UMMA (F16/BF16) into TMEM and tcgen05.commit:
 // `cute::tcgen05::{MmaF16BF16Op, CtaGroup, OperandSource, Field, commit}`.
 pub use ir::{UmmaDataKind, UmmaKind, UmmaScale};
-// Rubin (SM107) UMMA forms and collector buffers (roadmap part m10-rubin-umma).
+// Rubin (SM107) UMMA forms and collector buffers.
 pub use ir::{CollectorOp, Sm107Umma};
 
-// SM120 warp-level block-scaled mma.sync (roadmap part m10-sm120-blockscaled):
+// SM120 warp-level block-scaled mma.sync:
 // `cute::warp::{MmaMXF4Op, MmaMXF4NVF4Op, MmaMXF8Op, MmaMXF8F6F4Op}` and `cute::utils::sm120`.
 pub use atom::mma::{GemmOperand, gemm_block_scaled};
 pub use ir::BlockScaledMmaKind;
 pub use nvgpu::warp;
 
-// tcgen05 TMEM-sourced A and runtime MMA modifiers (roadmap part m10-umma-kinds).
+// tcgen05 TMEM-sourced A and runtime MMA modifiers.
 pub use atom::mma::gemm_disable_output_lane;
 
-// Cluster launch control (roadmap part m10-clc-scheduling): the CLC fetch pipeline is
+// Cluster launch control: the CLC fetch pipeline is
 // `cute::pipeline::PipelineClcFetchAsync`, the scheduler `cute::utils::ClcDynamicPersistentTileScheduler`.
 pub use arch::{clc_response, issue_clc_query};
 
-// 2:4 structured-sparse tcgen05 UMMA (roadmap part m10-sparse-umma): sparse element types;
+// 2:4 structured-sparse tcgen05 UMMA: sparse element types;
 // the MMAs are `cute::tcgen05::{MmaF16BF16SparseOp, MmaFP8SparseOp}`, the layouts in
 // `cute::utils::sm100`.
 mod sparse_elem;

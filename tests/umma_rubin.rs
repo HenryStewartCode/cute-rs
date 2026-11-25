@@ -10,7 +10,7 @@
 // That portion is under the BSD-3-Clause licence, and the rest of the file is cute-rs's own,
 // under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the licence text.
 
-//! The Rubin (sm_107) tcgen05 MMAs (roadmap part m10-rubin-umma): GEMM tiles on the
+//! The Rubin (sm_107) tcgen05 MMAs: GEMM tiles on the
 //! simulator for SM107MmaFP8Op (K = 64 and 32), SM107BlockScaledMmaMXF8F6F4Op (K = 64, one
 //! CTA and a pair) and SM107MmaMXF4NVF4Op (K = 128 with 16-element UE4M3 and UE5M3 scales,
 //! the UE5M3 codes made by the host codec, and 32-element UE8M0 scales), exact against plain

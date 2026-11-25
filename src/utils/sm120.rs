@@ -9,7 +9,7 @@
 // licence text and lists what each part ports.
 
 //! CuTe DSL's SM120 block-scaled helpers from `cutlass.utils`
-//! (`blackwell_helpers`; roadmap part m10-sm120-blockscaled): the tiled-MMA
+//! (`blackwell_helpers`): the tiled-MMA
 //! permutation, the scale-factor thread partitions that give each thread
 //! the scales a warp-level block-scaled `mma.sync`
 //! ([`warp::MmaMXF4Op`](crate::warp::MmaMXF4Op) and the others) expects,

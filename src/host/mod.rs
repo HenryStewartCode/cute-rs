@@ -11,7 +11,7 @@
 //! # Differences from `cutlass.torch`
 //!
 //! * No torch (or other tensor crate) dependency and no `rand`: values come from a seeded
-//!   SplitMix64 generator ([`Rng`](crate::utils::gemm::Rng)) with Box-Muller normals, so a
+//!   SplitMix64 generator ([`Rng`]) with Box-Muller normals, so a
 //!   seed gives the same tensor on every run and platform, **but not the values torch's
 //!   generator gives** for the same seed. Every creator takes an explicit `seed`.
 //! * `TensorInit::Skip` leaves the buffer zeroed (a Rust `Vec` is never uninitialised).

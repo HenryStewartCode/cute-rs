@@ -8,7 +8,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! TMA stores, reduce stores, L2 cache hints and prefetches (roadmap part m7-tma-store),
+//! TMA stores, reduce stores, L2 cache hints and prefetches,
 //! held to plain Rust: an epilogue that writes tiles to shared memory with plain stores,
 //! fences them for the async proxy, synchronises on a named barrier and has one warp
 //! TMA-store them through a two-stage buffer (waiting `.read` before each reuse), over a

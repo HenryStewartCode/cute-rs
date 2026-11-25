@@ -1,4 +1,4 @@
-//! Cluster launch control (roadmap part m10-clc-scheduling) on the simulator: a
+//! Cluster launch control on the simulator: a
 //! persistent kernel whose clusters claim the tiles of clusters that have not started
 //! (`PipelineClcFetchAsync` and `ClcDynamicPersistentTileScheduler`) processes every
 //! tile once, in the static scheduler's order, under several grids, cluster shapes,
@@ -421,7 +421,7 @@ fn clc_ptx_for_sm100a() {
 }
 
 // ---------------------------------------------------------------------------------------
-// Preferred and fallback clusters (m10-port-clc-clusters).
+// Preferred and fallback clusters.
 // ---------------------------------------------------------------------------------------
 
 use cute::utils::{ClusterArm, current_cluster_arm, mixed_cluster_arms};

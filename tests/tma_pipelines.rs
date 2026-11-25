@@ -1,4 +1,4 @@
-//! The TMA pipelines (roadmap part m9-pipeline-tma) on the simulator: the
+//! The TMA pipelines on the simulator: the
 //! `PipelineTmaAsync` and `PipelineTmaStore` feature kernels under the built-in and
 //! seeded schedules with random async completion, the signalling lanes of
 //! `init_empty_barrier_arrive_signal`, the multicast consumer count, the

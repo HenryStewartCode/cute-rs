@@ -1,4 +1,4 @@
-//! In-kernel tensor-map copies and updates (roadmap part m7-tensormap-update): the
+//! In-kernel tensor-map copies and updates: the
 //! feature kernels under seeded schedules and random completion, the build-time checks
 //! of the descriptor functions and `TensorMapManager`, and the PTX they lower to.
 //! Misuse the simulator reports is in `tests/diagnostics.rs`.

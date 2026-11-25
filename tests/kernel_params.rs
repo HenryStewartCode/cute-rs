@@ -51,7 +51,7 @@ fn cfg() -> LaunchConfig {
 }
 
 // ---------------------------------------------------------------------------
-// m5-kernel-params: the protocol, TensorSpec, layouts as arguments
+// The protocol, TensorSpec, layouts as arguments
 // ---------------------------------------------------------------------------
 
 type Signature = (Tensor<F16>, Tensor<f32>, Float32, Layout, Shape, Int32, FastDivmod, Option<Ptr<u8>>);
@@ -297,7 +297,7 @@ fn spec_alignment_reaches_the_kernel() {
 }
 
 // ---------------------------------------------------------------------------
-// m5-host-specs: mark_layout_dynamic, mark_compact_shape_dynamic, SymInt
+// Mark_layout_dynamic, mark_compact_shape_dynamic, SymInt
 // ---------------------------------------------------------------------------
 
 /// A host tensor of `shape:stride` (no data needed to mark it).
@@ -545,7 +545,7 @@ fn symint_launch_checks() {
 }
 
 // ---------------------------------------------------------------------------
-// m5-typed-entry: typed entry points, Constexpr, struct arguments, native structs
+// Typed entry points, Constexpr, struct arguments, native structs
 // ---------------------------------------------------------------------------
 
 kernel_params! {

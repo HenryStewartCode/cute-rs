@@ -5,7 +5,7 @@
 //! The key ([`Kernel::compile_with`](crate::Kernel::compile_with) builds it) is the MLIR text
 //! (with source locations only when line information is on, so a change that only moves
 //! code keeps the key), the kernel's signature, the target, PTX version, optimization level
-//! and the other options that change the output ([`CompileOptions::cache_key`]), the lowering
+//! and the other options that change the output (`CompileOptions::cache_key`), the lowering
 //! pipeline, the toolchain (the `mlir-opt` path, size, modification time and LLVM version,
 //! the `ptxas` path, size, modification time and CUDA release when it runs) and the crate
 //! version. The on-disk key adds the running

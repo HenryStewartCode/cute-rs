@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The MMA-aware TMA atoms of SM100 (roadmap part m10-port-fp16-gemm,
-//! `cute.nvgpu.make_tiled_tma_atom_A/B/C`), at build time: the atom's tiling (box,
+//! The MMA-aware TMA atoms of SM100 (`cute.nvgpu.make_tiled_tma_atom_A/B/C`), at build time: the atom's tiling (box,
 //! descriptor dimensions, gmem basis, TMA tensor) is that of `make_tiled_tma_atom` on
 //! the equivalent explicit CTA tile, the multicast counts follow the cluster's N mode
 //! (A) and M mode (B), the im2col A atom tiles as `make_im2col_tma_atom` on the

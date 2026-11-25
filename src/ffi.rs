@@ -1,5 +1,5 @@
 //! External device functions and standalone `__device__` functions (CuTe DSL's `cute.extern`,
-//! `cute.ffi` and `cute.compile[cute.DeviceTarget]`; roadmap part m11-extern-ffi-device-fn).
+//! `cute.ffi` and `cute.compile[cute.DeviceTarget]`).
 //!
 //! # Calling external device functions
 //!

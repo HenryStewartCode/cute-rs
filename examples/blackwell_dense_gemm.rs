@@ -10,8 +10,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! The canonical Blackwell GEMM, ported from CuTe DSL's `dense_gemm.py`
-//! (roadmap part m10-port-dense-gemm): `C = A B^T` with TMA loads, tcgen05 MMAs and a
+//! The canonical Blackwell GEMM, ported from CuTe DSL's `dense_gemm.py`: `C = A B^T` with TMA loads, tcgen05 MMAs and a
 //! TMA-store epilogue, on one CTA or a CTA pair, in a cluster of any shape.
 //!
 //! - A `(M, K)` and B `(N, K)` are K-major Float16, the accumulator Float32 in TMEM, C
@@ -39,8 +38,7 @@
 //!
 //! Differences from the Python:
 //! - the example defines its own `epilogue_tma_store`; the port builds the epilogue from the
-//!   packaged one ([`cute::utils::gemm::sm100::epilogue_tma_store`], roadmap part
-//!   m10-epilogue-helpers). The packaged one waits for each TMEM load explicitly (the
+//!   packaged one ([`cute::utils::gemm::sm100::epilogue_tma_store`]). The packaged one waits for each TMEM load explicitly (the
 //!   simulator requires it) and releases the accumulator from one thread per warp, so the
 //!   accumulator pipeline's consumer group counts the four epilogue warps, and its
 //!   named barrier is 2 (the example's own is 1; 1 is the TMEM free's here).

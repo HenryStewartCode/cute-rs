@@ -134,7 +134,7 @@ mod gpu {
     /// [`use_cuda_graphs`](BenchmarkOptions::use_cuda_graphs), the two runs are captured
     /// into graphs once (the closure is called the same number of times), the warmup graph
     /// replayed, and the replay of the timed graph measured. See the
-    /// [module documentation](self) for what is timed.
+    /// module documentation for what is timed.
     pub fn benchmark<'c>(
         stream: &CudaStream<'c>,
         options: &BenchmarkOptions,

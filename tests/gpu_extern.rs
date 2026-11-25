@@ -1,5 +1,4 @@
-//! External device functions, standalone device functions and flag locks on a GPU (roadmap
-//! lane m11-extern-distributed), each against the simulator: calls of functions from linked
+//! External device functions, standalone device functions and flag locks on a GPU, each against the simulator: calls of functions from linked
 //! bitcode (inlined and not), libdevice's `__nv_erff` and `__nv_powf` (when the CUDA toolkit's
 //! libdevice is installed), a kernel linked at load time with the device functions it calls,
 //! relocatable device code (`ptxas -c`, linked into a CUDA C program when `nvcc` is

@@ -9,7 +9,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! The TMA pipelines (roadmap part m9-pipeline-tma), held to plain Rust: a producer
+//! The TMA pipelines, held to plain Rust: a producer
 //! warp streaming K tiles through a 4-stage `PipelineTmaAsync` ring to a consumer
 //! warpgroup (with and without try-wait tokens); multicast A/B loads in 2x1, 1x2 and
 //! 2x2 clusters whose consumers release the stages of their multicast partners (with

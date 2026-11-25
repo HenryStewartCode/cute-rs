@@ -1,5 +1,4 @@
-//! TMA tile loads, runtime atom fields and `cute.copy`'s keyword arguments (roadmap
-//! part m7-tma-load): the feature kernels under seeded schedules and random
+//! TMA tile loads, runtime atom fields and `cute.copy`'s keyword arguments: the feature kernels under seeded schedules and random
 //! completion, the simulator's reports of misuse, the build-time checks of
 //! `CopyArgs`, `with_` and the MMA fields, and the MLIR the loads lower to.
 
@@ -605,7 +604,7 @@ fn installed_toolchains() -> Vec<Toolchain> {
     out
 }
 
-/// A TMA load into another CTA's shared memory (a `map_dsmem_ptr` tensor, m8-dsmem) is
+/// A TMA load into another CTA's shared memory (a `map_dsmem_ptr` tensor) is
 /// refused rather than landing in this CTA's.
 #[test]
 fn tma_load_refuses_a_dsmem_destination() {

@@ -1300,8 +1300,8 @@ fn compile_option_misuse() {
         ("--gpu-arch sm_88", "sm_88 is in the PTX ISA but not in CuTe DSL 4.8.1's Arch"),
         ("dump-ptx-path=maybe", "takes 1, true, yes or on"),
         ("remarks{ptxas}", "`ptxas` is not a diagnostic category"),
-        ("--link-libraries libdevice.bc", "it comes with m11-extern-ffi-device-fn"),
-        ("iket", "it comes with m11-profiling-iket"),
+        ("--link-libraries libdevice.bc", "linking device libraries is not available yet"),
+        ("iket", "IKET in-kernel event tracing is not available yet"),
         ("--frobnicate", "unknown option `--frobnicate`"),
         ("--keep", "ambiguous option `--keep`"),
         ("--h x", "ambiguous option `--h`: it could be --help, --host-target"),
@@ -8002,7 +8002,7 @@ mod grouped_scheduler_misuse {
     }
 }
 
-/// Tensor maps edited in the kernel (roadmap part m7-tensormap-update): a TMA copy
+/// Tensor maps edited in the kernel: a TMA copy
 /// through a descriptor written without the tensormap-proxy release or acquire, or with
 /// them in the wrong order, through bytes that hold no descriptor, a divergent
 /// `tensormap.cp_fenceproxy`, and `tensormap.replace` for plain sm_90.
@@ -8530,7 +8530,7 @@ mod tma_pipeline_misuse {
     }
 }
 
-// m10-tmem-core: misuse of tensor-memory allocation.
+// Misuse of tensor-memory allocation.
 mod tmem_misuse {
     use super::*;
 
@@ -8689,7 +8689,7 @@ mod tmem_misuse {
     }
 }
 
-// m9-range-prefetch: software-pipelined loops.
+// Software-pipelined loops.
 mod range_prefetch_misuse {
     use super::{build_panic, simulate_err};
     use cute::pipeline::{Agent, CooperativeGroup, Pipeline, PipelineCpAsync, PipelineCpAsyncOptions};

@@ -15,8 +15,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! The MMA forms only CuTe DSL's primitives issue (roadmap part
-//! m11-prims-mma-forms; `cutlass.experimental.primitives`): no CuTe MMA
+//! The MMA forms only CuTe DSL's primitives issue (`cutlass.experimental.primitives`): no CuTe MMA
 //! atom has them. Each takes raw operands, as the PTX instruction does: D's
 //! tensor-memory address, A's shared-memory descriptor or TMEM address,
 //! B's descriptor and an instruction descriptor (`prims::descriptors`).
@@ -721,7 +720,7 @@ impl From<Value<u32>> for ScaleOperand {
     }
 }
 
-/// m11-prims-mma-forms: why a warp-level sparse block-scaled kind is no
+/// Why a warp-level sparse block-scaled kind is no
 /// instruction the PTX ISA defines, if it is not: the types and scale
 /// vector of each kind (`mxf8f6f4` 1X UE8M0; `mxf4` 2X UE8M0; `mxf4nvf4`
 /// 2X UE8M0 or 4X UE4M3/UE8M0), byte-id (1X: 0 to 3; 2X: 0 or 2; 4X: 0) and

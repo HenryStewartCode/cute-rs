@@ -8,8 +8,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! The SM100 shared-memory layout atoms and `tile_to_mma_shape` (roadmap
-//! part m10-umma-layouts).
+//! The SM100 shared-memory layout atoms and `tile_to_mma_shape`.
 
 use crate::ir::DType;
 use crate::layout::{

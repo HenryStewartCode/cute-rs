@@ -45,11 +45,10 @@ pub enum MmaOp {
     /// picks it.
     Sm90(crate::ir::WgmmaKind),
     /// A tcgen05 MMA (`tcgen05.mma`, sm_100a) with A and B in shared memory
-    /// and D in tensor memory (roadmap part m10-umma-f16);
+    /// and D in tensor memory;
     /// [`tcgen05::MmaF16BF16Op`](crate::nvgpu::tcgen05::MmaF16BF16Op) picks it.
     Sm100(crate::ir::UmmaKind),
-    /// A warp-level block-scaled `mma.sync` (sm_120a, roadmap part
-    /// m10-sm120-blockscaled); the `cute::warp` operations
+    /// A warp-level block-scaled `mma.sync` (sm_120a); the `cute::warp` operations
     /// ([`MmaMXF4Op`](crate::warp::MmaMXF4Op) and the others) pick it.
     Sm120(crate::ir::BlockScaledMmaKind),
 }
@@ -554,7 +553,7 @@ impl MmaAtom {
             }
             MmaOp::Sm100(kind) => {
                 let (m, n, k) = kind.shape_mnk();
-                // m10-cta-pair: a CTA pair (ThrID 2) holds the upper and lower halves of A's,
+                // A CTA pair (ThrID 2) holds the upper and lower halves of A's,
                 // B's and C's rows (CUTLASS's SM100_MMA_*_2x1SM_SS traits).
                 let v = if kind.two_cta { 2 } else { 1 };
                 let tv = |rows: usize, cols: usize| {
@@ -565,13 +564,13 @@ impl MmaAtom {
                     op,
                     shape_mnk: [m, n, k],
                     thr_id: Layout::new(v, if v == 1 { 0 } else { 1 }),
-                    // m10-sparse-umma: a sparse A is partitioned compressed (half of K).
+                    // A sparse A is partitioned compressed (half of K).
                     a: tv(m, kind.a_k()),
                     b: tv(n, k),
                     c: tv(m, n),
-                    // m10-umma-kinds: the runtime negate bits and disable-output-lane mask;
-                    // m10-umma-blockscaled: the scale factors instead of the mask;
-                    // m10-sparse-umma: and the metadata.
+                    // The runtime negate bits and disable-output-lane mask;
+                    // The scale factors instead of the mask;
+                    // And the metadata.
                     fields: if kind.sparse {
                         super::fields::MmaFields::taking(&[
                             crate::MmaField::ACCUMULATE,
@@ -621,8 +620,7 @@ impl MmaAtom {
     }
 
     /// Whether the atom is a tcgen05 MMA whose A comes from tensor memory
-    /// ([`OperandSource::TMEM`](crate::nvgpu::tcgen05::OperandSource::TMEM),
-    /// m10-umma-kinds).
+    /// ([`OperandSource::TMEM`](crate::nvgpu::tcgen05::OperandSource::TMEM)).
     pub fn is_tcgen05_tmem_a(&self) -> bool {
         matches!(self.op, MmaOp::Sm100(kind) if kind.a_tmem)
     }
@@ -649,7 +647,7 @@ impl MmaAtom {
     }
 
     /// The atom's thread id layout (CuTe DSL's `thr_id`): `1:0` for one
-    /// thread or a 1-CTA `tcgen05` MMA, `2:1` for a CTA pair's (m10-cta-pair-pipelines).
+    /// thread or a 1-CTA `tcgen05` MMA, `2:1` for a CTA pair's.
     pub fn thr_id(&self) -> &Layout {
         &self.thr_id
     }
@@ -682,7 +680,7 @@ impl MmaAtom {
 
     /// Whether an A or B operand of type `ty` fits where the instruction
     /// takes `expected`: the type itself, or TFloat32 for the f32 operands of
-    /// a TF32 MMA. A tcgen05 TF32 MMA (m10-umma-dense-kinds) also takes
+    /// a TF32 MMA. A tcgen05 TF32 MMA also takes
     /// Float32 tensors, and FP6 and FP4 operands of a tcgen05 F8F6F4 MMA are
     /// Uint8 tensors holding the padded image (16 values per 16-byte slot,
     /// as a TMA load with an 8-bit `internal_type` writes it: CuTe C++'s
@@ -792,7 +790,7 @@ impl TiledMma {
     }
 
     /// This tiling (thread layout, permutations and the atom's runtime
-    /// fields) of the atom of `op` instead (m10-rubin-extras: the B
+    /// fields) of the atom of `op` instead (the B
     /// collector variants of a Rubin tiled MMA).
     pub(crate) fn with_op(&self, op: MmaOp) -> TiledMma {
         let mut atom = MmaAtom::new(op);
@@ -813,7 +811,7 @@ impl TiledMma {
     }
 
     /// The atom's thread id layout (CuTe DSL's `tiled_mma.thr_id`), as
-    /// [`MmaAtom::thr_id`] (m10-cta-pair-pipelines).
+    /// [`MmaAtom::thr_id`].
     pub fn thr_id(&self) -> &Layout {
         self.atom.thr_id()
     }
@@ -847,8 +845,7 @@ impl TiledMma {
     }
 
     /// [`thrfrg`](Self::thrfrg) with another `(thread, value)` atom layout
-    /// over an `ai x aj` atom tile: the SM120 scale-factor partitions
-    /// (m10-sm120-blockscaled).
+    /// over an `ai x aj` atom tile: the SM120 scale-factor partitions.
     pub(crate) fn thrfrg_with_atom(
         &self,
         layout: &Layout,
@@ -919,7 +916,7 @@ impl TiledMma {
     fn make_desc<T: Numeric>(&self, p: &Tensor<T>, which: Operand, what: &str) -> Tensor<T> {
         use crate::nvgpu::OperandMajorMode::{K, MN};
         if let MmaOp::Sm100(kind) = self.atom.op {
-            // m10-cta-pair: each CTA of a pair holds half of A's and of B's rows.
+            // Each CTA of a pair holds half of A's and of B's rows.
             let v = if kind.two_cta { 2 } else { 1 };
             let (mn, trans, name) = if which == Operand::A {
                 (kind.m as usize / v, kind.trans_a, "a")
@@ -927,8 +924,8 @@ impl TiledMma {
                 (kind.n as usize / v, kind.trans_b, "b")
             };
             let what = format!("{what}_{name} of {:?}", self.atom.op);
-            // m10-umma-dense-kinds: FP6/FP4 operands are read from their padded image
-            // (m10-umma-blockscaled: except the packed FP4 of .kind::mxf4 and mxf4nvf4).
+            // FP6/FP4 operands are read from their padded image
+            // (except the packed FP4 of .kind::mxf4 and mxf4nvf4).
             let packed = matches!(kind.kind, crate::ir::UmmaDataKind::Mxf4 | crate::ir::UmmaDataKind::Mxf4Nvf4);
             assert!(
                 packed || T::DTYPE.bits() >= 8,
@@ -1022,8 +1019,7 @@ impl TiledMma {
     }
 
     /// The TMEM A tensor of a tcgen05 MMA with A in tensor memory (CuTe
-    /// DSL's `make_fragment_A(shape)` with `a_src` TMEM, roadmap part
-    /// m10-umma-kinds), shaped like `input` (`((M, K), MMA_M, MMA_K, ...)`,
+    /// DSL's `make_fragment_A(shape)` with `a_src` TMEM), shaped like `input` (`((M, K), MMA_M, MMA_K, ...)`,
     /// a partition of A, a [`Layout`] or a shape): CuTe C++'s
     /// `UMMA::tmem_frg_1sm<T, T, NonInterleaved>` layout over a TMEM pointer
     /// at address 0. Row `i` of each MMA's A tile is in the lane of row `i`
@@ -1071,7 +1067,7 @@ impl TiledMma {
     #[track_caller]
     fn make_tmem_fragment<T: Numeric>(&self, shape: &Layout, what: &str) -> Tensor<T> {
         let MmaOp::Sm100(kind) = self.atom.op else { unreachable!("a tcgen05 MMA") };
-        // m10-cta-pair: one CTA's half of a pair's accumulator, M / 2 rows.
+        // One CTA's half of a pair's accumulator, M / 2 rows.
         let m = kind.m as usize / if kind.two_cta { 2 } else { 1 };
         let n = kind.n as usize;
         let first = shape.mode(0);
@@ -1290,7 +1286,7 @@ pub fn gemm<A: GemmOperand, B: GemmOperand, TC: Numeric>(mma: &TiledMma, d: &Ten
         return gemm_block_scaled(mma, d, &a, sfa, &b, sfb, c);
     }
     // m10-umma-blockscaled.
-    // m10-sparse-umma: A's companion is the metadata.
+    // A's companion is the metadata.
     if let MmaOp::Sm100(kind) = mma.atom.op
         && (kind.scale.is_some() || kind.sparse)
     {
@@ -1498,7 +1494,7 @@ fn gemm_warpgroup<TA: Numeric, TB: Numeric, TC: Numeric>(
     }
 }
 
-/// [`gemm`] for a tcgen05 MMA (roadmap part m10-umma-f16): `a` and `b`
+/// [`gemm`] for a tcgen05 MMA: `a` and `b`
 /// are descriptor fragments (`(1, MMA_M, MMA_K)` and `(1, MMA_N, MMA_K)`),
 /// `d` the TMEM accumulator tensor (`((M, N), MMA_M, MMA_N)`, from
 /// [`TiledMma::make_fragment_c`] over the TMEM allocation), which `c` must
@@ -1517,7 +1513,7 @@ fn gemm_tcgen05<TA: Numeric, TB: Numeric, TC: Numeric>(
 ) {
     let loc = Location::caller();
     let MmaOp::Sm100(kind) = mma.atom.op else { unreachable!("a tcgen05 MMA") };
-    // m10-rubin-umma: no published source gives the descriptor format of UE5M3 operands.
+    // No published source gives the descriptor format of UE5M3 operands.
     assert!(
         kind.a != DType::F8E5M3FNU && kind.b != DType::F8E5M3FNU,
         "gemm: {} with a FloatNV8E5M3FNU operand: cute-rs does not know that operand's instruction-descriptor \
@@ -1544,7 +1540,7 @@ fn gemm_tcgen05<TA: Numeric, TB: Numeric, TC: Numeric>(
     for (name, t) in [("A", tmem_a || a.engine_is_desc()), ("B", b.engine_is_desc())] {
         assert!(
             t,
-            "gemm: operand {name} of the tcgen05 MMA {:?} must be the descriptor fragment that              TiledMma::make_fragment_{} makes of its shared-memory tile",
+            "gemm: operand {name} of the tcgen05 MMA {:?} must be the descriptor fragment that TiledMma::make_fragment_{} makes of its shared-memory tile",
             mma.atom.op,
             name.to_lowercase()
         );
@@ -1552,7 +1548,7 @@ fn gemm_tcgen05<TA: Numeric, TB: Numeric, TC: Numeric>(
     let tmem = |t: &Tensor<TC>| t.memory_space() == Some(crate::ir::MemSpace::Raw(crate::tensor::AddressSpace::Tmem));
     assert!(
         tmem(d) && tmem(c),
-        "gemm: the accumulators of a tcgen05 MMA are in tensor memory: pass the TMEM tensor make_fragment_c's layout          gives over the TMEM allocation as C and D"
+        "gemm: the accumulators of a tcgen05 MMA are in tensor memory: pass the TMEM tensor make_fragment_c's layout gives over the TMEM allocation as C and D"
     );
     assert!(d.layout() == c.layout(), "gemm: a tcgen05 MMA accumulates in place, so C and D are the same TMEM tensor");
     for (name, t) in [("D", d.layout()), ("A", a.layout()), ("B", b.layout())] {
@@ -1563,7 +1559,7 @@ fn gemm_tcgen05<TA: Numeric, TB: Numeric, TC: Numeric>(
     assert_eq!(size(a.shape(), 1), m, "gemm: A has {} M-blocks but D has {m}", size(a.shape(), 1));
     assert_eq!(size(b.shape(), 1), n, "gemm: B has {} N-blocks but D has {n}", size(b.shape(), 1));
     assert_eq!(size(b.shape(), 2), k, "gemm: A has {k} K-blocks but B has {}", size(b.shape(), 2));
-    // m10-cta-pair: each CTA of a pair holds M / 2 rows of D.
+    // Each CTA of a pair holds M / 2 rows of D.
     let rows = kind.m / if kind.two_cta { 2 } else { 1 };
     assert_eq!(
         size(d.shape(), 0),
@@ -1591,7 +1587,7 @@ fn gemm_tcgen05<TA: Numeric, TB: Numeric, TC: Numeric>(
         }
         Tree::Branch(modes)
     };
-    // m10-umma-kinds: the runtime negate bits OR'd into the descriptor, and the lane mask.
+    // The runtime negate bits OR'd into the descriptor, and the lane mask.
     let field = |f: crate::MmaField| mma.field_values().into_iter().find(|(g, _)| *g == f).and_then(|(_, v)| v);
     let (neg_a, neg_b) = (field(crate::MmaField::NEGATE_A), field(crate::MmaField::NEGATE_B));
     let negated = (neg_a.is_some() || neg_b.is_some()).then(|| {
@@ -1604,7 +1600,7 @@ fn gemm_tcgen05<TA: Numeric, TB: Numeric, TC: Numeric>(
         v
     });
     let idesc = if kind.scale.is_some() { None } else { negated.map(|v| v.checked()) };
-    // m10-sparse-umma: the metadata's TMEM tensor (A's companion, or the METADATA field).
+    // The metadata's TMEM tensor (A's companion, or the METADATA field).
     let metadata = kind.sparse.then(|| {
         let Some(e) = sfa.clone().or_else(|| mma.atom.fields.tensors[0].clone()) else {
             panic!(
@@ -1628,7 +1624,7 @@ fn gemm_tcgen05<TA: Numeric, TB: Numeric, TC: Numeric>(
     if kind.sparse {
         assert!(sfb.is_none(), "gemm: the sparse MMA {} takes no companion tensor with B", kind.ptx());
     }
-    // m10-umma-blockscaled: the scale factors' TMEM tensors.
+    // The scale factors' TMEM tensors.
     let scales = kind.scale.map(|sc| {
         let field = |i: usize| mma.atom.fields.tensors[i].clone();
         let (Some(sfa), Some(sfb)) = (sfa.or_else(|| field(0)), sfb.or_else(|| field(1))) else {
@@ -1676,7 +1672,7 @@ fn gemm_tcgen05<TA: Numeric, TB: Numeric, TC: Numeric>(
             for nn in 0..n {
                 let desc_b = b.slice(at(b.shape(), [nn, kk])).smem_desc(0).checked();
                 let taddr = d.slice(at(d.shape(), [mm, nn])).ptr().toint_i32().checked();
-                // m10-sparse-umma: the metadata address with its column's lowest bit in the
+                // The metadata address with its column's lowest bit in the
                 // descriptor's selector (CuTe C++'s sparse MMA_Traits).
                 let (meta, idesc) = match &metadata {
                     None => (None, idesc),
@@ -1722,7 +1718,7 @@ fn gemm_tcgen05<TA: Numeric, TB: Numeric, TC: Numeric>(
 }
 
 /// [`gemm`] with a `{disable-output-lane}` mask (CuTe DSL's `cute.gemm(...,
-/// disable_output_lane=mask)`, roadmap part m10-umma-kinds): the MMAs of a
+/// disable_output_lane=mask)`): the MMAs of a
 /// tcgen05 `mma` leave the TMEM lanes of D whose bits `mask` sets
 /// unwritten (see [`MmaAtom::set_disable_output_lane`]).
 #[track_caller]
@@ -1754,7 +1750,7 @@ pub fn gemm_sparse<TA: Numeric, TB: Numeric, TC: Numeric>(
     c: &Tensor<TC>,
 ) {
     assert!(mma.atom.is_sparse(), "gemm_sparse: {:?} is not a sparse MMA: call gemm", mma.atom.op);
-    // m10-sparse-umma: a tcgen05 sparse MMA's metadata tensor is in TMEM.
+    // A tcgen05 sparse MMA's metadata tensor is in TMEM.
     if mma.atom.is_tcgen05() {
         return gemm_tcgen05(mma, d, a, b, c, (Some(ScaleOperand::of(e)), None));
     }
@@ -1887,7 +1883,7 @@ fn emit_mma<TA: Numeric, TB: Numeric, TC: Numeric>(
     }
 }
 
-// m10-sm120-blockscaled: gemm operands with scale factors, and the
+// Gemm operands with scale factors, and the
 // block-scaled warp MMA.
 
 /// A [`gemm`] A or B operand: a fragment (`&Tensor<T>`), or a fragment and
@@ -1937,7 +1933,7 @@ impl MmaAtom {
     /// boolean fields, tensor fields are not carried through loops.
     #[track_caller]
     pub fn set_tensor<S: Numeric>(&mut self, field: crate::MmaField, value: &Tensor<S>) {
-        // m10-sparse-umma: the METADATA of a sparse tcgen05 MMA (in the first slot).
+        // The METADATA of a sparse tcgen05 MMA (in the first slot).
         if let MmaOp::Sm100(crate::ir::UmmaKind { sparse: true, .. }) = self.op {
             assert!(
                 field == crate::MmaField::METADATA,
@@ -1966,8 +1962,7 @@ impl TiledMma {
     }
 }
 
-/// [`gemm`] for a block-scaled warp MMA (sm_120a, roadmap part
-/// m10-sm120-blockscaled): `a` is `(MMA, MMA_M, MMA_K)`, `b` `(MMA, MMA_N,
+/// [`gemm`] for a block-scaled warp MMA (sm_120a): `a` is `(MMA, MMA_M, MMA_K)`, `b` `(MMA, MMA_N,
 /// MMA_K)`, `c` and `d` Float32 `(MMA, MMA_M, MMA_N)`, and `sfa` and `sfb`
 /// the scale-factor fragments of [`partition_fragment_sfa`] and
 /// [`partition_fragment_sfb`] (`(MMA_SF, MMA_M, MMA_K)` and `(MMA_SF, MMA_N,

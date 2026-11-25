@@ -133,7 +133,7 @@ pub struct CompileOptions {
     warnings_ignore: Option<bool>,
     no_cache: Option<bool>,
     /// LLVM bitcode linked into every module compiled with these options (CuTe DSL's
-    /// `cute.LinkLibraries`; m11-extern-distributed).
+    /// `cute.LinkLibraries`).
     link_libraries: Vec<PathBuf>,
 }
 
@@ -884,7 +884,7 @@ impl CompileOptions {
                     if braces.is_some() || value.is_some() {
                         return Err(OptionError::new(format!("`{word}`: iket takes no value or selectors")));
                     }
-                    return Err(pending("iket", "IKET in-kernel event tracing", "m11-profiling-iket"));
+                    return Err(pending("iket", "IKET in-kernel event tracing"));
                 }
                 "debug" => {
                     let Some(selectors) = braces.filter(|_| value.is_none()) else {
@@ -970,7 +970,7 @@ impl CompileOptions {
             Effect::EnableTvmFfi => self.enable_tvm_ffi = Some(active),
             Effect::RemarkFilter => self.remark_filter = active.then(|| text.trim().to_string()),
             Effect::RemarkOutput => self.remark_output = active.then(|| PathBuf::from(text.trim())),
-            Effect::Pending { feature, part } if active => return Err(pending(shown, feature, part)),
+            Effect::Pending { feature } if active => return Err(pending(shown, feature)),
             Effect::Unsupported(why) if active => {
                 return Err(OptionError::new(format!("`{shown}` is not supported: {why}")));
             }
@@ -982,8 +982,8 @@ impl CompileOptions {
 
 const NO_PYIR: &str = "cute-rs records structured control flow directly, with no PyIR to convert";
 
-fn pending(shown: &str, feature: &str, part: &str) -> OptionError {
-    OptionError::new(format!("`{shown}`: {feature} is not available yet; it comes with {part}"))
+fn pending(shown: &str, feature: &str) -> OptionError {
+    OptionError::new(format!("`{shown}`: {feature} is not available yet"))
 }
 
 fn opt_level_range(level: &str) -> String {
@@ -1086,7 +1086,6 @@ enum Effect {
     /// Rejected until `part` lands.
     Pending {
         feature: &'static str,
-        part: &'static str,
     },
     /// Rejected for good, for the given reason.
     Unsupported(&'static str),
@@ -1134,13 +1133,13 @@ const SPECS: &[Spec] = &[
         flag: "link-libraries",
         compact: "link-libraries",
         kind: Kind::Str,
-        effect: Effect::Pending { feature: "linking device libraries", part: "m11-extern-ffi-device-fn" },
+        effect: Effect::Pending { feature: "linking device libraries" },
     },
     Spec {
         flag: "rdc",
         compact: "rdc",
         kind: Kind::Bool,
-        effect: Effect::Pending { feature: "relocatable device code", part: "m11-extern-ffi-device-fn" },
+        effect: Effect::Pending { feature: "relocatable device code" },
     },
     Spec {
         flag: "flatten-locs-output-json-path",
@@ -1572,16 +1571,10 @@ mod tests {
     }
 
     #[test]
-    fn options_of_later_parts_name_them() {
-        for (text, part) in [
-            ("--link-libraries libdevice.bc", "m11-extern-ffi-device-fn"),
-            ("--rdc", "m11-extern-ffi-device-fn"),
-            ("rdc", "m11-extern-ffi-device-fn"),
-            ("iket", "m11-profiling-iket"),
-            ("--iket", "m11-profiling-iket"),
-        ] {
+    fn unavailable_options_say_so() {
+        for text in ["--link-libraries libdevice.bc", "--rdc", "rdc", "iket", "--iket"] {
             let e = error(text);
-            assert!(e.contains(part) && e.contains("not available yet"), "{text}: {e}");
+            assert!(e.contains("not available yet"), "{text}: {e}");
         }
         // The value after --ptxas-options is consumed even though it starts with '-'; other
         // flags take such a value only after `=` (see values_that_start_with_a_dash).

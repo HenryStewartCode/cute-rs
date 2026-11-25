@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The simulator's cluster launch control (roadmap part m10-clc-scheduling),
+//! The simulator's cluster launch control,
 //! modelled from the PTX ISA's `clusterlaunchcontrol.try_cancel` and
 //! `clusterlaunchcontrol.query_cancel`.
 //!

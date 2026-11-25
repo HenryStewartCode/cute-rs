@@ -81,7 +81,7 @@ pub fn desc_address_to_inline_ptx_kernel() -> Kernel {
     })
 }
 
-/// A TMA atom (roadmap part m7-tma-atom) over `a`, a row-major `(m, k)` f16 matrix with
+/// A TMA atom over `a`, a row-major `(m, k)` f16 matrix with
 /// runtime extents, for 128x64 tiles in the 128-byte-swizzled K-major layout: thread 0
 /// copies the atom's hidden descriptor's 16 words to `out`.
 pub fn tma_atom_desc_kernel() -> Kernel {

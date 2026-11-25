@@ -962,7 +962,7 @@ pub struct MbarrierOptions {
 
 /// The peer CTA of an mbarrier operation: `peer_cta_rank_in_cluster`, or
 /// the CTA a [`map_dsmem_ptr`] pointer to the mbarrier points into (as
-/// CuTe DSL's examples arrive on `mapa`-ed mbarriers; roadmap part m8-dsmem).
+/// CuTe DSL's examples arrive on `mapa`-ed mbarriers).
 #[track_caller]
 fn mbarrier_peer(mapped: Option<ValueId>, opts: MbarrierOptions, what: &str) -> Option<ValueId> {
     match (mapped, opts.peer_cta_rank_in_cluster) {
@@ -1126,7 +1126,7 @@ pub(crate) struct BulkExtras {
     pub cache_policy: Option<ValueId>,
     pub mcast_mask: Option<ValueId>,
     pub peer: Option<ValueId>,
-    /// `.cp_mask` (roadmap part m7-tma-sm100-modes).
+    /// `.cp_mask`.
     pub byte_mask: Option<ValueId>,
 }
 
@@ -1278,8 +1278,7 @@ pub fn fence_proxy(kind: FenceProxyKind) {
 /// `tensormap` and `generic` kinds belong to the tensor-map fences
 /// (`fence.proxy.tensormap::generic.acquire/release`), which NVVM's
 /// `fence.proxy` refuses: they are refused here, naming
-/// `fence_tma_desc_acquire` and `fence_tma_desc_release` (roadmap part
-/// m7-tensormap-update).
+/// `fence_tma_desc_acquire` and `fence_tma_desc_release`.
 #[track_caller]
 pub fn fence_proxy_with(kind: FenceProxyKind, opts: FenceProxyOptions) {
     fence_proxy_at(kind, opts, Location::caller());
@@ -1290,8 +1289,7 @@ fn fence_proxy_at(kind: FenceProxyKind, opts: FenceProxyOptions, loc: crate::ir:
     let ir_kind = match (kind, opts.space) {
         (FenceProxyKind::Tensormap | FenceProxyKind::Generic, _) => panic!(
             "fence_proxy: the {kind:?} kind is a tensor-map fence (fence.proxy.tensormap::generic.acquire or \
-             .release), which fence.proxy does not take: use fence_tma_desc_acquire or fence_tma_desc_release \
-             (roadmap part m7-tensormap-update)"
+             .release), which fence.proxy does not take: use fence_tma_desc_acquire or fence_tma_desc_release"
         ),
         (FenceProxyKind::AsyncShared, None) => {
             panic!("fence_proxy: the AsyncShared kind needs a space (SharedSpace::Cta or SharedSpace::Cluster)")
@@ -1356,7 +1354,7 @@ pub enum SharedSpace {
     #[default]
     Cta,
     /// Any CTA's of the cluster (`.shared::cluster`, distributed shared
-    /// memory): a [`map_dsmem_ptr`] pointer (roadmap part m8-dsmem).
+    /// memory): a [`map_dsmem_ptr`] pointer.
     Cluster,
 }
 
@@ -1565,8 +1563,7 @@ pub fn store_vector<T: Numeric, const N: usize>(ptr: &Ptr<T>, values: [Value<T>;
 /// The keyword arguments of CuTe DSL's `cute.arch.prefetch(addr,
 /// cache_level=, evict_priority=, predicate=, uniform=)` for data addresses.
 /// The default prefetches into L1. With `tensormap`, the address is a
-/// TMA descriptor's (`prefetch.tensormap`, sm_90; roadmap part
-/// m7-tma-store); `in_param_space=` is not needed, as the address is
+/// TMA descriptor's (`prefetch.tensormap`, sm_90); `in_param_space=` is not needed, as the address is
 /// generic.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PrefetchOptions {
@@ -1640,7 +1637,7 @@ pub fn prefetch_tensormap(desc: impl IntoValue<i64>) {
 /// sm_90 and PTX 8.1). The peer's phase must expect those bytes
 /// (`mbarrier_expect_tx`); the data is visible to the peer's threads that
 /// wait on that phase. `smem_ptr` must be aligned to the store's 4, 8 or 16
-/// bytes. Roadmap part m7-cluster-copies.
+/// bytes.
 #[track_caller]
 pub fn store_async_dsmem<T: Numeric, const N: usize>(
     smem_ptr: &Ptr<T>,
@@ -1682,7 +1679,7 @@ pub fn store_async_dsmem<T: Numeric, const N: usize>(
 /// A pointer into the shared memory of CTA `cta_rank_in_cluster` of the
 /// cluster, at the offset `smem_ptr` has in this CTA's (CuTe DSL's
 /// `cute.arch.map_dsmem_ptr(smem_ptr, cta_rank_in_cluster)`, PTX's `mapa`;
-/// sm_90, roadmap part m8-dsmem). It keeps the element type, alignment and
+/// sm_90). It keeps the element type, alignment and
 /// swizzle (every CTA has the same shared-memory layout), and its
 /// [`memspace`](Ptr::memspace) is [`AddressSpace::Dsmem`].
 ///

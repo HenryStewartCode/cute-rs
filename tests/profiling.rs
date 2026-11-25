@@ -1,5 +1,4 @@
-//! Profiling scopes, the kernel symbol registry and IKET event tracing (roadmap part
-//! m11-profiling-iket) on the simulator, and on the MLIR the scopes lower to.
+//! Profiling scopes, the kernel symbol registry and IKET event tracing on the simulator, and on the MLIR the scopes lower to.
 
 mod iket_kernels;
 

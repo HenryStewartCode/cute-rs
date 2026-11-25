@@ -1,4 +1,4 @@
-//! Roadmap part m11-prims-descriptors-swizzle: the typed MMA descriptors built in a
+//! The typed MMA descriptors built in a
 //! kernel from a runtime shared-memory address, and the base DSL's byte-address swizzle
 //! (`cutlass.Swizzle`, `apply_swizzle`, `load_swizzled`, `store_swizzled`) on the
 //! simulator, in the PTX, and (with `--features cuda`) on a GPU. The bit-level field
