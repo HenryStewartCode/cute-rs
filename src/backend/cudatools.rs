@@ -289,62 +289,77 @@ impl JitOption {
 /// `-v` and `--verbose` to `CU_JIT_LOG_VERBOSE`. Any other flag is an error naming `ptxas`,
 /// which is the only thing that takes it.
 pub fn jit_options_for_ptxas_flags(flags: &[String]) -> Result<Vec<JitOption>, OptionError> {
+    map_ptxas_flags(flags, false)
+}
+
+/// [`jit_options_for_ptxas_flags`], leaving out each flag that has no JIT equivalent (or a
+/// value that does not parse) instead of failing.
+pub(crate) fn jit_options_for_ptxas_flags_lossy(flags: &[String]) -> Vec<JitOption> {
+    map_ptxas_flags(flags, true).unwrap_or_default()
+}
+
+fn map_ptxas_flags(flags: &[String], lossy: bool) -> Result<Vec<JitOption>, OptionError> {
     let mut out: Vec<JitOption> = Vec::new();
-    let mut put = |o: JitOption| {
-        out.retain(|e| e.code() != o.code());
-        out.push(o);
-    };
     let mut i = 0;
     while i < flags.len() {
-        let flag = flags[i].as_str();
-        i += 1;
-        let (name, inline) = match flag.split_once('=') {
-            Some((n, v)) => (n, Some(v.to_string())),
-            None => (flag, None),
-        };
-        let mut value = |what: &str| -> Result<String, OptionError> {
-            match &inline {
-                Some(v) => Ok(v.clone()),
-                None => {
-                    let v = flags
-                        .get(i)
-                        .cloned()
-                        .ok_or_else(|| OptionError::new(format!("the ptxas flag `{flag}` needs a value ({what})")))?;
-                    i += 1;
-                    Ok(v)
-                }
+        match map_ptxas_flag(flags, &mut i) {
+            Ok(o) => {
+                out.retain(|e| e.code() != o.code());
+                out.push(o);
             }
-        };
-        let number = |text: &str, flag: &str| -> Result<u32, OptionError> {
-            text.trim()
-                .parse::<u32>()
-                .map_err(|_| OptionError::new(format!("the ptxas flag `{flag}` takes a number, not `{text}`")))
-        };
-        match name {
-            "--maxrregcount" | "-maxrregcount" => {
-                let n = number(&value("a register count")?, flag)?;
-                put(JitOption::MaxRegisters(n));
-            }
-            "--opt-level" | "-opt-level" => {
-                let n = number(&value("0 to 3")?, flag)?;
-                put(JitOption::OptimizationLevel(ptx_level_to_jit(n, flag)?));
-            }
-            f if f.len() == 3 && f.starts_with("-O") && f.as_bytes()[2].is_ascii_digit() => {
-                put(JitOption::OptimizationLevel(ptx_level_to_jit(u32::from(f.as_bytes()[2] - b'0'), flag)?));
-            }
-            "-lineinfo" | "--generate-line-info" => put(JitOption::GenerateLineInfo(true)),
-            "-v" | "--verbose" => put(JitOption::LogVerbose(true)),
-            _ => {
-                return Err(OptionError::new(format!(
-                    "the ptxas flag `{flag}` has no CUDA driver JIT equivalent, so it needs ptxas itself: install a \
-                     CUDA toolkit (ptxas is looked up in $CUTE_RS_PTXAS, $CUDA_HOME/bin, $CUDA_PATH/bin, PATH and \
-                     /usr/local/cuda/bin); without one, only --maxrregcount=N, -O<n>, -lineinfo and -v can be \
-                     forwarded"
-                )));
-            }
+            Err(_) if lossy => {}
+            Err(e) => return Err(e),
         }
     }
     Ok(out)
+}
+
+/// The JIT option for the flag at `flags[*i]`; `i` moves past the flag and its value.
+fn map_ptxas_flag(flags: &[String], i: &mut usize) -> Result<JitOption, OptionError> {
+    let flag = flags[*i].as_str();
+    *i += 1;
+    let (name, inline) = match flag.split_once('=') {
+        Some((n, v)) => (n, Some(v.to_string())),
+        None => (flag, None),
+    };
+    let mut value = |what: &str| -> Result<String, OptionError> {
+        match &inline {
+            Some(v) => Ok(v.clone()),
+            None => {
+                let v = flags
+                    .get(*i)
+                    .cloned()
+                    .ok_or_else(|| OptionError::new(format!("the ptxas flag `{flag}` needs a value ({what})")))?;
+                *i += 1;
+                Ok(v)
+            }
+        }
+    };
+    let number = |text: &str, flag: &str| -> Result<u32, OptionError> {
+        text.trim()
+            .parse::<u32>()
+            .map_err(|_| OptionError::new(format!("the ptxas flag `{flag}` takes a number, not `{text}`")))
+    };
+    Ok(match name {
+        "--maxrregcount" | "-maxrregcount" => JitOption::MaxRegisters(number(&value("a register count")?, flag)?),
+        "--opt-level" | "-opt-level" => {
+            let n = number(&value("0 to 3")?, flag)?;
+            JitOption::OptimizationLevel(ptx_level_to_jit(n, flag)?)
+        }
+        f if f.len() == 3 && f.starts_with("-O") && f.as_bytes()[2].is_ascii_digit() => {
+            JitOption::OptimizationLevel(ptx_level_to_jit(u32::from(f.as_bytes()[2] - b'0'), flag)?)
+        }
+        "-lineinfo" | "--generate-line-info" => JitOption::GenerateLineInfo(true),
+        "-v" | "--verbose" => JitOption::LogVerbose(true),
+        _ => {
+            return Err(OptionError::new(format!(
+                "the ptxas flag `{flag}` has no CUDA driver JIT equivalent, so it needs ptxas itself: install a \
+                 CUDA toolkit (ptxas is looked up in $CUTE_RS_PTXAS, $CUDA_HOME/bin, $CUDA_PATH/bin, PATH and \
+                 /usr/local/cuda/bin); without one, only --maxrregcount=N, -O<n>, -lineinfo and -v can be \
+                 forwarded"
+            )));
+        }
+    })
 }
 
 fn ptx_level_to_jit(level: u32, flag: &str) -> Result<u32, OptionError> {
@@ -454,5 +469,15 @@ mod tests {
         assert_eq!(t.ptxas, None);
         let t = CudaTools::discover_with(|_| None, &none);
         assert!(t.ptxas.is_none() || t.ptxas.unwrap().path.is_file());
+    }
+
+    #[test]
+    fn lossy_mapping_keeps_the_flags_it_can_map() {
+        let flags: Vec<String> = ["--maxrregcount=64", "--warn-on-spills", "-O2"].map(String::from).to_vec();
+        assert!(jit_options_for_ptxas_flags(&flags).is_err());
+        assert_eq!(
+            jit_options_for_ptxas_flags_lossy(&flags),
+            [JitOption::MaxRegisters(64), JitOption::OptimizationLevel(2)]
+        );
     }
 }

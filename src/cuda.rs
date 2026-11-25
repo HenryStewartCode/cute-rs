@@ -401,6 +401,8 @@ pub struct CudaContext {
     modules: std::cell::RefCell<ModuleCache>,
     /// `cuModuleLoadDataEx` calls so far.
     loads: std::cell::Cell<u64>,
+    /// The live device buffers and what stream captures have used of them (for graph replays).
+    tracking: std::cell::RefCell<graph::Tracking>,
     api: Api,
     ordinal: usize,
     device: CuDevice,
@@ -436,6 +438,7 @@ impl CudaContext {
         Ok(CudaContext {
             modules: std::cell::RefCell::new(crate::backend::cache::Lru::new()),
             loads: std::cell::Cell::new(0),
+            tracking: Default::default(),
             api,
             ordinal,
             device,
@@ -839,6 +842,7 @@ impl CudaContext {
         unsafe {
             check(&self.api, (self.api.mem_alloc)(&mut device, bytes.max(1)), "cuMemAlloc")?;
         }
+        self.tracking.borrow_mut().alloc(device);
         let buffer = DeviceBuffer { ctx: self, ptr: device, bytes };
         // SAFETY: copies `bytes` bytes from live host memory into the new allocation.
         unsafe {
@@ -1007,6 +1011,7 @@ pub struct DeviceBuffer<'a> {
 
 impl Drop for DeviceBuffer<'_> {
     fn drop(&mut self) {
+        self.ctx.tracking.borrow_mut().free(self.ptr);
         let _ = self.ctx.make_current();
         // SAFETY: ptr was returned by cuMemAlloc.
         unsafe { (self.ctx.api.mem_free)(self.ptr) };

@@ -167,6 +167,7 @@ impl CudaContext {
         let mut ptr: CuDevicePtr = 0;
         // SAFETY: a valid out-pointer.
         check(&self.api, unsafe { (self.api.mem_alloc)(&mut ptr, bytes.max(1)) }, "cuMemAlloc")?;
+        self.tracking.borrow_mut().alloc(ptr);
         Ok(DeviceBuffer { ctx: self, ptr, bytes })
     }
 
@@ -197,6 +198,7 @@ impl CudaContext {
         let mut ptr: CuDevicePtr = 0;
         // SAFETY: a valid out-pointer and a live stream of this context.
         check(&self.api, unsafe { alloc(&mut ptr, bytes.max(1), stream.raw) }, "cuMemAllocAsync")?;
+        self.tracking.borrow_mut().alloc(ptr);
         Ok(DeviceBuffer { ctx: self, ptr, bytes })
     }
 
@@ -314,6 +316,7 @@ impl<'ctx> DeviceBuffer<'ctx> {
         let free = self.ctx.api.mem_free_async.ok_or_else(|| err("this CUDA driver has no cuMemFreeAsync"))?;
         self.ctx.make_current()?;
         let this = std::mem::ManuallyDrop::new(self);
+        this.ctx.tracking.borrow_mut().free(this.ptr);
         // SAFETY: the pointer was allocated by this context and is freed once (Drop does not run).
         check(&this.ctx.api, unsafe { free(this.ptr, stream.raw) }, "cuMemFreeAsync")
     }
@@ -430,6 +433,7 @@ impl<'ctx> CudaStream<'ctx> {
         dst: &'a DeviceBuffer<'_>,
         byte_offset: usize,
     ) -> Result<Pending<'a>, CudaError> {
+        self.ctx.note_captured(self.raw, [dst.ptr]);
         self.same_context(src)?;
         self.no_host_copy_in_capture("an asynchronous upload")?;
         src.settle();
@@ -449,6 +453,7 @@ impl<'ctx> CudaStream<'ctx> {
         byte_offset: usize,
         dst: &'a mut PinnedBuffer<'_, T>,
     ) -> Result<Pending<'a>, CudaError> {
+        self.ctx.note_captured(self.raw, [src.ptr]);
         self.same_context(dst)?;
         self.no_host_copy_in_capture("an asynchronous download")?;
         // SAFETY: page-locked memory, borrowed until the stream is synchronised (and flagged
@@ -509,6 +514,7 @@ impl<'ctx> CudaStream<'ctx> {
         src_offset: usize,
         bytes: usize,
     ) -> Result<(), CudaError> {
+        self.ctx.note_captured(self.raw, [dst.ptr, src.ptr]);
         let to = dst.range(dst_offset, bytes, "a copy")?;
         let from = src.range(src_offset, bytes, "a copy")?;
         self.ctx.make_current()?;
@@ -519,6 +525,7 @@ impl<'ctx> CudaStream<'ctx> {
 
     /// Queue setting every byte of `buffer` to `value` (`cuMemsetD8Async`); capturable.
     pub fn memset_async(&self, buffer: &DeviceBuffer<'_>, value: u8) -> Result<(), CudaError> {
+        self.ctx.note_captured(self.raw, [buffer.ptr]);
         self.ctx.make_current()?;
         // SAFETY: the range is the allocation.
         let r = unsafe { (self.ctx.api.memset_d8_async)(buffer.ptr, value, buffer.bytes, self.raw) };

@@ -180,7 +180,19 @@ impl<'a> LaunchBuilder<'a> {
             };
             ws.check_launch(&self.sig.name, &self.cfg, self.args.len(), &scalar, bytes).map_err(err)?;
         }
-        submit(self.ctx, self.function, &self.sig, self.cfg, self.stream, self.args, self.events)
+        let (ctx, stream, args) = (self.ctx, self.stream, self.args);
+        submit(ctx, self.function, &self.sig, self.cfg, stream, args, self.events)?;
+        // A capture remembers the buffers its launches use, so that a replay can refuse freed ones.
+        ctx.note_captured(
+            stream,
+            args.iter().filter_map(|a| match a {
+                DeviceArg::Buffer(buffer) | DeviceArg::View { buffer, .. } | DeviceArg::Slice { buffer, .. } => {
+                    Some(buffer.ptr)
+                }
+                _ => None,
+            }),
+        );
+        Ok(())
     }
 }
 

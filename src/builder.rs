@@ -168,6 +168,8 @@ pub(crate) struct BuilderState {
     name: String,
     value_types: Vec<DType>,
     facts: HashMap<ValueId, ValueFacts>,
+    /// Values that are not constants but are always 0 (`x * 0`): every number divides them.
+    known_zero: HashSet<ValueId>,
     /// Open [`ExactScope`]s: while any is, Float `+`, `-` and `*` are recorded in
     /// `exact_float` and never contracted.
     exact_depth: u32,
@@ -322,6 +324,15 @@ pub(crate) fn declared_target() -> Option<crate::Arch> {
         return Some(arch);
     }
     std::env::var(crate::backend::ENV_ARCH).ok()?.trim().parse().ok()
+}
+
+/// The largest number known to divide `v`, or `None` if `v` is always 0, which every number
+/// divides. 1 if no kernel is being built (or the builder is already borrowed).
+pub(crate) fn value_divisor(v: ValueId) -> Option<usize> {
+    BUILDER.with(|b| {
+        let Ok(b) = b.try_borrow() else { return Some(1) };
+        b.as_ref().map_or(Some(1), |s| s.known_divisor(v))
+    })
 }
 
 /// Facts about `v` if a kernel is being built (and the builder is not
@@ -497,9 +508,9 @@ impl BuilderState {
         }
     }
 
-    /// Whether `v` is an integer constant 0.
+    /// Whether `v` is an integer constant 0, or an integer the facts prove is always 0.
     fn is_zero_constant(&self, v: ValueId) -> bool {
-        self.constant_of(v).is_some_and(|c| c.dtype().is_int() && c.bits() == 0)
+        self.known_zero.contains(&v) || self.constant_of(v).is_some_and(|c| c.dtype().is_int() && c.bits() == 0)
     }
 
     /// The largest number known to divide `v`, or `None` if `v` is the
@@ -532,9 +543,10 @@ impl BuilderState {
     /// divides it (and of 1 otherwise). A minimum or maximum, which is one
     /// of the operands, keeps their gcd. A product of powers of two, or one
     /// shifted left, is a power of two.
-    fn binary_facts(&self, op: BinaryOp, lhs: ValueId, rhs: ValueId) -> ValueFacts {
+    /// The facts of `lhs op rhs`, and whether the result is always 0.
+    fn binary_facts(&self, op: BinaryOp, lhs: ValueId, rhs: ValueId) -> (ValueFacts, bool) {
         if !self.dtype(lhs).is_int() {
-            return ValueFacts::default();
+            return (ValueFacts::default(), false);
         }
         let bits = self.dtype(lhs).bits() as i128;
         let (a, b) = (self.known_divisor(lhs), self.known_divisor(rhs));
@@ -580,8 +592,8 @@ impl BuilderState {
             BinaryOp::Shl => fa.pow2 && matches!(self.int_constant(rhs), Some(k) if (0..bits).contains(&k)),
             _ => false,
         };
-        // A result that is always 0 is left without facts.
-        ValueFacts { bound: None, divisor: divisor.unwrap_or(1).max(1), pow2 }
+        // A result that is always 0 (no divisor) has no facts of its own: it is recorded as zero.
+        (ValueFacts { bound: None, divisor: divisor.unwrap_or(1).max(1), pow2 }, divisor.is_none())
     }
 
     pub(crate) fn push(&mut self, mut op: Op, loc: Loc) {
@@ -755,8 +767,11 @@ impl BuilderState {
                 | BinaryOp::Xor
         );
         let key = if commutative && rhs < lhs { PureKey::Binary(op, rhs, lhs) } else { PureKey::Binary(op, lhs, rhs) };
-        let facts = self.binary_facts(op, lhs, rhs);
+        let (facts, zero) = self.binary_facts(op, lhs, rhs);
         let result = self.pure(key, lt, loc, |result| Op::Binary { result, op, lhs, rhs });
+        if zero {
+            self.known_zero.insert(result);
+        }
         // A value shared (by deduplication) with an exact scope stays exact.
         if self.exact_depth > 0 && lt.is_float() && matches!(op, BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul) {
             self.exact_float.insert(result);
@@ -1648,6 +1663,7 @@ impl KernelOptions {
                 name: self.name.clone(),
                 value_types: Vec::new(),
                 facts: HashMap::new(),
+                known_zero: HashSet::new(),
                 exact_depth: 0,
                 exact_float: Default::default(),
                 constants: HashMap::new(),

@@ -553,3 +553,25 @@ fn clustered_launches_need_a_cluster_device() {
         assert!(e.contains("cannot launch thread block clusters (CU_DEVICE_ATTRIBUTE_CLUSTER_LAUNCH is 0"), "{e}");
     }
 }
+
+/// A graph replay is refused once a buffer its capture used has been dropped (replaying it
+/// would be a use-after-free on the device); dropping an unrelated buffer does not matter.
+#[test]
+fn a_graph_replay_refuses_a_freed_buffer() {
+    let Some((ctx, _)) = device() else { return };
+    let stream = ctx.stream().unwrap();
+    let kept = ctx.alloc::<f32>(64).unwrap();
+    let freed = ctx.alloc::<f32>(64).unwrap();
+    let other = ctx.alloc::<f32>(64).unwrap();
+    let capture = stream.begin_capture(CaptureMode::Relaxed).unwrap();
+    stream.memset_async(&kept, 1).unwrap();
+    stream.memset_async(&freed, 2).unwrap();
+    let graph = capture.end().unwrap();
+    let exec = graph.instantiate().unwrap();
+    drop(other);
+    exec.launch(&stream).unwrap();
+    stream.synchronize().unwrap();
+    drop(freed);
+    let e = exec.launch(&stream).unwrap_err();
+    assert!(format!("{e:?}").contains("freed"), "{e:?}");
+}

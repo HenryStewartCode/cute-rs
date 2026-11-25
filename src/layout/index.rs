@@ -529,7 +529,7 @@ impl IndexExpr {
         match self {
             S(0) => None,
             S(v) => Some(*v),
-            IndexExpr::Dynamic(v) | IndexExpr::Signed(v) => Some(crate::builder::value_facts(*v).divisor),
+            IndexExpr::Dynamic(v) | IndexExpr::Signed(v) => crate::builder::value_divisor(*v),
             IndexExpr::Neg(a) => a.divisor(),
             IndexExpr::Add(a, b) | IndexExpr::Sub(a, b) => match (a.divisor(), b.divisor()) {
                 (None, d) | (d, None) => d,

@@ -649,19 +649,25 @@ impl CompiledKernel {
     /// with no JIT equivalent is left out here; [`try_jit_options`](Self::try_jit_options)
     /// reports it.
     pub fn jit_options(&self) -> Vec<JitOption> {
-        self.try_jit_options().unwrap_or_else(|_| self.base_jit_options())
+        let flags = self.options.get_ptxas_options().unwrap_or(&[]);
+        self.with_base_jit_options(cudatools::jit_options_for_ptxas_flags_lossy(flags))
     }
 
     /// [`jit_options`](Self::jit_options), failing, with a message that names `ptxas`, on a
     /// `ptxas` flag the driver's JIT has no option for.
     pub fn try_jit_options(&self) -> Result<Vec<JitOption>, OptionError> {
-        let mut options = self.base_jit_options();
         let flags = self.options.get_ptxas_options().unwrap_or(&[]);
-        for o in jit_options_for_ptxas_flags(flags)? {
+        Ok(self.with_base_jit_options(jit_options_for_ptxas_flags(flags)?))
+    }
+
+    /// The base options, with `mapped` (from the `ptxas` flags) replacing those they set again.
+    fn with_base_jit_options(&self, mapped: Vec<JitOption>) -> Vec<JitOption> {
+        let mut options = self.base_jit_options();
+        for o in mapped {
             options.retain(|e| e.code() != o.code());
             options.push(o);
         }
-        Ok(options)
+        options
     }
 
     fn base_jit_options(&self) -> Vec<JitOption> {

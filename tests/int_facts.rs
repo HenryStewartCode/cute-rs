@@ -321,3 +321,19 @@ fn oversized_divisors() {
     let Some(tc) = Toolchain::discover() else { return };
     kernel.compile_ptx(&tc, Arch::Sm80).unwrap_or_else(|e| panic!("{e}"));
 }
+
+/// A product with a constant 0 is always 0, which every number divides: it used to count as
+/// divisible only by 1, which failed alignment checks on offsets built from it.
+#[test]
+fn a_product_with_zero_divides_by_anything() {
+    Kernel::build("zero_product", || {
+        let u = param_scalar::<i32>("u");
+        let a = assume(param_scalar::<i32>("a"), Some(16), false);
+        #[allow(clippy::erasing_op)]
+        let z = u * 0;
+        assert_eq!(get_divisibility(&(z + a)), 16);
+        assert_eq!(get_divisibility(&(z * 128 + a)), 16);
+        assert_eq!(get_divisibility(&((z << 3) + a)), 16);
+        assert_eq!(get_divisibility(&(u + a)), 1);
+    });
+}

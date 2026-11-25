@@ -159,10 +159,16 @@ impl PackedArgs {
 
 /// The scalar bits of `arg` for a parameter of `dtype`, or why it does not fit.
 fn scalar_for(name: &str, i: usize, dtype: DType, multiple_of: usize, arg: &KernelArg) -> Result<u128, String> {
+    // The integer the bits stand for: sign-extended for a signed type, so that -1 is not
+    // read as 2^32 - 1 (a multiple of 3).
+    let value = |bits: u128| {
+        let shift = 128 - (dtype.bits() as u32).min(128);
+        if dtype.is_int() && dtype.is_signed() { ((bits as i128) << shift) >> shift } else { bits as i128 }
+    };
     match arg.scalar_bits() {
-        Some((t, bits)) if t == dtype && bits.is_multiple_of(multiple_of as u128) => Ok(bits),
+        Some((t, bits)) if t == dtype && value(bits).unsigned_abs().is_multiple_of(multiple_of as u128) => Ok(bits),
         Some((t, bits)) if t == dtype => {
-            Err(format!("argument {i} (`{name}`) must be a multiple of {multiple_of}, got {bits}"))
+            Err(format!("argument {i} (`{name}`) must be a multiple of {multiple_of}, got {}", value(bits)))
         }
         Some((t, _)) if t.bits() != dtype.bits() && (t.bits() == 64 || dtype.bits() == 64) => Err(format!(
             "argument {i} (`{name}`) is a {}-bit leaf ({dtype}), got a {} scalar: pass a {dtype}",
@@ -964,4 +970,18 @@ pub(crate) fn writes_buffer(ir: &KernelIr, b: crate::ir::BufferId) -> bool {
     let mut f = Found::default();
     walk(ir, &ir.body, b, &mut f);
     f.direct || (f.escapes && f.raw_or_asm_write)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn negative_scalars_are_checked_as_signed() {
+        // 0xFFFF_FFFF is a multiple of 3; -1 is not.
+        assert!(scalar_for("n", 0, DType::I32, 3, &KernelArg::ScalarI32(-1)).is_err());
+        assert_eq!(scalar_for("n", 0, DType::I32, 3, &KernelArg::ScalarI32(-6)), Ok(-6i32 as u32 as u128));
+        let e = scalar_for("n", 0, DType::I32, 4, &KernelArg::ScalarI32(-6)).unwrap_err();
+        assert!(e.ends_with("got -6"), "{e}");
+    }
 }

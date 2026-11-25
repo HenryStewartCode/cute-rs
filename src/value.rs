@@ -1126,7 +1126,7 @@ impl<T: Integer> Assumable for Value<T> {
     fn divisibility(&self) -> usize {
         match builder::try_constant(self.id) {
             Some(c) => usize::try_from(int_literal_value(c).unsigned_abs()).unwrap_or(usize::MAX),
-            None => builder::value_facts(self.id).divisor,
+            None => builder::value_divisor(self.id).unwrap_or(0),
         }
     }
 }
