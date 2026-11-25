@@ -40,11 +40,24 @@
 //! `batch` in the multi-token form, `Options::tokens > 1`), `A`, `D`, `dt_bias`
 //! `[nheads]` (FlashInfer's `(nheads, dim, dstate)` `A` with zero strides, `dt` over `dim`).
 //!
-//! Not yet covered: the int16 block-scaled state, stochastic rounding (Philox), the
-//! `dst_state_batch_indices`, strided inputs, the SM90 TMA kernels (vertical, horizontal),
-//! the MTP kernels' intermediate-state cache, `num_accepted_tokens` and varlen `cu_seqlens`,
-//! `dim` not a multiple of 4, and offsets beyond 2^31
-//! elements.
+//! * **Sequence options** ([`Options`]), the semantics of FlashInfer's MTP "simple" kernel:
+//!   `cu_seqlens` (`varlen`: packed `[total_tokens, ..]` inputs, `tokens` the longest sequence,
+//!   a token past a sequence leaves the state alone, an empty sequence is skipped);
+//!   `num_accepted_tokens` (the state is read from column `max(accepted - 1, 0)` of 2D
+//!   `[batch, tokens]` indices); `dst_state_batch_indices` (written per token for several
+//!   tokens, per sequence for one; `pad_slot_id` skipped); and the MTP cache
+//!   (`intermediate_states` `[cache, tokens, nheads, dim, dstate]` at
+//!   `intermediate_state_indices[b]`, or the state slot, written for every token, the main
+//!   state left alone). The state is already in registers, so each is a per-token store.
+//! * **int16 state** (`Options::int16`, FlashInfer's `state_scale`): a Float32 decode scale per
+//!   `(slot, head, row)`; the row's new maximum (a butterfly over its lanes) sets the next
+//!   scale, `max|s| / 32767`, and the stored value is `round(s * 32767 / max|s|)`. Its
+//!   `Problem::state` is [`StateDtype::F16`], a 2-byte stand-in (the enum is shared with
+//!   [`crate::gdn`] and [`crate::kda`]).
+//!
+//! Not yet covered: stochastic rounding (Philox), strided inputs, the SM90 TMA kernels
+//! (vertical, horizontal), `dim` not a multiple of 4, `dstate` not a multiple of 32, and
+//! offsets beyond 2^31 elements.
 //!
 //! `examples/mamba.rs` runs it on the simulator and, with `--features cuda` and `GPU=1`, on
 //! the GPU against a reference, then benchmarks it.
@@ -138,6 +151,26 @@ pub struct Options {
     /// (MTP) update, which runs the recurrence over the tokens with the state in registers
     /// and writes only the last state.
     pub tokens: usize,
+    /// `dst_state_batch_indices` is given: the state is read from `state_batch_indices` and
+    /// written to these slots (`[batch]` for one token, `[batch, tokens]` for several, one
+    /// write per token; `pad_slot_id` entries are skipped). Exclusive with `intermediate`.
+    pub has_dst: bool,
+    /// `cu_seqlens` is given: the inputs are packed `[total_tokens, ..]` and `tokens` is the
+    /// longest sequence (FlashInfer's `cache_steps`); a sequence of no tokens is skipped.
+    pub varlen: bool,
+    /// `num_accepted_tokens` is given (needs `has_indices`, whose indices are then
+    /// `[batch, tokens]`): the state is read from column `max(accepted - 1, 0)`.
+    pub has_accepted: bool,
+    /// The MTP cache: every token's state goes to `intermediate_states`
+    /// `[cache, tokens, nheads, dim, dstate]` at `[intermediate_state_indices[b], t]` and the
+    /// main state is not written.
+    pub intermediate: bool,
+    /// `intermediate_state_indices` `[batch]` is given (else the state slot is used).
+    pub istate_indices: bool,
+    /// The state is block-scaled int16 (FlashInfer's `state_scale`): one Float32 decode scale
+    /// per `(slot, head, row)`, the stored value being `round(state * 32767 / max|row|)`.
+    /// `state` of [`Problem`] must then be [`StateDtype::F16`] (a 2-byte stand-in).
+    pub int16: bool,
 }
 
 impl Default for Options {
@@ -150,6 +183,12 @@ impl Default for Options {
             dt_softplus: true,
             update_state: true,
             tokens: 1,
+            has_dst: false,
+            varlen: false,
+            has_accepted: false,
+            intermediate: false,
+            istate_indices: false,
+            int16: false,
         }
     }
 }
@@ -196,9 +235,17 @@ fn c(v: f32) -> Float32 {
 }
 
 /// Parameter order of [`kernel`]: `state, x, dt, A, B, C, D, dt_bias, z, out,
-/// state_batch_indices, nheads, ngroups, pad_slot_id`. Absent optional tensors still take
+/// state_batch_indices, dst_state_batch_indices, cu_seqlens, num_accepted_tokens,
+/// intermediate_states, intermediate_state_indices, state_scale, intermediate_state_scales,
+/// nheads, ngroups, pad_slot_id`. Absent optional tensors still take
 /// a (one-element) buffer.
 pub fn kernel(input: Dtype, state: StateDtype, opts: Options, dim: usize, dstate: usize, plan: Plan) -> Kernel {
+    if opts.int16 {
+        return match input {
+            Dtype::F16 => kernel_of::<F16, i16>(input, state, opts, dim, dstate, plan),
+            Dtype::BF16 => kernel_of::<BF16, i16>(input, state, opts, dim, dstate, plan),
+        };
+    }
     match (input, state) {
         (Dtype::F16, StateDtype::F16) => kernel_of::<F16, F16>(input, state, opts, dim, dstate, plan),
         (Dtype::F16, StateDtype::BF16) => kernel_of::<F16, BF16>(input, state, opts, dim, dstate, plan),
@@ -229,10 +276,15 @@ fn kernel_of<T: Numeric, S: Numeric>(
     assert!(rpw.is_multiple_of(step));
     let tiled = rpb < dim;
     let o = opts;
+    assert!(!(o.has_dst && o.intermediate), "dst_state_batch_indices and the intermediate cache are exclusive");
+    assert!(!o.has_accepted || o.has_indices, "num_accepted_tokens needs state_batch_indices");
+    assert!(!o.istate_indices || o.intermediate);
+    assert!(!o.int16 || state_dtype == StateDtype::F16, "int16 state: pass StateDtype::F16");
+    let scaled = o.int16;
     let name = format!(
-        "flashinfer_ssu_{}_{}_d{dim}_n{dstate}_r{rpb}_u{unroll}_l{lanes}_{}{}{}{}{}{}_t{}",
+        "flashinfer_ssu_{}_{}_d{dim}_n{dstate}_r{rpb}_u{unroll}_l{lanes}_{}{}{}{}{}{}_t{}_{}{}{}{}{}{}",
         input.name(),
-        state_dtype.name(),
+        if scaled { "i16" } else { state_dtype.name() },
         o.has_z as u8,
         o.has_d as u8,
         o.has_dt_bias as u8,
@@ -240,6 +292,12 @@ fn kernel_of<T: Numeric, S: Numeric>(
         o.dt_softplus as u8,
         o.update_state as u8,
         o.tokens,
+        o.has_dst as u8,
+        o.varlen as u8,
+        o.has_accepted as u8,
+        o.intermediate as u8,
+        o.istate_indices as u8,
+        o.int16 as u8,
     );
     Kernel::builder(&name).block_dim([THREADS as u32, 1, 1]).build(|| {
         let state = param_ptr::<S>("state");
@@ -253,6 +311,13 @@ fn kernel_of<T: Numeric, S: Numeric>(
         let z = param_ptr::<T>("z");
         let out = param_ptr::<T>("out");
         let indices = param_ptr::<i32>("state_batch_indices");
+        let dst_indices = param_ptr::<i32>("dst_state_batch_indices");
+        let cu_seqlens = param_ptr::<i32>("cu_seqlens");
+        let accepted = param_ptr::<i32>("num_accepted_tokens");
+        let istate = param_ptr::<S>("intermediate_states");
+        let istate_indices = param_ptr::<i32>("intermediate_state_indices");
+        let state_scale = param_ptr::<f32>("state_scale");
+        let istate_scale = param_ptr::<f32>("intermediate_state_scales");
         let nheads = param_scalar::<i32>("nheads");
         let ngroups = param_scalar::<i32>("ngroups");
         let pad_slot_id = param_scalar::<i32>("pad_slot_id");
@@ -267,93 +332,171 @@ fn kernel_of<T: Numeric, S: Numeric>(
         let dim_off = if tiled { block_idx().z * rpb as i32 } else { Int32::from(0) };
         let group = head / (nheads / ngroups);
 
-        let state_batch = if o.has_indices { indices.load_at(batch) } else { batch };
+        let nt = o.tokens;
+        // The sequence's first token and length: `cu_seqlens`, or `tokens` each.
+        let (bos, seq_len) = if o.varlen {
+            let b0 = cu_seqlens.load_at(batch);
+            (b0, cu_seqlens.load_at(batch + 1) - b0)
+        } else {
+            (batch * nt as i32, Int32::from(nt as i32))
+        };
+        // The state is read from the column `max(accepted - 1, 0)` of the indices.
+        let init = if o.has_accepted { (accepted.load_at(batch) - 1).max(0) } else { Int32::from(0) };
+        let idx_cols = if o.has_accepted { nt as i32 } else { 1 };
+        let state_batch = if o.has_indices { indices.load_at(batch * idx_cols + init) } else { batch };
         let valid = if o.has_indices { state_batch.ne(pad_slot_id) } else { Boolean::constant(true) };
         let load_slot = if o.has_indices { state_batch.max(0) } else { state_batch };
+        let valid_opt = o.has_indices.then_some(valid);
+        let both = |a: Option<Boolean>, b: Option<Boolean>| match (a, b) {
+            (Some(a), Some(b)) => Some(a & b),
+            (a, b) => a.or(b),
+        };
+        let act = |t: usize| o.varlen.then(|| seq_len.gt(t as i32));
 
-        let nt = o.tokens;
-        // Per token: dt (with bias and softplus), dA, and this lane's B and C slice, `nv`
-        // vectors of `vs` elements at columns `(member + lanes j) * vs`, reused for every row.
-        let d_value = if o.has_d { Some(dd.load_at(head)) } else { None };
-        let tok = |t: usize| batch * nt as i32 + t as i32;
-        let mut d_as = Vec::with_capacity(nt);
-        let mut db_regs: Vec<Vec<Float32>> = Vec::with_capacity(nt);
-        let mut c_regs: Vec<Vec<Float32>> = Vec::with_capacity(nt);
-        for t in 0..nt {
-            let mut dt_value = dt.load_at(tok(t) * nheads + head);
-            if o.has_dt_bias {
-                dt_value = dt_value + dt_bias.load_at(head);
-            }
-            if o.dt_softplus {
-                // `__logf(1 + __expf(x))`, and x itself above 20.
-                let e = cute::math::exp2(dt_value * c(std::f32::consts::LOG2_E), true);
-                let sp = cute::math::log2(e + c(1.0), true) * c(std::f32::consts::LN_2);
-                dt_value = select(dt_value.le(20.0f32), sp, dt_value);
-            }
-            d_as.push(cute::math::exp2(a.load_at(head) * dt_value * c(std::f32::consts::LOG2_E), true));
-            let bc_base = (tok(t) * ngroups + group) * dstate as i32;
-            let load_bc = |p: &Ptr<T>| -> Vec<Float32> {
-                (0..nv)
-                    .flat_map(|j| load_n::<T>(&p.offset(bc_base + (member + lanes as i32 * j as i32) * vs as i32), vs))
-                    .collect()
-            };
-            // `B * dt`, once.
-            db_regs.push(load_bc(&bm).iter().map(|b| *b * dt_value).collect());
-            c_regs.push(load_bc(&cm));
-        }
-
-        let row_base = |t: usize| (tok(t) * nheads + head) * dim as i32 + dim_off;
-        let state_head = ((load_slot * nheads + head) * dim as i32 + dim_off) * (dstate / vs) as i32;
-        let first_row = warp * rpw as i32;
-        let sv = (dstate / vs) as i32;
-        let run = |r0: Int32| {
-            // The rows `r0 .. r0 + unroll` of this warp (relative to the block's tile).
-            let rows: Vec<Int32> = (0..unroll).map(|k| r0 + (k * groups) as i32 + group_in_warp).collect();
-            let xs: Vec<Vec<Float32>> =
-                rows.iter().map(|r| (0..nt).map(|t| x.load_at(row_base(t) + *r).to::<f32>()).collect()).collect();
-            let at = |r: &Int32, j: usize| (state_head + *r * sv + member + lanes as i32 * j as i32) * vs as i32;
-            // All state loads first.
-            let olds: Vec<Vec<Float32>> =
-                rows.iter().map(|r| (0..nv).flat_map(|j| load_n::<S>(&state.offset(at(r, j)), vs)).collect()).collect();
-            for ((r, xrow), old) in rows.iter().zip(&xs).zip(&olds) {
-                let mut cur: Vec<Float32> =
-                    old.iter().map(|s| if o.has_indices { select(valid, *s, 0.0f32) } else { *s }).collect();
-                for t in 0..nt {
-                    let mut acc = c(0.0);
-                    for (i, s) in cur.iter_mut().enumerate() {
-                        let ns = *s * d_as[t] + db_regs[t][i] * xrow[t];
-                        acc = acc + ns * c_regs[t][i];
-                        *s = ns;
-                    }
-                    let mut res = warp_reduction_sum(acc, lanes);
-                    if let Some(dv) = d_value {
-                        res = res + dv * xrow[t];
-                    }
-                    if o.has_z {
-                        let zv = z.load_at(row_base(t) + *r).to::<f32>();
-                        // `z * sigmoid(z)`, `__fdividef(1, 1 + __expf(-z))`.
-                        let e = cute::math::exp2(zv * c(-std::f32::consts::LOG2_E), true);
-                        res = res * cute::math::div(zv, e + c(1.0), true);
-                    }
-                    if_(member.eq(0), || out.store_at(row_base(t) + *r, res.to::<T>()));
+        let body = || {
+            // Per token: dt (with bias and softplus), dA, and this lane's B and C slice, `nv`
+            // vectors of `vs` elements at columns `(member + lanes j) * vs`, reused for every row.
+            let d_value = if o.has_d { Some(dd.load_at(head)) } else { None };
+            // Tokens past the sequence read the last one (and are masked below).
+            let tok = |t: usize| if o.varlen { bos + (seq_len - 1).min(t as i32) } else { bos + t as i32 };
+            let mut d_as = Vec::with_capacity(nt);
+            let mut db_regs: Vec<Vec<Float32>> = Vec::with_capacity(nt);
+            let mut c_regs: Vec<Vec<Float32>> = Vec::with_capacity(nt);
+            for t in 0..nt {
+                let mut dt_value = dt.load_at(tok(t) * nheads + head);
+                if o.has_dt_bias {
+                    dt_value = dt_value + dt_bias.load_at(head);
                 }
-                if o.update_state {
-                    for j in 0..nv {
-                        let ptr = state.offset(at(r, j));
-                        let vals = &cur[j * vs..(j + 1) * vs];
-                        if o.has_indices {
-                            if_(valid, || store_n::<S>(&ptr, vals));
-                        } else {
-                            store_n::<S>(&ptr, vals);
+                if o.dt_softplus {
+                    // `__logf(1 + __expf(x))`, and x itself above 20.
+                    let e = cute::math::exp2(dt_value * c(std::f32::consts::LOG2_E), true);
+                    let sp = cute::math::log2(e + c(1.0), true) * c(std::f32::consts::LN_2);
+                    dt_value = select(dt_value.le(20.0f32), sp, dt_value);
+                }
+                d_as.push(cute::math::exp2(a.load_at(head) * dt_value * c(std::f32::consts::LOG2_E), true));
+                let bc_base = (tok(t) * ngroups + group) * dstate as i32;
+                let load_bc = |p: &Ptr<T>| -> Vec<Float32> {
+                    (0..nv)
+                        .flat_map(|j| {
+                            load_n::<T>(&p.offset(bc_base + (member + lanes as i32 * j as i32) * vs as i32), vs)
+                        })
+                        .collect()
+                };
+                // `B * dt`, once.
+                db_regs.push(load_bc(&bm).iter().map(|b| *b * dt_value).collect());
+                c_regs.push(load_bc(&cm));
+            }
+            // Where each token's state goes. The destination slot of token `t` (uniform).
+            let dst_slots: Vec<Int32> = (0..nt)
+                .map(|t| if o.has_dst { dst_indices.load_at(batch * nt as i32 + t as i32) } else { Int32::from(0) })
+                .collect();
+            let icache = if o.istate_indices { istate_indices.load_at(batch) } else { state_batch };
+
+            let row_base = |t: usize| (tok(t) * nheads + head) * dim as i32 + dim_off;
+            let first_row = warp * rpw as i32;
+            let sv = (dstate / vs) as i32;
+            // The element offset of `r`'s vector `j` in `slot`.
+            let at = |slot: Int32, r: &Int32, j: usize| {
+                (((slot * nheads + head) * dim as i32 + dim_off + *r) * sv + member + lanes as i32 * j as i32)
+                    * vs as i32
+            };
+            let scale_at = |slot: Int32, r: &Int32| (slot * nheads + head) * dim as i32 + dim_off + *r;
+            // Store `cur` as `r`'s state in `slot` of `ptr` (with the scale in `sptr`), if `cond`.
+            let write =
+                |ptr: &Ptr<S>, sptr: &Ptr<f32>, slot: Int32, r: &Int32, cur: &[Float32], cond: Option<Boolean>| {
+                    // int16: scale the row so its largest value is 32767 (all of the row's lanes agree).
+                    let (vals, scale) = if scaled {
+                        let mx = cur.iter().skip(1).fold(cur[0].abs(), |m, v| m.max(v.abs()));
+                        let mx = warp_reduction_max(mx, lanes);
+                        let enc = select(mx.eq(0.0f32), c(1.0), c(32767.0) / mx);
+                        let q: Vec<Float32> =
+                            cur.iter().map(|v| (*v * enc).max(-32767.0f32).min(32767.0f32).rint()).collect();
+                        (q, Some(c(1.0) / enc))
+                    } else {
+                        (cur.to_vec(), None)
+                    };
+                    let go = || {
+                        for j in 0..nv {
+                            store_n::<S>(&ptr.offset(at(slot, r, j)), &vals[j * vs..(j + 1) * vs]);
+                        }
+                        if let Some(sc) = scale {
+                            if_(member.eq(0), || sptr.store_at(scale_at(slot, r), sc));
+                        }
+                    };
+                    match cond {
+                        Some(cn) => if_(cn, go),
+                        None => go(),
+                    }
+                };
+            let run = |r0: Int32| {
+                // The rows `r0 .. r0 + unroll` of this warp (relative to the block's tile).
+                let rows: Vec<Int32> = (0..unroll).map(|k| r0 + (k * groups) as i32 + group_in_warp).collect();
+                let xs: Vec<Vec<Float32>> =
+                    rows.iter().map(|r| (0..nt).map(|t| x.load_at(row_base(t) + *r).to::<f32>()).collect()).collect();
+                // All state loads first.
+                let olds: Vec<Vec<Float32>> = rows
+                    .iter()
+                    .map(|r| (0..nv).flat_map(|j| load_n::<S>(&state.offset(at(load_slot, r, j)), vs)).collect())
+                    .collect();
+                for ((r, xrow), old) in rows.iter().zip(&xs).zip(&olds) {
+                    let decode = if scaled { Some(state_scale.load_at(scale_at(load_slot, r))) } else { None };
+                    let mut cur: Vec<Float32> = old
+                        .iter()
+                        .map(|s| {
+                            let s = decode.map_or(*s, |d| *s * d);
+                            if o.has_indices { select(valid, s, 0.0f32) } else { s }
+                        })
+                        .collect();
+                    for t in 0..nt {
+                        let mut acc = c(0.0);
+                        for (i, s) in cur.iter_mut().enumerate() {
+                            let ns = *s * d_as[t] + db_regs[t][i] * xrow[t];
+                            acc = acc + ns * c_regs[t][i];
+                            // Past the sequence the state stays.
+                            *s = match act(t) {
+                                Some(on) => select(on, ns, *s),
+                                None => ns,
+                            };
+                        }
+                        let mut res = warp_reduction_sum(acc, lanes);
+                        if let Some(dv) = d_value {
+                            res = res + dv * xrow[t];
+                        }
+                        if o.has_z {
+                            let zv = z.load_at(row_base(t) + *r).to::<f32>();
+                            // `z * sigmoid(z)`, `__fdividef(1, 1 + __expf(-z))`.
+                            let e = cute::math::exp2(zv * c(-std::f32::consts::LOG2_E), true);
+                            res = res * cute::math::div(zv, e + c(1.0), true);
+                        }
+                        let store_out = both(Some(member.eq(0)), act(t)).unwrap();
+                        if_(store_out, || out.store_at(row_base(t) + *r, res.to::<T>()));
+                        // The state of this token: the cache, a destination slot, or (after the
+                        // last token) the state itself.
+                        if o.intermediate {
+                            let slot = icache * nt as i32 + t as i32;
+                            write(&istate, &istate_scale, slot, r, &cur, both(valid_opt, act(t)));
+                        } else if o.has_dst {
+                            if nt == 1 && !o.update_state {
+                                continue;
+                            }
+                            let cond = both(both(valid_opt, act(t)), Some(dst_slots[t].ne(pad_slot_id)));
+                            write(&state, &state_scale, dst_slots[t], r, &cur, cond);
+                        } else if o.update_state && t == nt - 1 {
+                            write(&state, &state_scale, state_batch, r, &cur, valid_opt);
                         }
                     }
                 }
+            };
+            if rpw == step {
+                run(first_row);
+            } else {
+                for_range(0, (rpw / step) as i32, 1, |i| run(first_row + i * step as i32));
             }
         };
-        if rpw == step {
-            run(first_row);
+        if o.varlen {
+            if_(seq_len.gt(0), body);
         } else {
-            for_range(0, (rpw / step) as i32, 1, |i| run(first_row + i * step as i32));
+            body();
         }
     })
 }
@@ -392,6 +535,7 @@ pub struct Problem {
     pub input: Dtype,
     pub state: StateDtype,
     pub opts: Options,
+    /// Sequences.
     pub batch: usize,
     pub nheads: usize,
     pub dim: usize,
@@ -399,10 +543,22 @@ pub struct Problem {
     pub ngroups: usize,
     /// Slots in the state cache (`batch` unless there are indices).
     pub cache: usize,
-    /// The slot of each batch entry (with `opts.has_indices`); negative is `pad_slot_id`.
+    /// The slot of each sequence (with `opts.has_indices`), `[batch]` or `[batch, tokens]` with
+    /// `num_accepted_tokens`; negative is `pad_slot_id`.
     pub indices: Vec<i32>,
     pub pad_slot_id: i32,
+    /// The destination slots (with `opts.has_dst`), `[batch]` or `[batch, tokens]`.
+    pub dst: Vec<i32>,
+    /// Tokens of each sequence (with `opts.varlen`; `cu_seqlens` is their running sum).
+    pub seqlens: Vec<usize>,
+    /// Accepted tokens of each sequence (with `opts.has_accepted`).
+    pub accepted: Vec<i32>,
+    /// Slots of the intermediate cache (with `opts.intermediate`) and each sequence's slot.
+    pub icache: usize,
+    pub istate_indices: Vec<i32>,
+    /// The stored state (the integers, for int16) and, for int16, the decode scales.
     pub state0: Vec<f32>,
+    pub scale0: Vec<f32>,
     pub x: Vec<f32>,
     pub dt: Vec<f32>,
     pub a: Vec<f32>,
@@ -413,6 +569,15 @@ pub struct Problem {
     pub z: Vec<f32>,
     /// The SM count the launch plan assumes.
     pub num_sms: usize,
+    /// At most this many rows in flight per warp (overrides [`Plan`]'s choice downward).
+    pub unroll_cap: usize,
+}
+
+/// What a launch left in its buffers, decoded to values (see [`Problem::decode`]).
+pub struct Outputs {
+    pub state: Vec<f32>,
+    pub out: Vec<f32>,
+    pub istate: Vec<f32>,
 }
 
 impl Problem {
@@ -424,31 +589,65 @@ impl Problem {
         seed: u64,
     ) -> Problem {
         assert!(nheads.is_multiple_of(ngroups));
+        let nt = opts.tokens;
+        assert!(!opts.has_accepted || opts.has_indices);
         let mut rng = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
         let mut uni = move |lo: f32, hi: f32| {
             rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
             lo + (hi - lo) * ((rng >> 33) as f32 / (1u64 << 31) as f32)
         };
-        let cache = if opts.has_indices { batch + 3 } else { batch };
-        // A shuffled choice of distinct slots, with every fifth one padded.
+        // Source slots `0 .. batch * cols` (distinct); destinations come after them, so no block
+        // writes a slot another reads.
+        let cols = if opts.has_accepted { nt } else { 1 };
+        let sources = batch * cols;
+        let dst_cols = if nt > 1 { nt } else { 1 };
+        let cache = if opts.has_indices || opts.has_dst { sources + batch * dst_cols + 3 } else { batch };
         let indices: Vec<i32> = if opts.has_indices {
-            (0..batch).map(|i| if i % 5 == 3 { -1 } else { ((i * 7 + 2) % cache) as i32 }).collect()
+            (0..sources).map(|i| if (i / cols + i % cols) % 5 == 3 { -1 } else { i as i32 }).collect()
         } else {
             vec![]
         };
+        let dst: Vec<i32> = if opts.has_dst {
+            (0..batch * dst_cols)
+                .map(|i| match i % 4 {
+                    3 => -1,
+                    // In place, when a one-token sequence's own slot is known.
+                    0 if nt == 1 && opts.has_indices && indices[i] >= 0 => indices[i],
+                    _ => (sources + i) as i32,
+                })
+                .collect()
+        } else {
+            vec![]
+        };
+        let seqlens: Vec<usize> =
+            if opts.varlen { (0..batch).map(|b| (b * 3 + 1) % (nt + 1)).collect() } else { vec![] };
+        let accepted: Vec<i32> =
+            if opts.has_accepted { (0..batch).map(|b| (b % (nt + 1)) as i32).collect() } else { vec![] };
+        let icache = match (opts.intermediate, opts.istate_indices || !opts.has_indices) {
+            (false, _) => 0,
+            (true, true) => batch + 2,
+            (true, false) => cache,
+        };
+        let istate_indices: Vec<i32> =
+            if opts.istate_indices { (0..batch).map(|b| (batch + 1 - b) as i32).collect() } else { vec![] };
+        let total = if opts.varlen { seqlens.iter().sum() } else { batch * nt };
         let mut v =
             |n: usize, lo: f32, hi: f32, r: &dyn Fn(f32) -> f32| (0..n).map(|_| r(uni(lo, hi))).collect::<Vec<f32>>();
-        let (ri, rs) = (|x| input.round(x), |x| state.round(x));
-        let state0 = v(cache * nheads * dim * dstate, -1.0, 1.0, &rs);
-        let nt = opts.tokens;
-        let x = v(batch * nt * nheads * dim, -1.0, 1.0, &ri);
-        let dt = v(batch * nt * nheads, -1.5, 1.0, &|x| x);
+        let (ri, rs) = (
+            |x| input.round(x),
+            |x: f32| if opts.int16 { x.round_ties_even().clamp(-32767.0, 32767.0) } else { state.round(x) },
+        );
+        let i16s = opts.int16;
+        let state0 = v(cache * nheads * dim * dstate, -1.0, 1.0, &|x| rs(if i16s { x * 32767.0 } else { x }));
+        let scale0 = if i16s { v(cache * nheads * dim, 0.5 / 32767.0, 1.0 / 32767.0, &|x| x) } else { vec![] };
+        let x = v(total * nheads * dim, -1.0, 1.0, &ri);
+        let dt = v(total * nheads, -1.5, 1.0, &|x| x);
         let a = v(nheads, -2.0, -0.1, &|x| x);
-        let b = v(batch * nt * ngroups * dstate, -1.0, 1.0, &ri);
-        let c = v(batch * nt * ngroups * dstate, -1.0, 1.0, &ri);
+        let b = v(total * ngroups * dstate, -1.0, 1.0, &ri);
+        let c = v(total * ngroups * dstate, -1.0, 1.0, &ri);
         let d = v(nheads, -1.0, 1.0, &|x| x);
         let dt_bias = v(nheads, -0.5, 0.5, &|x| x);
-        let z = v(batch * nt * nheads * dim, -3.0, 3.0, &ri);
+        let z = v(total * nheads * dim, -3.0, 3.0, &ri);
         Problem {
             input,
             state,
@@ -461,7 +660,13 @@ impl Problem {
             cache,
             indices,
             pad_slot_id: -1,
+            dst,
+            seqlens,
+            accepted,
+            icache,
+            istate_indices,
             state0,
+            scale0,
             x,
             dt,
             a,
@@ -471,11 +676,51 @@ impl Problem {
             dt_bias,
             z,
             num_sms: 22,
+            // A store per token keeps more rows' state live: 4 rows spill (500 bytes, 1.7x
+            // slower on the cache); 2 do not.
+            unroll_cap: if nt > 1 && (opts.intermediate || opts.has_dst) { 2 } else { usize::MAX },
         }
     }
 
+    /// A state-typed buffer of `v` (stored integers if int16).
+    pub fn state_buffer(&self, v: &[f32]) -> KernelArg {
+        if self.opts.int16 {
+            KernelArg::buffer(&v.iter().map(|&x| x as i16).collect::<Vec<_>>())
+        } else {
+            self.state.buffer(v)
+        }
+    }
+
+    /// A state buffer's values.
+    pub fn read_state(&self, a: &KernelArg) -> Vec<f32> {
+        if self.opts.int16 { a.to_vec::<i16>().into_iter().map(|x| x as f32).collect() } else { self.state.read(a) }
+    }
+
+    /// Tokens in all sequences.
+    pub fn total_tokens(&self) -> usize {
+        if self.opts.varlen { self.seqlens.iter().sum() } else { self.batch * self.opts.tokens }
+    }
+
+    /// `cu_seqlens`.
+    pub fn cu_seqlens(&self) -> Vec<i32> {
+        std::iter::once(0)
+            .chain(self.seqlens.iter().scan(0, |acc, n| {
+                *acc += *n as i32;
+                Some(*acc)
+            }))
+            .collect()
+    }
+
+    fn istate_len(&self) -> usize {
+        self.icache * self.opts.tokens * self.nheads * self.dim * self.dstate
+    }
+
     pub fn plan(&self) -> Plan {
-        Plan::new(self.batch, self.nheads, self.dim, self.opts.tokens, self.num_sms)
+        let mut plan = Plan::new(self.batch, self.nheads, self.dim, self.opts.tokens, self.num_sms);
+        while plan.unroll > self.unroll_cap.max(1) {
+            plan.unroll /= 2;
+        }
+        plan
     }
 
     pub fn kernel(&self) -> Kernel {
@@ -488,13 +733,19 @@ impl Problem {
         LaunchConfig::new([self.batch as u32, self.nheads as u32, tiles], [THREADS as u32, 1, 1])
     }
 
-    /// The kernel's arguments (see [`kernel`]); the state is argument 0, the output 9.
+    /// The kernel's arguments (see [`kernel`]); the state is argument 0, the output 9, the
+    /// intermediate states 14, the state scales 16 and the intermediate scales 17.
     pub fn args(&self) -> Vec<KernelArg> {
-        assert!(self.cache * self.nheads * self.dim * self.dstate < 1 << 31, "offsets are 32-bit");
+        assert!(
+            self.cache.max(self.icache * self.opts.tokens) * self.nheads * self.dim * self.dstate < 1 << 31,
+            "offsets are 32-bit"
+        );
         let one = || vec![0.0f32];
         let opt = |on: bool, v: &Vec<f32>| if on { v.clone() } else { one() };
+        let ints = |on: bool, v: Vec<i32>| KernelArg::i32(if on { v } else { vec![0] });
+        let scaled = self.opts.int16;
         vec![
-            self.state.buffer(&self.state0),
+            self.state_buffer(&self.state0),
             self.input.buffer(&self.x),
             KernelArg::f32(self.dt.clone()),
             KernelArg::f32(self.a.clone()),
@@ -503,31 +754,58 @@ impl Problem {
             KernelArg::f32(opt(self.opts.has_d, &self.d)),
             KernelArg::f32(opt(self.opts.has_dt_bias, &self.dt_bias)),
             self.input.buffer(&opt(self.opts.has_z, &self.z)),
-            self.input.buffer(&vec![0.0; self.batch * self.opts.tokens * self.nheads * self.dim]),
-            KernelArg::i32(if self.opts.has_indices { self.indices.clone() } else { vec![0] }),
+            self.input.buffer(&vec![0.0; self.total_tokens() * self.nheads * self.dim]),
+            ints(self.opts.has_indices, self.indices.clone()),
+            ints(self.opts.has_dst, self.dst.clone()),
+            ints(self.opts.varlen, self.cu_seqlens()),
+            ints(self.opts.has_accepted, self.accepted.clone()),
+            self.state_buffer(&vec![0.0; self.istate_len().max(1)]),
+            ints(self.opts.istate_indices, self.istate_indices.clone()),
+            KernelArg::f32(opt(scaled, &self.scale0)),
+            KernelArg::f32(vec![
+                0.0;
+                if scaled { self.icache * self.opts.tokens * self.nheads * self.dim } else { 0 }.max(1)
+            ]),
             KernelArg::ScalarI32(self.nheads as i32),
             KernelArg::ScalarI32(self.ngroups as i32),
             KernelArg::ScalarI32(self.pad_slot_id),
         ]
     }
 
-    /// The new state and the output in f64: `(state, out)`.
-    pub fn reference(&self) -> (Vec<f64>, Vec<f64>) {
+    /// Values from stored integers and their per-row decode scales (identity unless int16).
+    pub fn decode(&self, stored: &[f32], scales: &[f32]) -> Vec<f32> {
+        if !self.opts.int16 {
+            return stored.to_vec();
+        }
+        stored.iter().enumerate().map(|(i, v)| v * scales[i / self.dstate]).collect()
+    }
+
+    /// The new state, the output and the intermediate states in f64.
+    pub fn reference(&self) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
         let (nh, dim, ds) = (self.nheads, self.dim, self.dstate);
-        let mut state: Vec<f64> = self.state0.iter().map(|&v| v as f64).collect();
         let nt = self.opts.tokens;
-        let mut out = vec![0.0f64; self.batch * nt * nh * dim];
+        let mut state: Vec<f64> = self.decode(&self.state0, &self.scale0).iter().map(|&v| v as f64).collect();
+        let mut istate = vec![0.0f64; self.istate_len()];
+        let cu = if self.opts.varlen { self.cu_seqlens() } else { vec![] };
+        let mut out = vec![0.0f64; self.total_tokens() * nh * dim];
+        #[allow(clippy::needless_range_loop)]
         for b in 0..self.batch {
-            let slot = if self.opts.has_indices { self.indices[b] } else { b as i32 };
+            let (bos, len) = if self.opts.varlen { (cu[b] as usize, self.seqlens[b]) } else { (b * nt, nt) };
+            if len == 0 {
+                continue;
+            }
+            let init = if self.opts.has_accepted { (self.accepted[b] - 1).max(0) as usize } else { 0 };
+            let cols = if self.opts.has_accepted { nt } else { 1 };
+            let slot = if self.opts.has_indices { self.indices[b * cols + init] } else { b as i32 };
             let pad = self.opts.has_indices && slot == self.pad_slot_id;
+            let icache = if self.opts.istate_indices { self.istate_indices[b] } else { slot };
             for h in 0..nh {
                 let g = h / (nh / self.ngroups);
                 for r in 0..dim {
-                    let mut cur: Vec<f64> = (0..ds)
-                        .map(|n| if pad { 0.0 } else { state[((slot.max(0) as usize * nh + h) * dim + r) * ds + n] })
-                        .collect();
-                    for t in 0..nt {
-                        let tok = b * nt + t;
+                    let row = |s: i32| ((s.max(0) as usize * nh + h) * dim + r) * ds;
+                    let mut cur: Vec<f64> = (0..ds).map(|n| if pad { 0.0 } else { state[row(slot) + n] }).collect();
+                    for t in 0..len {
+                        let tok = bos + t;
                         let mut dt = self.dt[tok * nh + h] as f64;
                         if self.opts.has_dt_bias {
                             dt += self.dt_bias[h] as f64;
@@ -549,23 +827,44 @@ impl Problem {
                             acc *= zv / (1.0 + (-zv).exp());
                         }
                         out[(tok * nh + h) * dim + r] = acc;
-                    }
-                    if !pad && self.opts.update_state {
-                        for (n, s) in cur.iter().enumerate() {
-                            state[((slot.max(0) as usize * nh + h) * dim + r) * ds + n] = *s;
+                        if pad {
+                            continue;
+                        }
+                        if self.opts.intermediate {
+                            let at = (icache as usize * nt + t) * nh * dim * ds + (h * dim + r) * ds;
+                            istate[at..at + ds].copy_from_slice(&cur);
+                        } else if self.opts.has_dst {
+                            let dst = self.dst[b * if nt > 1 { nt } else { 1 } + t];
+                            if dst != self.pad_slot_id && (nt > 1 || self.opts.update_state) {
+                                state[row(dst)..row(dst) + ds].copy_from_slice(&cur);
+                            }
+                        } else if t == len - 1 && self.opts.update_state {
+                            state[row(slot)..row(slot) + ds].copy_from_slice(&cur);
                         }
                     }
                 }
             }
         }
-        (state, out)
+        (state, out, istate)
     }
 
-    /// Check the new state and output against the reference (absolute plus relative);
-    /// returns the largest scaled `(state, out)` errors.
-    pub fn check(&self, state: &[f32], out: &[f32]) -> (f64, f64) {
-        let (rs, ro) = self.reference();
+    /// Decode what the buffers hold after a launch: the raw `state`, `state_scale`, `out`,
+    /// `intermediate_states` and `intermediate_state_scales` values.
+    pub fn outputs(&self, state: &[f32], scales: &[f32], out: &[f32], istate: &[f32], iscales: &[f32]) -> Outputs {
+        Outputs {
+            state: self.decode(state, scales),
+            out: out.to_vec(),
+            istate: self.decode(istate, iscales)[..self.istate_len()].to_vec(),
+        }
+    }
+
+    /// Check the new state, the output and the intermediate states against the reference
+    /// (absolute plus relative); returns the largest scaled `(state, out)` errors (the state's
+    /// including the intermediate states).
+    pub fn check(&self, got: &Outputs) -> (f64, f64) {
+        let (rs, ro, ri) = self.reference();
         let scaled = |got: &[f32], want: &[f64], tol: f64, what: &str| {
+            assert_eq!(got.len(), want.len(), "{what}");
             let mut worst = 0.0f64;
             for (i, (&g, &r)) in got.iter().zip(want).enumerate() {
                 let e = (g as f64 - r).abs() / (1.0 + r.abs());
@@ -574,15 +873,20 @@ impl Problem {
             }
             worst
         };
-        let ts = self.state.tolerance() + 2e-5;
-        let to = self.input.tolerance() + 2e-4 + self.state.tolerance();
-        (scaled(state, &rs, ts, "state"), scaled(out, &ro, to, "out"))
+        let st = if self.opts.int16 { 1.5e-4 } else { self.state.tolerance() };
+        let ts = st + 2e-5;
+        let to = self.input.tolerance() + 2e-4 + st;
+        let es = scaled(&got.state, &rs, ts, "state").max(scaled(&got.istate, &ri, ts, "intermediate state"));
+        (es, scaled(&got.out, &ro, to, "out"))
     }
 
-    /// Bytes moved: the state read and written, `x`, `z`, `out`, `B`, `C`.
+    /// Bytes moved: the state read and written, `x`, `z`, `out`, `B`, `C` (a sequence's state
+    /// is read and written once; the cache or destination writes add one write per token).
     pub fn bytes(&self) -> f64 {
-        let state = 2 * self.batch * self.nheads * self.dim * self.dstate * self.state.bytes();
+        let row = self.nheads * self.dim * self.dstate * if self.opts.int16 { 2 } else { self.state.bytes() };
         let nt = self.opts.tokens;
+        let writes = if self.opts.intermediate || (self.opts.has_dst && nt > 1) { nt } else { 1 };
+        let state = (1 + writes) * self.batch * row;
         let io = (nt * self.batch * self.nheads * self.dim * (2 + self.opts.has_z as usize)
             + 2 * nt * self.batch * self.ngroups * self.dstate)
             * 2;
@@ -596,7 +900,14 @@ pub fn simulate(p: &Problem) -> (f64, f64) {
     let k = p.kernel();
     let mut args = p.args();
     k.simulate(p.launch(), &mut args).unwrap_or_else(|e| panic!("{}: {e}", k.name()));
-    p.check(&p.state.read(&args[0]), &p.input.read(&args[9]))
+    let scales = |a: &KernelArg| if p.opts.int16 { a.to_vec::<f32>() } else { vec![] };
+    p.check(&p.outputs(
+        &p.read_state(&args[0]),
+        &scales(&args[16]),
+        &p.input.read(&args[9]),
+        &p.read_state(&args[14]),
+        &scales(&args[17]),
+    ))
 }
 
 /// Running on the GPU (`--features cuda`).
@@ -674,12 +985,17 @@ pub mod gpu {
         stream.synchronize()?;
         let mut err = (0.0, 0.0);
         if check {
-            let state = match p.state {
-                super::StateDtype::F16 => bufs[0].to_vec::<F16>()?.into_iter().map(|x| x.to_f32()).collect(),
-                super::StateDtype::BF16 => {
-                    bufs[0].to_vec::<u16>()?.into_iter().map(|b| f32::from_bits((b as u32) << 16)).collect()
+            let read = |i: usize| -> Result<Vec<f32>, Box<dyn Error>> {
+                if p.opts.int16 {
+                    return Ok(bufs[i].to_vec::<i16>()?.into_iter().map(|x| x as f32).collect());
                 }
-                super::StateDtype::F32 => bufs[0].to_vec::<f32>()?,
+                Ok(match p.state {
+                    super::StateDtype::F16 => bufs[i].to_vec::<F16>()?.into_iter().map(|x| x.to_f32()).collect(),
+                    super::StateDtype::BF16 => {
+                        bufs[i].to_vec::<u16>()?.into_iter().map(|b| f32::from_bits((b as u32) << 16)).collect()
+                    }
+                    super::StateDtype::F32 => bufs[i].to_vec::<f32>()?,
+                })
             };
             let out: Vec<f32> = match p.input {
                 super::Dtype::F16 => bufs[9].to_vec::<F16>()?.into_iter().map(|x| x.to_f32()).collect(),
@@ -687,7 +1003,10 @@ pub mod gpu {
                     bufs[9].to_vec::<u16>()?.into_iter().map(|b| f32::from_bits((b as u32) << 16)).collect()
                 }
             };
-            err = p.check(&state, &out);
+            let scales = |i: usize| -> Result<Vec<f32>, Box<dyn Error>> {
+                Ok(if p.opts.int16 { bufs[i].to_vec::<f32>()? } else { vec![] })
+            };
+            err = p.check(&p.outputs(&read(0)?, &scales(16)?, &out, &read(14)?, &scales(17)?));
         }
         let t = if time {
             let opts = BenchmarkOptions::new().warmup_iterations(10).iterations(100).use_cuda_graphs(true);

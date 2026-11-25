@@ -90,6 +90,33 @@ fn gpu_main() -> Result<(), Box<dyn Error>> {
             );
         }
     }
+    // The options beyond the plain update: checked on a small shape, then timed at batch 16
+    // (bf16 state, 6 tokens where there are several), against `mamba_flashinfer_bench.py`.
+    let variants: [(&str, Options); 6] = [
+        ("dst (1 token)", Options { has_indices: true, has_dst: true, ..base }),
+        ("varlen", Options { varlen: true, tokens: 6, ..base }),
+        ("accepted", Options { has_indices: true, has_accepted: true, tokens: 6, ..base }),
+        ("istate", Options { intermediate: true, istate_indices: true, tokens: 6, ..base }),
+        ("dst (6 tokens)", Options { has_indices: true, has_dst: true, tokens: 6, ..base }),
+        ("int16", Options { int16: true, ..base }),
+    ];
+    println!("option           time(us)    GB/s");
+    for (name, opts) in variants {
+        let mut p = Problem::new(Dtype::BF16, StateDtype::F16, opts, (6, 8, 32, 128, 2), 5);
+        p.num_sms = sms;
+        let ((es, eo), _) = run(&ctx, &mut ks, &p, true, false)?;
+        let state = if opts.int16 { StateDtype::F16 } else { StateDtype::BF16 };
+        let mut p = Problem::new(Dtype::BF16, state, opts, (16, 128, 64, 128, 8), 3);
+        p.num_sms = sms;
+        // No pad slots when timing (FlashInfer's script has none): distinct sources, then
+        // distinct destinations.
+        let n = p.indices.len() as i32;
+        p.indices = (0..n).collect();
+        p.dst = (0..p.dst.len() as i32).map(|i| n + i).collect();
+        let (_, t) = run(&ctx, &mut ks, &p, false, true)?;
+        let t = t.unwrap();
+        println!("{name:15} {t:8.2}  {:7.1}  (check: state {es:.2e}, out {eo:.2e})", p.bytes() / (t * 1e-6) / 1e9);
+    }
     Ok(())
 }
 
