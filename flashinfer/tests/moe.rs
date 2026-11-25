@@ -86,3 +86,21 @@ fn deepseek_routing_matches_reference() {
         assert!(err <= 1.0, "{score:?} e{e} groups {n_group}/{topk_group} k{k}: error {err}");
     }
 }
+
+/// The trtllm-gen methods without groups: Llama4 (top-1), TopK, Sigmoid, SigmoidRenorm,
+/// MiniMax2 (with its bias) and TopKSigmoid; one and several experts per lane, padded lanes.
+#[test]
+fn sigmoid_and_topk_routing_match_reference() {
+    for routing in [Routing::TopK, Routing::Sigmoid, Routing::SigmoidRenorm, Routing::MiniMax2, Routing::TopKSigmoid] {
+        for (score, e, k) in [(ScoreType::F32, 8usize, 2usize), (ScoreType::BF16, 60, 4), (ScoreType::F16, 256, 8)] {
+            let p = RouteProblem::new(routing, score, 6, e, k, 13);
+            let err = simulate_route(&p);
+            assert!(err <= 1.0, "{routing:?} {score:?} e{e} k{k}: error {err}");
+        }
+    }
+    for (score, e) in [(ScoreType::F32, 16usize), (ScoreType::BF16, 128)] {
+        let p = RouteProblem::new(Routing::Llama4, score, 6, e, 1, 14);
+        let err = simulate_route(&p);
+        assert!(err <= 1.0, "Llama4 {score:?} e{e}: error {err}");
+    }
+}

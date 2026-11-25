@@ -151,6 +151,10 @@ fn kv_layout_matches_reference() {
         (base, StateDtype::BF16, (3, 2, 4, 128, 64)),
         (base, StateDtype::F16, (2, 2, 2, 128, 128)),
         (Options { tokens: 3, ..base }, StateDtype::F32, (3, 2, 4, 128, 64)),
+        // The tile kernel (f32 state, K = 128, few states): pools with padding, no l2 norm, no write-back.
+        (Options { has_indices: true, has_out_indices: true, ..base }, StateDtype::F32, (7, 2, 4, 128, 64)),
+        (Options { l2norm: false, ..base }, StateDtype::F32, (3, 2, 4, 128, 32)),
+        (Options { update_state: false, ..base }, StateDtype::F32, (3, 2, 4, 128, 64)),
         (Options { has_indices: true, has_out_indices: true, ..base }, StateDtype::BF16, (7, 2, 4, 128, 64)),
         (Options { tokens: 2, update_state: false, ..base }, StateDtype::F32, (3, 2, 4, 64, 32)),
         (Options { tokens: 2, has_indices: true, ..base }, StateDtype::F32, (6, 2, 2, 256, 32)),

@@ -48,7 +48,9 @@
 //! the semantics of FlashInfer's `RoutingMethodType`s `Default` (softmax, then top-k),
 //! `RenormalizeNaive` (softmax, top-k, renormalize), `Renormalize` (top-k, then softmax) and
 //! `DeepSeekV3` (`fused_topk_deepseek`: sigmoid plus bias, `n_group` / `topk_group` group
-//! selection by top-2 sums, `routed_scaling_factor`). Written after FlashInfer's
+//! selection by top-2 sums, `routed_scaling_factor`), and the trtllm-gen `Llama4` (top-1,
+//! sigmoid), `TopK` (raw logits as weights), `Sigmoid`, `SigmoidRenorm`, `MiniMax2` (sigmoid
+//! plus bias, no groups, scaled sum-normalize) and `TopKSigmoid` (top-k, then sigmoid). Written after FlashInfer's
 //! `csrc/fused_moe/noAuxTcKernels.cu` and its trtllm-gen routing documentation; nothing was
 //! translated. One warp per token instead of FlashInfer's CTA of `num_experts` threads. On
 //! SM89 FlashInfer runs only the DeepSeek-V3 kernel (trtllm-gen routing is SM100+); the
@@ -368,6 +370,19 @@ pub enum Routing {
     /// kept, and the top-k `b` among their experts chosen; the weights are
     /// `s / (sum s + 1e-20) * routed_scaling_factor`.
     DeepSeekV3 { n_group: usize, topk_group: usize },
+    /// `Llama4`: top-1 of the logits, weight `sigmoid(logit)` (`top_k` must be 1).
+    Llama4,
+    /// `TopK`: top-k of the logits; the weights are the logits themselves.
+    TopK,
+    /// `Sigmoid`: top-k of `sigmoid(logit)`; the weights are those scores.
+    Sigmoid,
+    /// `SigmoidRenorm`: `Sigmoid`, then the weights divided by `sum + 1e-20`.
+    SigmoidRenorm,
+    /// `MiniMax2`: DeepSeek-V3 without groups: top-k of `sigmoid(logit) + bias` (the bias
+    /// only selects), weights `s / (sum s + 1e-20) * routed_scaling_factor`.
+    MiniMax2,
+    /// `TopKSigmoid`: top-k of the logits, weight `sigmoid(logit)`.
+    TopKSigmoid,
 }
 
 impl Routing {
@@ -377,6 +392,12 @@ impl Routing {
             Routing::SoftmaxTopK { renormalize: true } => "softmax_topk_renorm".into(),
             Routing::Renormalize => "renormalize".into(),
             Routing::DeepSeekV3 { n_group, topk_group } => format!("deepseek_v3_g{n_group}_tg{topk_group}"),
+            Routing::Llama4 => "llama4".into(),
+            Routing::TopK => "topk".into(),
+            Routing::Sigmoid => "sigmoid".into(),
+            Routing::SigmoidRenorm => "sigmoid_renorm".into(),
+            Routing::MiniMax2 => "minimax2".into(),
+            Routing::TopKSigmoid => "topk_sigmoid".into(),
         }
     }
 }
@@ -392,8 +413,8 @@ pub fn route_launch(num_tokens: usize) -> LaunchConfig {
 /// The routing kernel: router logits `[num_tokens, num_experts]` to `token_selected_experts`
 /// (i32) and `token_final_scales` (f32), both `[num_tokens, top_k]`, in descending order of
 /// the selection score (ties go to the lower expert index). Parameters: `logits`, `bias`
-/// (`[num_experts]`, read by DeepSeek-V3 only), `token_selected_experts`,
-/// `token_final_scales`, `num_tokens`, `routed_scaling_factor` (DeepSeek-V3 only).
+/// (`[num_experts]`, read by DeepSeek-V3 and MiniMax2 only), `token_selected_experts`,
+/// `token_final_scales`, `num_tokens`, `routed_scaling_factor` (DeepSeek-V3 and MiniMax2 only).
 ///
 /// One warp per token (FlashInfer's kernels use a CTA of `num_experts` threads per token):
 /// lane `l` holds the `C = ceil(num_experts / 32)` contiguous experts `l * C ..`; each of the
@@ -440,6 +461,9 @@ fn route_of<T: Numeric>(routing: Routing, score: ScoreType, num_experts: usize, 
         assert!(g.is_multiple_of(c) && (g / c).is_power_of_two(), "group size {g} vs {c} experts per lane");
         assert!((1..=n_group).contains(&topk_group) && topk_group * g >= top_k, "topk_group {topk_group}");
     }
+    if routing == Routing::Llama4 {
+        assert_eq!(top_k, 1, "Llama4 routing selects one expert");
+    }
     let name = format!("flashinfer_moe_route_{}_{}_e{e_n}_k{top_k}", routing.name(), score.name());
     Kernel::builder(&name).block_dim([32 * ROUTE_WARPS as u32, 1, 1]).build(|| {
         let logits = param_ptr::<T>("logits");
@@ -453,6 +477,7 @@ fn route_of<T: Numeric>(routing: Routing, score: ScoreType, num_experts: usize, 
         let ninf = Float32::from(f32::NEG_INFINITY);
         let one = Float32::from(1.0f32);
         let exp = |x: Float32| cute::math::exp2(x * Float32::from(std::f32::consts::LOG2_E), true);
+        let sig = |v: Float32| cute::math::div(one, one + exp(Float32::from(0.0f32) - v), true);
         if_(token.lt(num_tokens), || {
             let base = lane * c as i32;
             let row = token * e_n as i32;
@@ -498,8 +523,7 @@ fn route_of<T: Numeric>(routing: Routing, score: ScoreType, num_experts: usize, 
                 Routing::DeepSeekV3 { n_group, topk_group } => {
                     let g = e_n / n_group;
                     let lanes = g / c; // lanes per group
-                    let s: Vec<Float32> =
-                        x.iter().map(|&v| cute::math::div(one, one + exp(Float32::from(0.0f32) - v), true)).collect();
+                    let s: Vec<Float32> = x.iter().map(|&v| sig(v)).collect();
                     let b: Vec<Float32> = (0..c)
                         .map(|j| s[j] + bias.load_at((base + j as i32).min(e_n as i32 - 1)).to::<f32>())
                         .collect();
@@ -530,6 +554,38 @@ fn route_of<T: Numeric>(routing: Routing, score: ScoreType, num_experts: usize, 
                     let mine = shuffle_sync(chosen, lane / lanes as i32).ne(0);
                     let masked: Vec<Float32> = (0..c).map(|j| select(mine & valid[j], b[j], ninf)).collect();
                     topk(masked, &s);
+                    let sum = picks.iter().skip(1).fold(picks[0].1, |a, p| a + p.1);
+                    let k = cute::math::div(scale, sum + Float32::from(1e-20f32), true);
+                    picks.iter().map(|p| p.1 * k).collect()
+                }
+                Routing::TopK => {
+                    topk(x.clone(), &x);
+                    picks.iter().map(|p| p.1).collect()
+                }
+                Routing::Llama4 | Routing::TopKSigmoid => {
+                    topk(x.clone(), &x);
+                    picks.iter().map(|p| sig(p.1)).collect()
+                }
+                Routing::Sigmoid | Routing::SigmoidRenorm => {
+                    let s: Vec<Float32> = (0..c).map(|j| select(valid[j], sig(x[j]), ninf)).collect();
+                    topk(s.clone(), &s);
+                    if routing == Routing::Sigmoid {
+                        picks.iter().map(|p| p.1).collect()
+                    } else {
+                        let sum = picks.iter().skip(1).fold(picks[0].1, |a, p| a + p.1);
+                        let k = cute::math::div(one, sum + Float32::from(1e-20f32), true);
+                        picks.iter().map(|p| p.1 * k).collect()
+                    }
+                }
+                Routing::MiniMax2 => {
+                    let s: Vec<Float32> = x.iter().map(|&v| sig(v)).collect();
+                    let b: Vec<Float32> = (0..c)
+                        .map(|j| {
+                            let e = (base + j as i32).min(e_n as i32 - 1);
+                            select(valid[j], s[j] + bias.load_at(e).to::<f32>(), ninf)
+                        })
+                        .collect();
+                    topk(b, &s);
                     let sum = picks.iter().skip(1).fold(picks[0].1, |a, p| a + p.1);
                     let k = cute::math::div(scale, sum + Float32::from(1e-20f32), true);
                     picks.iter().map(|p| p.1 * k).collect()
@@ -578,7 +634,8 @@ impl RouteProblem {
             a.iter().zip(&b).map(|(x, y)| score.round(1.5 * (x + y))).collect()
         };
         let bias = u(num_experts, seed + 2, 0.1);
-        let routed_scaling_factor = if matches!(routing, Routing::DeepSeekV3 { .. }) { 2.5 } else { 1.0 };
+        let routed_scaling_factor =
+            if matches!(routing, Routing::DeepSeekV3 { .. } | Routing::MiniMax2) { 2.5 } else { 1.0 };
         RouteProblem { routing, score, num_tokens, num_experts, top_k, routed_scaling_factor, logits, bias }
     }
 
@@ -609,7 +666,20 @@ impl RouteProblem {
         let e_n = self.num_experts;
         let x: Vec<f64> = self.logits[t * e_n..(t + 1) * e_n].iter().map(|&v| v as f64).collect();
         match self.routing {
-            Routing::SoftmaxTopK { .. } | Routing::Renormalize => (x.clone(), x),
+            Routing::SoftmaxTopK { .. }
+            | Routing::Renormalize
+            | Routing::TopK
+            | Routing::Llama4
+            | Routing::TopKSigmoid => (x.clone(), x),
+            Routing::Sigmoid | Routing::SigmoidRenorm => {
+                let s: Vec<f64> = x.iter().map(|v| 1.0 / (1.0 + (-v).exp())).collect();
+                (s.clone(), s)
+            }
+            Routing::MiniMax2 => {
+                let s: Vec<f64> = x.iter().map(|v| 1.0 / (1.0 + (-v).exp())).collect();
+                let b = s.iter().zip(&self.bias).map(|(s, &b)| s + b as f64).collect();
+                (b, s)
+            }
             Routing::DeepSeekV3 { n_group, topk_group } => {
                 let s: Vec<f64> = x.iter().map(|v| 1.0 / (1.0 + (-v).exp())).collect();
                 let b: Vec<f64> = s.iter().zip(&self.bias).map(|(s, &b)| s + b as f64).collect();
@@ -643,7 +713,13 @@ impl RouteProblem {
                 let sum: f64 = chosen.iter().map(|&e| (num[e] - max).exp()).sum();
                 chosen.iter().map(|&e| (num[e] - max).exp() / sum).collect()
             }
-            Routing::DeepSeekV3 { .. } => {
+            Routing::TopK | Routing::Sigmoid => chosen.iter().map(|&e| num[e]).collect(),
+            Routing::Llama4 | Routing::TopKSigmoid => chosen.iter().map(|&e| 1.0 / (1.0 + (-num[e]).exp())).collect(),
+            Routing::SigmoidRenorm => {
+                let sum: f64 = chosen.iter().map(|&e| num[e]).sum();
+                chosen.iter().map(|&e| num[e] / (sum + 1e-20)).collect()
+            }
+            Routing::DeepSeekV3 { .. } | Routing::MiniMax2 => {
                 let _ = t;
                 let sum: f64 = chosen.iter().map(|&e| num[e]).sum();
                 chosen.iter().map(|&e| num[e] / (sum + 1e-20) * self.routed_scaling_factor as f64).collect()

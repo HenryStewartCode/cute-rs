@@ -37,12 +37,18 @@ const CONFIGS: [(&str, MoeShape); 3] = [
 ];
 
 #[allow(dead_code)]
-const ROUTES: [(&str, Routing, usize, usize); 5] = [
+const ROUTES: [(&str, Routing, usize, usize); 11] = [
     ("mixtral_softmax", Routing::SoftmaxTopK { renormalize: false }, 8, 2),
     ("qwen3_renormalize", Routing::Renormalize, 128, 8),
     ("qwen3_softmax_renorm", Routing::SoftmaxTopK { renormalize: true }, 128, 8),
     ("deepseek_v3", Routing::DeepSeekV3 { n_group: 8, topk_group: 4 }, 256, 8),
     ("kimi_k2", Routing::DeepSeekV3 { n_group: 1, topk_group: 1 }, 384, 8),
+    ("llama4_128e", Routing::Llama4, 128, 1),
+    ("topk_128e", Routing::TopK, 128, 8),
+    ("sigmoid_128e", Routing::Sigmoid, 128, 8),
+    ("sigmoid_renorm_128e", Routing::SigmoidRenorm, 128, 8),
+    ("minimax2_256e", Routing::MiniMax2, 256, 8),
+    ("topk_sigmoid_128e", Routing::TopKSigmoid, 128, 8),
 ];
 
 #[cfg(feature = "cuda")]

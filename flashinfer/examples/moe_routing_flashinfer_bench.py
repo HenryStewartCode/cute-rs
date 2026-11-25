@@ -86,3 +86,37 @@ for name, e, k in [("mixtral_softmax", 8, 2), ("qwen3_softmax_renorm", 128, 8)]:
             return w / w.sum(-1, keepdim=True), i
 
         print("%-21s %6s %7d %5d %6d %9.2f" % (name, "f32", e, k, t, graph_bench(run)))
+
+
+# The trtllm-gen methods FlashInfer has no SM89 kernel for: PyTorch references, for scale only.
+def ref_method(method, logits, bias, k):
+    lf = logits.float()
+    if method == "topk":
+        return torch.topk(lf, k, dim=-1)
+    if method == "topk_sigmoid":
+        v, i = torch.topk(lf, k, dim=-1)
+        return v.sigmoid(), i
+    s = lf.sigmoid()
+    if method == "minimax2":
+        i = torch.topk(s + bias.float(), k, dim=-1).indices
+        w = s.gather(1, i)
+        return w / (w.sum(-1, keepdim=True) + 1e-20), i
+    w, i = torch.topk(s, k, dim=-1)
+    if method == "sigmoid_renorm":
+        w = w / (w.sum(-1, keepdim=True) + 1e-20)
+    return w, i
+
+
+print("torch (not FlashInfer) references of the other trtllm-gen methods, f32 logits")
+for name, method, e, k in [
+    ("llama4_128e", "sigmoid", 128, 1),
+    ("topk_128e", "topk", 128, 8),
+    ("sigmoid_128e", "sigmoid", 128, 8),
+    ("sigmoid_renorm_128e", "sigmoid_renorm", 128, 8),
+    ("minimax2_256e", "minimax2", 256, 8),
+    ("topk_sigmoid_128e", "topk_sigmoid", 128, 8),
+]:
+    bias = torch.rand(e, device=dev, generator=gen) * 0.2 - 0.1
+    for t in TOKENS:
+        logits = torch.randn(t, e, device=dev, generator=gen)
+        print("%-21s %6s %7d %5d %6d %9.2f" % (name, "f32", e, k, t, graph_bench(lambda: ref_method(method, logits, bias, k))))

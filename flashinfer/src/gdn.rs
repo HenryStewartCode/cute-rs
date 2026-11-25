@@ -212,6 +212,9 @@ fn kernel_of<T: Numeric, S: Numeric>(
     vdim: usize,
     plan: Plan,
 ) -> Kernel {
+    if kv_tile_applies(&opts, state_dtype, kdim, vdim, plan) {
+        return kv_tile_kernel_of::<T, S>(input, state_dtype, opts, vdim);
+    }
     let vs = state_dtype.vec(kdim);
     assert!(vs >= 1 && kdim.is_multiple_of(32 * vs), "K = {kdim} must be a multiple of {}", 32 * vs);
     let nv = kdim / (32 * vs);
@@ -438,6 +441,186 @@ fn kernel_of<T: Numeric, S: Numeric>(
             run(first_row);
         } else {
             for_range(0, rpw as i32 / unroll as i32, 1, |i| run(first_row + i * unroll as i32));
+        }
+    })
+}
+
+/// V columns of the `[K, V]` tile kernel's block.
+const TILE_V: usize = 16;
+/// Padded row stride (floats) of its shared-memory state tile; 20 keeps both the 16-byte
+/// copies aligned and a warp's reads (8 rows of 4 columns) free of bank conflicts.
+const TILE_STRIDE: usize = 20;
+
+/// Whether [`kernel`] builds the tile kernel: single-token `[K, V]` decode of an f32 state with
+/// `K = 128` at the small-batch plan (16 rows per block), where states are too few to fill the
+/// SMs. Larger batches use the column-vector kernel.
+fn kv_tile_applies(opts: &Options, state: StateDtype, kdim: usize, vdim: usize, plan: Plan) -> bool {
+    opts.kv_layout
+        && opts.tokens == 1
+        && !opts.per_token_slots
+        && state == StateDtype::F32
+        && kdim == 128
+        && plan.rows_per_block == TILE_V
+        && vdim.is_multiple_of(TILE_V)
+}
+
+/// The small-batch `[K, V]` decode kernel, after FlashInfer's `gdn_decode_kernel_small_batch_nontranspose`
+/// (`gdn_decode_nontranspose.py`, Apache-2.0): a block of 4 warps takes a `K x 16` tile of one
+/// state, whose rows are contiguous along `V`, with 16-byte `cp.async` copies into padded shared
+/// memory (issued before the gates and the l2 norm). A warp then owns 4 columns: lane
+/// `4 kl + vl` holds column `4 warp + vl` of the rows `8 i + kl`, so `S k` and `S q` need only
+/// three shuffles, and the new tile goes back through shared memory to be written as full rows.
+fn kv_tile_kernel_of<T: Numeric, S: Numeric>(input: Dtype, state_dtype: StateDtype, o: Options, vdim: usize) -> Kernel {
+    const K: usize = 128;
+    const ROWS: usize = K / 8;
+    assert!(!o.has_out_indices || o.has_indices);
+    let name = format!(
+        "flashinfer_gdn_tile_{}_{}_v{vdim}_{}{}{}_u{}",
+        input.name(),
+        state_dtype.name(),
+        o.l2norm as u8,
+        o.has_indices as u8,
+        o.has_out_indices as u8,
+        o.update_state as u8,
+    );
+    Kernel::builder(&name).block_dim([THREADS as u32, 1, 1]).build(|| {
+        let state = param_ptr::<S>("state");
+        let q = param_ptr::<T>("q");
+        let k = param_ptr::<T>("k");
+        let v = param_ptr::<T>("v");
+        let a = param_ptr::<T>("a");
+        let b = param_ptr::<T>("b");
+        let a_log = param_ptr::<f32>("A_log");
+        let dt_bias = param_ptr::<f32>("dt_bias");
+        let out = param_ptr::<T>("out");
+        let indices = param_ptr::<i32>("state_indices");
+        let out_indices = param_ptr::<i32>("output_state_indices");
+        let _cache = param_ptr::<S>("intermediate_states");
+        let hq = param_scalar::<i32>("num_q_heads");
+        let hv = param_scalar::<i32>("num_v_heads");
+        let scale = param_scalar::<f32>("scale");
+        let _ssm_indices = param_ptr::<i32>("ssm_state_indices");
+
+        let tid = thread_idx().x;
+        let lane = tid & 31;
+        let warp = tid >> 5;
+        let batch = block_idx().x;
+        let vhead = block_idx().y;
+        let row_off = block_idx().z * TILE_V as i32;
+        let qhead = vhead / (hv / hq);
+
+        let slot_in = if o.has_indices { indices.load_at(batch) } else { batch };
+        let valid = if o.has_indices { slot_in.ge(0) } else { Boolean::constant(true) };
+        let load_slot = if o.has_indices { slot_in.max(0) } else { slot_in };
+        let store_slot = if o.has_out_indices { out_indices.load_at(batch).max(0) } else { load_slot };
+        let store_ok = if o.has_out_indices { valid & out_indices.load_at(batch).ge(0) } else { valid };
+
+        // The tile: rows `tid / 4 + 32 p`, 16-byte chunk `tid % 4`; 16-byte vectors are columns
+        // of `(4, n)` views, which prove the alignment.
+        const BOUND: usize = 1 << 30;
+        let vecs = |p: &Ptr<S>| make_tensor(p, Layout::col_major((4, BOUND / 4)));
+        let tile = make_smem_tensor_aligned::<S>(Layout::col_major(K * TILE_STRIDE), 16);
+        let tile_vecs = make_tensor(&tile.ptr(), Layout::col_major((4, K * TILE_STRIDE / 4)));
+        let state_g = vecs(&state);
+        let atom = make_copy_atom::<S>(CopyOp::CpAsync { bytes: 16, bypass_l1: true });
+        let (crow, cchunk) = (tid >> 2, tid & 3);
+        let gvec = |slot: Int32, p: usize| {
+            (((slot * hv + vhead) * K as i32 + crow + (32 * p) as i32) * (vdim / 4) as i32)
+                + block_idx().z * (TILE_V / 4) as i32
+                + cchunk
+        };
+        for p in 0..K / 32 {
+            copy(
+                &atom,
+                &state_g.slice((.., gvec(load_slot, p))),
+                &tile_vecs.slice((.., (crow + (32 * p) as i32) * (TILE_STRIDE / 4) as i32 + cchunk)),
+            );
+        }
+        cp_async_commit_group();
+
+        // Gates (the same scalars in every thread).
+        let ab = batch * hv + vhead;
+        let x = a.load_at(ab).to::<f32>() + dt_bias.load_at(vhead);
+        let e = cute::math::exp2(x * c(std::f32::consts::LOG2_E), true);
+        let sp = select(x.le(20.0f32), cute::math::log2(e + c(1.0), true) * c(std::f32::consts::LN_2), x);
+        let decay = cute::math::exp2(
+            -(cute::math::exp2(a_log.load_at(vhead) * c(std::f32::consts::LOG2_E), true))
+                * sp
+                * c(std::f32::consts::LOG2_E),
+            true,
+        );
+        let bx = b.load_at(ab).to::<f32>();
+        let beta = cute::math::div(c(1.0), c(1.0) + cute::math::exp2(bx * c(-std::f32::consts::LOG2_E), true), true);
+
+        // q and k, one element a thread, through shared memory (thread `i` of the block = column
+        // `i`); the l2 norms are reduced over the warps' partial sums.
+        let ck_smem = make_smem_tensor_aligned::<f32>(Layout::col_major(2 * K + 8), 16);
+        let qk_base = (batch * hq + qhead) * K as i32 + tid;
+        let (qx, kx) = (q.load_at(qk_base).to::<f32>(), k.load_at(qk_base).to::<f32>());
+        let (qn, kn) = if o.l2norm {
+            let sq = warp_reduction_sum(qx * qx, 32);
+            let sk = warp_reduction_sum(kx * kx, 32);
+            if_(lane.eq(0), || {
+                ck_smem.store(2 * K as i32 + warp, sq);
+                ck_smem.store(2 * K as i32 + 4 + warp, sk);
+            });
+            sync_threads();
+            let (mut tq, mut tk) = (c(0.0), c(0.0));
+            for w in 0..WARPS as i32 {
+                tq = tq + ck_smem.load(2 * K as i32 + w);
+                tk = tk + ck_smem.load(2 * K as i32 + 4 + w);
+            }
+            (qx * (tq + c(1e-6)).rsqrt(), kx * (tk + c(1e-6)).rsqrt())
+        } else {
+            (qx, kx)
+        };
+        ck_smem.store(tid, kn);
+        ck_smem.store(K as i32 + tid, qn * scale);
+        cp_async_wait_group(0);
+        sync_threads();
+
+        // This lane's column of the tile and the rows it owns.
+        let kl = lane >> 2;
+        let vidx = warp * 4 + (lane & 3);
+        let vo = (batch * hv + vhead) * vdim as i32 + row_off;
+        let vnew_in = v.load_at(vo + vidx).to::<f32>();
+        let tile_at = |i: usize| (kl + (8 * i) as i32) * TILE_STRIDE as i32 + vidx;
+        let hs: Vec<Float32> = (0..ROWS).map(|i| tile.load(tile_at(i)).to::<f32>() * decay).collect();
+        let ks: Vec<Float32> = (0..ROWS).map(|i| ck_smem.load(kl + (8 * i) as i32)).collect();
+        let qs: Vec<Float32> = (0..ROWS).map(|i| ck_smem.load(K as i32 + kl + (8 * i) as i32)).collect();
+        let hsum = |mut s: Float32| {
+            for off in [16, 8, 4] {
+                s = s + shuffle_sync_bfly(s, off);
+            }
+            s
+        };
+        let hk = hsum(hs.iter().zip(&ks).fold(c(0.0), |s, (h, kk)| s + *h * *kk));
+        let u = (vnew_in - hk) * beta;
+        let news: Vec<Float32> = hs.iter().zip(&ks).map(|(h, kk)| *h + *kk * u).collect();
+        let hq_sum = hsum(news.iter().zip(&qs).fold(c(0.0), |s, (n, qq)| s + *n * *qq));
+        if_(kl.eq(0), || out.store_at(vo + vidx, select(valid, hq_sum, 0.0f32).to::<T>()));
+
+        if o.update_state {
+            // Each lane overwrites only the tile entries it read.
+            for (i, n) in news.iter().enumerate() {
+                tile.store(tile_at(i), n.to::<S>());
+            }
+            sync_threads();
+            let state_o = vecs(&state);
+            let store_vecs = tile_vecs;
+            for p in 0..K / 32 {
+                let vec = load_vector::<S, 4>(
+                    &store_vecs.ptr().offset((crow + (32 * p) as i32) * TILE_STRIDE as i32 + cchunk * 4),
+                    LoadOptions::default(),
+                );
+                let ptr = state_o.ptr().offset(gvec(store_slot, p) * 4);
+                let write = || store_vector::<S, 4>(&ptr, vec, StoreOptions::default());
+                if o.has_indices {
+                    if_(store_ok, write);
+                } else {
+                    write();
+                }
+            }
         }
     })
 }
