@@ -25,6 +25,10 @@
 //! `CUTE_RS_CROSSCHECK_DUMP=<directory>` also saves the buffers of every kernel that differs
 //! (before the run, after the device and after the simulator), for looking at afterwards.
 //!
+//! `CUTE_RS_CROSSCHECK_REPLAY=<directory>` uses such a directory in place of a device, on
+//! any machine: a simulated kernel that has a saved run with the same inputs is compared with
+//! what the device gave then (`SAME` or `DIFF`; `NONE` when its saved runs have other inputs).
+//!
 //! The kernel is compiled without floating-point contraction, as the simulator rounds every
 //! operation. Results that depend on how threads interleave (atomics, a racy reduction) and
 //! tensor-core arithmetic on values that are not exactly representable can still differ.
@@ -76,6 +80,9 @@ thread_local! {
 pub(crate) fn run(kernel: &Kernel, cfg: LaunchConfig, before: Vec<KernelArg>, sim: &[KernelArg], at: &Location<'_>) {
     let thread = std::thread::current();
     let tag = format!("{} [{}] {}:{}", kernel.name(), thread.name().unwrap_or("?"), at.file(), at.line());
+    if let Some(dir) = replay_dir() {
+        return replay(dir, kernel.name(), &tag, &before, sim);
+    }
     let Some(toolchain) = toolchain() else { return log(&format!("SKIP {tag}: no mlir-opt")) };
     CONTEXT.with(|slot| {
         let mut slot = slot.borrow_mut();
@@ -140,6 +147,58 @@ fn dump(kernel: &str, inputs: &[KernelArg], gpu: &[KernelArg], sim: &[KernelArg]
         }
     }
     Some(stem)
+}
+
+/// `CUTE_RS_CROSSCHECK_REPLAY`: a directory of buffers saved by `CUTE_RS_CROSSCHECK_DUMP` on a
+/// machine with a GPU. With it set no device is used: a simulated kernel that has a saved run
+/// with the same inputs is compared with what the device gave then.
+fn replay_dir() -> Option<&'static str> {
+    static DIR: OnceLock<Option<String>> = OnceLock::new();
+    DIR.get_or_init(|| std::env::var("CUTE_RS_CROSSCHECK_REPLAY").ok().filter(|s| !s.is_empty())).as_deref()
+}
+
+/// The saved runs in `dir`, by kernel name: the stems `<pid>_<n>_<kernel>` of their files.
+fn recorded(dir: &'static str) -> &'static std::collections::HashMap<String, Vec<String>> {
+    static INDEX: OnceLock<std::collections::HashMap<String, Vec<String>>> = OnceLock::new();
+    INDEX.get_or_init(|| {
+        let mut index: std::collections::HashMap<String, Vec<String>> = Default::default();
+        for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+            let file = entry.file_name().to_string_lossy().into_owned();
+            let Some((stem, rest)) = file.split_once(".arg") else { continue };
+            let mut parts = stem.splitn(3, '_');
+            let (Some(_), Some(_), Some(kernel)) = (parts.next(), parts.next(), parts.next()) else { continue };
+            if rest.ends_with(".gpu.bin") {
+                let stems = index.entry(kernel.to_string()).or_default();
+                if !stems.iter().any(|s| s == stem) {
+                    stems.push(stem.to_string());
+                }
+            }
+        }
+        index
+    })
+}
+
+/// Compare `sim` with the device's saved buffers of a run of `kernel` on the inputs `before`.
+fn replay(dir: &'static str, kernel: &str, tag: &str, before: &[KernelArg], sim: &[KernelArg]) {
+    let Some(stems) = recorded(dir).get(kernel) else { return };
+    let read = |stem: &str, i: usize, what: &str| std::fs::read(format!("{dir}/{stem}.arg{i}.{what}.bin")).ok();
+    let buffers: Vec<usize> = (0..sim.len()).filter(|&i| sim[i].buffer_type().is_some()).collect();
+    let same_inputs =
+        |stem: &str| buffers.iter().all(|&i| read(stem, i, "in").is_some_and(|b| b == before[i].to_bytes()));
+    let Some(stem) = stems.iter().find(|stem| same_inputs(stem)) else {
+        return log(&format!("NONE {tag}: {} saved runs, none with these inputs", stems.len()));
+    };
+    let mut gpu = sim.to_vec();
+    for &i in &buffers {
+        match read(stem, i, "gpu") {
+            Some(bytes) if bytes.len() == sim[i].to_bytes().len() => gpu[i].set_from_bytes(&bytes),
+            _ => return log(&format!("NONE {tag}: the saved run {stem} lacks argument {i}")),
+        }
+    }
+    match compare(&gpu, sim) {
+        None => log(&format!("SAME {tag} (saved {stem})")),
+        Some(diff) => log(&format!("DIFF {tag} (saved {stem}): {diff}")),
+    }
 }
 
 fn first_line(text: &str) -> String {

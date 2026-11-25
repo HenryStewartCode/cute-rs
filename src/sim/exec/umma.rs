@@ -507,6 +507,20 @@ impl<'a> Machine<'a> {
         // for all N columns of B (each CTA of a pair reads its own TMEM).
         let mut scales: Vec<(Vec<f64>, Vec<f64>)> = Vec::new();
         if let (Some(sc), Some((sfa_v, sfb_v))) = (kind.scale, sf) {
+            // A pair's M = 128 MMA runs on the 2x2 data path (the PTX ISA's Layout B), whose
+            // scale factors for B are placed differently: with every CTA and lane partition
+            // holding all of SFB, as below, a B200 gave the columns of the second half of B
+            // the factors of the first. Where they belong is not known yet, so it is not run.
+            if v == 2 && m == 128 {
+                return Err(self.err(
+                    format!(
+                        "{name}: the scale factors of a CTA pair's M = 128 MMA (the 2x2 data path) are not modelled: \
+                         a B200 does not read B's factors there as it does for M = 256 or for one CTA, and where it \
+                         wants them is not known yet. Use M = 256 for the pair, or one CTA"
+                    ),
+                    Some(base),
+                ));
+            }
             let nsf = kind.scale_factors();
             let a_id = (desc_bits >> UmmaKind::A_SF_ID_BIT & 3) as usize;
             let b_id = (desc_bits >> UmmaKind::B_SF_ID_BIT & 3) as usize;

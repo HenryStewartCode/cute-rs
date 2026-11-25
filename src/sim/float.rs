@@ -537,13 +537,17 @@ fn exp2_rounded(x: u64, f: Format) -> u64 {
     }
 }
 
+/// The NaN TMA's `nan_request_zero_fma` fill writes into a 16-bit element, which `fma` with
+/// `.oob` answers with `+0`: the positive NaN with every mantissa bit set.
+pub(super) const OOB_NAN: u64 = 0x7fff;
+
 /// One element of a half-precision instruction, in format `f` (`bf16`:
 /// BFloat16), from the PTX ISA: `.ftz` flushes subnormal inputs and results
 /// to zeros of their signs; the result is the exact value rounded once to
 /// nearest even (`.rn`, also the default); NaN results are the canonical
 /// NaN; `.sat` clamps to `[0, 1]`, a NaN and `-0` giving `+0`; `.relu` makes
 /// a negative result (`-0` too) `+0`; `.oob` gives `+0` when a multiplicand
-/// is a NaN (see [`half_inst`]). `ex2.approx` is the exact `2^a`, rounded,
+/// is the out-of-bounds NaN (see [`half_inst`]). `ex2.approx` is the exact `2^a`, rounded,
 /// and in BFloat16 flushes subnormal inputs and results.
 ///
 /// `.ftz` detects a subnormal result after rounding, as an SM89 GPU does
@@ -558,7 +562,7 @@ fn half_element(func: HalfFn, f: Format, bf16: bool, mods: HalfModifiers, ops: [
         let r = exp2_rounded(x, f);
         return if bf16 { f.flush(r) } else { r };
     }
-    if mods.oob && (nan_in(f, ops[0]) || nan_in(f, ops[1])) {
+    if mods.oob && (ops[0] == OOB_NAN || ops[1] == OOB_NAN) {
         return 0;
     }
     let flush = |bits: u64| if mods.ftz { f.flush(bits) } else { bits };
@@ -618,9 +622,11 @@ fn widen_exactly(bits: u64, f: Format, wide: Format) -> u64 {
 /// `.oob` is specified as a zero result where an operand is the "OOB NaN"
 /// that TMA's out-of-bounds NaN fill writes, a special NaN whose encoding
 /// neither the PTX ISA nor the CUDA documentation gives. The simulator
-/// takes any NaN multiplicand (`a` or `b`) for it, as CUTLASS's host
-/// reference for `fma.rn.oob` (`guarded_multiply_add`) does; a GPU may
-/// return NaN for other NaNs.
+/// takes it to be [`OOB_NAN`], the pattern that fill writes on a GPU, in a
+/// multiplicand (`a` or `b`). Any other NaN there gives the canonical NaN,
+/// as a B200 does (CUTLASS's host reference, `guarded_multiply_add`, zeroes
+/// every NaN). Whether the device also takes the pattern with the sign bit
+/// set for it is not known.
 pub(super) fn half_inst(func: HalfFn, ty: HalfType, mods: HalfModifiers, args: &[u64]) -> u64 {
     let (f, bf16) = (Format::of(ty.elem()), ty.elem() == DType::BF16);
     let element = |shift: u32| {
@@ -1077,10 +1083,6 @@ mod tests {
             if self.bf16 { ((v as f32).to_bits() >> 16) as u16 } else { F16::from_f32(v as f32).0 }
         }
 
-        fn is_nan(&self, bits: u16) -> bool {
-            self.value(bits).is_nan()
-        }
-
         fn is_subnormal(&self, bits: u16) -> bool {
             let v = self.value(bits).abs();
             v != 0.0 && v < 2f64.powi(self.emin)
@@ -1140,7 +1142,7 @@ mod tests {
         /// with `mods`.
         fn op(&self, func: HalfFn, mods: HalfModifiers, a: u16, b: u16, c: u16) -> u16 {
             let canonical = 0x7fff;
-            if mods.oob && (self.is_nan(a) || self.is_nan(b)) {
+            if mods.oob && (a == 0x7fff || b == 0x7fff) {
                 return 0;
             }
             let flush = |x: u16| if mods.ftz && self.is_subnormal(x) { x & 0x8000 } else { x };

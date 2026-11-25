@@ -83,8 +83,10 @@ fn scatter_value(row: i32, c: i32) -> f32 {
     (row * 7 + c * 3 % 41) as f32
 }
 
-/// The rows the scatter4 kernel writes to: distinct, two past the tensor.
-const SCATTER_ROWS: [i32; G_TILE] = [3, 13, 0, 7, 11, -1, 5, 9];
+/// The rows the scatter4 kernel writes to: distinct, two past the tensor's end. (None is
+/// negative: a store takes no negative coordinate, except scatter4 on sm_107f, and a B200
+/// stops with an illegal-instruction error on one.)
+const SCATTER_ROWS: [i32; G_TILE] = [3, 13, 0, 7, 11, 12, 5, 9];
 
 /// A scatter4 store (`CopyBulkTensor2DScatter4S2GOp`): an `(8, 32)` tile whose row `r`
 /// holds [`scatter_value`] of row `idx[r]` (the kernel writes [`SCATTER_ROWS`] there),

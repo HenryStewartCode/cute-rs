@@ -5885,7 +5885,8 @@ fn check_carry_around_smem(args: &[KernelArg], cluster: bool) {
         want.extend(&src[o * 4..o * 4 + 4]);
         want.extend(&src[SMEM_CARRY_WORDS + o * 4..SMEM_CARRY_WORDS + o * 4 + 4]);
         if cluster {
-            want.extend([block as u32 % 2, 2, total + 1024]);
+            // `%aggr_smem_size` is not rounded to the allocation unit (a B200 gives this).
+            want.extend([block as u32 % 2, 2, SMEM_CARRY_REGION_START + SMEM_CARRY_REGION_BYTES + 1024]);
         }
         assert_eq!(out32[r * n32..(r + 1) * n32], want[..], "row {r}");
     }
@@ -6947,10 +6948,11 @@ impl HalfFormat {
     /// it is tiny after rounding, as an SM89 GPU detects it), the exact
     /// result rounds once to nearest even, NaN results are `0x7fff`, `.sat`
     /// clamps to `[0, 1]` (NaN and `-0` to `+0`), `.relu` makes a negative
-    /// result `+0`, and `.oob` gives `+0` for a NaN multiplicand.
+    /// result `+0`, and `.oob` gives `+0` for a multiplicand that is the out-of-bounds NaN
+    /// `0x7fff` (any other NaN gives the canonical NaN, as a B200 does).
     pub fn op(&self, func: cute::ir::HalfFn, mods: cute::ir::HalfModifiers, a: u16, b: u16, c: u16) -> u16 {
         use cute::ir::HalfFn;
-        if mods.oob && (self.is_nan(a) || self.is_nan(b)) {
+        if mods.oob && (a == 0x7fff || b == 0x7fff) {
             return 0;
         }
         let flush = |x: u16| if mods.ftz && self.is_subnormal(x) { x & 0x8000 } else { x };

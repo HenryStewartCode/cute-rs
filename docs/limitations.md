@@ -1,30 +1,29 @@
 # Limitations
 
-* Where the simulator and a B200 (sm_100a) disagree. These were found by running the
-  simulator's tests with `CUTE_RS_CROSSCHECK_GPU`
-  ([testing.md](testing.md#results-on-a-b200)); the device is the reference, and neither the
-  simulator nor, where it says so, the kernel has been corrected yet:
-  * A CTA pair's NVFP4 MMA (`MmaMXF4NVF4Op` with 16-element scale-factor vectors): the
-    columns of C that come from the second half of B are wrong on the device. The pair's B
-    scale factors are not where the hardware reads them, the same gap as
-    `make_tmem_layout_sfb`'s 2x2 data path. The single-CTA forms and a pair's `MmaMXF8F6F4Op`
-    agree.
-  * `ldmatrix`'s 4-bit unpacking form leaves each value in the low four bits of its byte on
-    the device; the simulator puts it two bits higher.
-  * `fma` with `oob` on Float16 and BFloat16: where the simulator gives zero for a NaN
-    operand, the device gives the NaN `0x7fff`.
-  * The scatter4 TMA store (`CopyBulkTensor2DScatter4S2GOp`) passes the validator and the
-    driver's compiler for sm_100a and then stops with an illegal-instruction error on the
-    device. The gather4 load runs.
-  * `aggr_smem_size` in a cluster of two: the simulator gives 3,200 bytes where the device
-    gives 3,088.
+* What a B200 (sm_100a) showed that the simulator did not, found by running the simulator's
+  tests with `CUTE_RS_CROSSCHECK_GPU` ([testing.md](testing.md#results-on-a-b200)):
+  * Still open: a CTA pair's block-scaled MMA with M = 128 (the PTX ISA's Layout B, the 2x2
+    data path, as `MmaMXF4NVF4Op::new(.., (128, 128), CtaGroup::TWO, ..)` uses). With B's
+    scale factors staged as for M = 256, the device gave the columns of the second half of
+    B the factors of the first. Where that layout wants them is not known, so the simulator
+    refuses such an MMA, and `make_tmem_layout_sfb` refuses a pair. One CTA, and a pair with
+    M = 256, agree with the device.
+  * Corrected in the simulator, and checked against the device's saved outputs:
+    `ldmatrix`'s 4-bit unpacking zero-extends (it had the value two bits higher);
+    `fma` with `oob` gives zero only for the out-of-bounds NaN `0x7fff` that TMA's NaN fill
+    writes, and the canonical NaN for any other NaN (it gave zero for every NaN);
+    `aggr_smem_size` is not rounded to the allocation unit.
+  * Corrected, but not run on the device again: a TMA store takes no negative coordinate.
+    The scatter4 test kernel had one, which the simulator let through for scatter4 and the
+    device stopped on with an illegal-instruction error (the PTX ISA allows it on sm_107f
+    only). The simulator now reports it.
   * These differ by nature and are not errors: which cluster cluster launch control cancels
     first, and which cluster shape the device picks; how often a `try_wait` succeeds at once;
     a collector `USE` after its source changed (the device reloads the operand, which the
     simulator reports by default); tensor memory read without having been written;
-    approximate instructions and NaN payloads; sums whose order depends on timing, and
-    tensor-core sums of values that round; the bytes of a TMA descriptor; a dynamic
-    shared-memory size above what the device allows.
+    approximate instructions (`ex2.approx` and the fast maths) and NaN payloads; sums whose
+    order depends on timing, and tensor-core sums of values that round; the bytes of a TMA
+    descriptor; a dynamic shared-memory size above what the device allows.
 * A tcgen05 operand in shared memory that is MN-major takes `MN_SW128_32B` exactly when its
   elements are 32 bits wide. A B200 reads the other pairings as zeros, so the descriptor
   refuses them when the kernel is built.
@@ -121,13 +120,14 @@
   kernel fills: CuTe DSL's sparse element types (m10) are not implemented,
   and only the TID metadata format (sparsity selector 0) exists. The
   simulator reports metadata that is not one of the six ordered index
-  pairs. The 8-bit `ldmatrix` shapes (`.m16n16`, `.m8n16`) have run on no
-  GPU (they need sm_100a or sm_120a): the simulator follows the PTX ISA's
-  fragment figures, and the 4- and 6-bit unpacking places each value as
-  the PTX ISA's decompression figures for the same `.b8x16.b4x16_p64` /
-  `.b6x16_p32` qualifiers of `tcgen05.cp` show (4 bits in bits 2 to 5, 6
-  bits in bits 0 to 5, the rest zero; the `ldmatrix` section does not say),
-  which is how `mma.kind::f8f6f4` takes them. The signed `.m8n16.s8.s4`
+  pairs. The 8-bit `ldmatrix` shapes (`.m16n16`, `.m8n16`) agree with a
+  B200 (they need sm_100a or sm_120a), following the PTX ISA's fragment
+  figures. The 4- and 6-bit unpacking zero-extends each value into its
+  byte, as the device does. `mma.kind::f8f6f4` takes a 4-bit value two
+  bits higher, so bytes loaded that way are shifted left by two before
+  such an MMA (CuTe C++'s `fp4_shift_A`/`fp4_shift_B`; cute-rs has no
+  helper for it, as `gemm` places the values of a typed FP4 fragment
+  itself). The signed `.m8n16.s8.s4`
   form (PTX 9.4) is not in CuTe DSL and is left out.
 * Conversions to BFloat16 go through Float32 from every type but Float32
   (`cvt.bf16.f64` and the integer forms need sm_90, so the emitter routes
@@ -414,11 +414,13 @@
   (fma's out-of-bounds modifier) gives `+0` where a multiplicand is the
   "OOB NaN" that TMA's NaN fill writes, a special NaN whose encoding
   neither the PTX ISA nor the CUDA documentation gives: the simulator takes
-  every NaN multiplicand for it, as CUTLASS's host reference does
-  (`guarded_multiply_add`), where a GPU may return NaN for other NaNs. No
-  available GPU runs `.oob`, the bf16x2 `add` and `sub`,
-  `ex2.approx.ftz.bf16x2` or `cvt.rn.bf16.s8` (sm_90): they are simulated
-  and assembled with `ptxas` 12.8 for sm_90 and newer. The s2f6x2
+  it to be `0x7fff`, the pattern the fill writes on a GPU, and gives the
+  canonical NaN for any other NaN multiplicand, as a B200 does (CUTLASS's
+  host reference, `guarded_multiply_add`, zeroes every NaN). Whether the
+  device also takes `0xffff` for it is not known. A B200 has run `.oob`,
+  the bf16x2 `add` and `sub` and `ex2.approx.ftz.bf16x2` (sm_90) against
+  the simulator; `ex2.approx` differs from the simulator's exactly rounded
+  value in the last digit of some results, as an approximation may. The s2f6x2
   int8-to-BFloat16 conversions need PTX 9.1 (CUDA 13.1), which only LLVM 23
   emits and `ptxas` 12.8 cannot assemble, so they are simulated and checked
   as MLIR (and as PTX text with LLVM 23; LLVM 21 and 22 are refused, see

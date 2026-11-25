@@ -18,6 +18,12 @@ No version has been tagged yet; 0.1.0 will be the first.
   pairings as zeros, which the simulator did not show.
 - The Hopper and Blackwell device tests compile a kernel for its own target (the sm_90 TMA
   copy failed to compile on an sm_100 GPU).
+- The simulator, where a B200 disagreed with it: `ldmatrix`'s 4-bit unpacking zero-extends
+  each value (it was two bits higher); `fma` with `oob` gives zero only for the out-of-bounds
+  NaN `0x7fff` and the canonical NaN for any other; `aggr_smem_size` is not rounded up to the
+  allocation unit; a scatter4 store with a negative coordinate is reported, like any other
+  store's; and a CTA pair's block-scaled MMA with M = 128 is refused, as its scale-factor
+  layout for B is not the one modelled.
 
 ### Added
 
@@ -26,6 +32,9 @@ No version has been tagged yet; 0.1.0 will be the first.
 - Tests of `make_tiled_copy_c_atom` with one- and two-value atoms.
 - `CUTE_RS_CROSSCHECK_GPU=<log file>` (with the `cuda` feature): every simulated kernel is
   also run on GPU 0 and compared with the simulator, one `SAME`/`DIFF`/`SKIP`/`FAIL` line each.
+  `CUTE_RS_CROSSCHECK_DUMP=<directory>` saves the buffers of the kernels that differ, and
+  `CUTE_RS_CROSSCHECK_REPLAY=<directory>` compares the simulator with such saved runs on a
+  machine without the GPU.
 - `tests/gpu_blackwell_soak.rs`: each Blackwell GEMM launched 200 times and on about ten
   shapes, every result checked (they need an sm_100 GPU; all pass on a B200).
 - TF32 and 8-bit tcgen05 tiles with MN-major operands in the tile tests.

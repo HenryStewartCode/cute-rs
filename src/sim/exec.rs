@@ -7713,8 +7713,10 @@ impl<'a> Machine<'a> {
             ));
         }
         // The .global.shared::cta direction: no negative coordinates, and an im2col bounding
-        // box inside the tensor (the PTX ISA's restrictions on tensor copies).
-        if start.iter().any(|&c| c < 0) && !access.mode.is_rows4() {
+        // box inside the tensor (the PTX ISA's restrictions on tensor copies). The PTX ISA
+        // lets a scatter4 store start at a negative coordinate on sm_107f only; a B200 stops
+        // with an illegal-instruction error on one, so it is reported for every target.
+        if start.iter().any(|&c| c < 0) {
             return Err(self
                 .err(format!("{what}: the coordinates {start:?} are negative, which a store does not take"), Some(t)));
         }
@@ -9181,9 +9183,11 @@ fn total_smem_size(smem: &SharedMemoryLayout, dynamic: usize) -> usize {
 }
 
 /// `%aggr_smem_size`: the block's shared memory plus the system's
-/// reservation, in bytes.
+/// reservation, in bytes. Unlike `%total_smem_size` it is not rounded up to
+/// the allocation unit: a B200 reports 3,088 for a block of 2,064 bytes
+/// (the one layout measured), where `%total_smem_size` is 2,176.
 fn aggr_smem_size(smem: &SharedMemoryLayout, dynamic: usize) -> usize {
-    smem.block_bytes(dynamic).next_multiple_of(SMEM_ALLOCATION_UNIT) + SMEM_SYSTEM_RESERVED
+    smem.block_bytes(dynamic) + SMEM_SYSTEM_RESERVED
 }
 
 /// How a report names byte `i` of shared buffer `d`: by element
@@ -9453,16 +9457,20 @@ mod tests {
 /// A 16-byte `ldmatrix` source row as 16 8-bit containers: the bytes
 /// themselves, or with `unpack` the 16 4-bit (`.b4x16_p64`, in the low 8
 /// bytes) or 6-bit (`.b6x16_p32`, in the low 12 bytes) values packed from
-/// the least significant bit, the rest padding, each expanded as the PTX
-/// ISA's decompression figures show (Figures 198 and 200, the same
-/// `.dst_fmt.src_fmt` qualifiers on `tcgen05.cp`): a 4-bit value in bits 2
-/// to 5 of its byte and a 6-bit value in bits 0 to 5, the other bits zero.
-/// That is the container placement of `mma` with `.kind::f8f6f4` (E2M1 in
-/// the central 4 bits, E3M2 and E2M3 in the low 6).
+/// the least significant bit, the rest padding, each zero-extended to its
+/// byte: a 4-bit value in bits 0 to 3 and a 6-bit value in bits 0 to 5. The
+/// PTX ISA calls the source elements unsigned without saying where the
+/// padding goes; a B200 gives these bytes, and CuTe C++ names the atoms
+/// `SM100_SU4_DU8x16_*_LDSM_N`.
+///
+/// `mma` with `.kind::f8f6f4` takes E3M2 and E2M3 in the low 6 bits of a
+/// byte but E2M1 in its central 4, so CuTe C++ shifts a 4-bit operand
+/// loaded this way left by two before the MMA (`fp4_shift_A`,
+/// `fp4_shift_B`).
 pub(crate) fn ldmatrix_expand(row: u128, unpack: Option<u8>) -> [u8; 16] {
     std::array::from_fn(|e| match unpack {
         None => (row >> (8 * e)) as u8,
-        Some(4) => (((row >> (4 * e)) & 0xf) as u8) << 2,
+        Some(4) => ((row >> (4 * e)) & 0xf) as u8,
         Some(_) => ((row >> (6 * e)) & 0x3f) as u8,
     })
 }
@@ -9480,7 +9488,7 @@ mod ldmatrix_expand_tests {
             b4 |= e << (4 * e);
         }
         b4 |= u128::MAX << 64;
-        assert_eq!(ldmatrix_expand(b4, Some(4)), std::array::from_fn(|e| (e as u8) << 2));
+        assert_eq!(ldmatrix_expand(b4, Some(4)), std::array::from_fn(|e| e as u8));
         let mut b6 = 0u128;
         for e in 0..16u128 {
             b6 |= (4 * e + 3) << (6 * e);

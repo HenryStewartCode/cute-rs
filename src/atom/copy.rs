@@ -63,10 +63,12 @@ pub enum CopyOp {
     /// `ldmatrix.m8n16.x{num}.shared.b8x16.b4x16_p64` or `.b6x16_p32`: each
     /// 16-byte row holds 16 4-bit (6-bit) values packed into its low 8 (12)
     /// bytes, the rest padding (what TMA's `16U4_ALIGN16B` and
-    /// `16U6_ALIGN16B` formats write), and each value arrives in an 8-bit
-    /// container (a 4-bit value in bits 2 to 5, a 6-bit one in bits 0 to 5,
-    /// as `mma.kind::f8f6f4` takes them); the source tensor has 16 8-bit
-    /// elements per row and only its row addresses matter. CuTe C++'s
+    /// `16U6_ALIGN16B` formats write), and each value arrives zero-extended
+    /// in an 8-bit container (a 4-bit value in bits 0 to 3, a 6-bit one in
+    /// bits 0 to 5). `mma.kind::f8f6f4` takes a 6-bit value there but a
+    /// 4-bit one in bits 2 to 5, so CuTe C++ shifts 4-bit operands left by
+    /// two before the MMA (`fp4_shift_A`, `fp4_shift_B`); the source tensor
+    /// has 16 8-bit elements per row and only its row addresses matter. CuTe C++'s
     /// `SM100_SU4_DU8x16_x{1,2,4}_LDSM_N` and `SM100_SU6_DU8x16_*`; sm_100a or
     /// sm_120a.
     LdMatrix8x16x8b { num: usize, unpack_bits: Option<u32> },

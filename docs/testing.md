@@ -369,6 +369,12 @@ the last line of the log. Nothing panics, and the tests' own results are unchang
 whole simulator suite becomes a check of the simulator's model of that GPU.
 (`cute::cuda::crosscheck` describes what can legitimately differ.)
 
+`CUTE_RS_CROSSCHECK_DUMP=<directory>` also saves the buffers of every kernel that differs
+(before the run, from the device and from the simulator). With
+`CUTE_RS_CROSSCHECK_REPLAY=<directory>` such a directory stands in for the device on any
+machine: a simulated kernel that has a saved run with the same inputs is compared with what
+the device gave then, which is how a correction to the simulator is checked without the GPU.
+
 ## Results on a B200
 
 One rented B200 (sm_100a, driver 595.112, LLVM 22.1, `ptxas` 12.8), on 2026-11-25.
@@ -387,10 +393,12 @@ were skipped (built for another architecture, mostly sm_110a, sm_90a and sm_120a
 failed to launch (the scatter4 store twice, and a shared-memory size above the device's
 limit). Most of the differences are of kinds that are not errors (the order a
 cluster scheduler works in, approximate instructions, NaN payloads, rounding inside the
-tensor cores, memory read without being written, TMA descriptor bytes). The ones that are
-errors are in [limitations.md](limitations.md): a CTA pair's NVFP4 scale factors for B,
-`ldmatrix`'s 4-bit unpacking, `fma` with `oob` on NaN operands, the scatter4 TMA store and
-`aggr_smem_size`. One more became a rule: an MN-major tcgen05 operand must pair
+tensor cores, memory read without being written, TMA descriptor bytes). The ones that were
+errors are in [limitations.md](limitations.md): `ldmatrix`'s 4-bit unpacking, `fma` with
+`oob` on NaN operands, `aggr_smem_size` and a negative coordinate in the scatter4 store are
+corrected (the first three checked against the device's saved outputs with
+`CUTE_RS_CROSSCHECK_REPLAY`), and a CTA pair's block-scaled MMA with M = 128 is refused
+until its scale-factor layout is known. One more became a rule: an MN-major tcgen05 operand must pair
 `MN_SW128_32B` with 32-bit elements and the other MN-major layouts with narrower ones (the
 device read the other pairings as zeros), and the descriptor now refuses the rest.
 

@@ -432,13 +432,26 @@ fn mxf4_and_nvf4_tiles_match_the_rust_reference() {
 fn pair_tiles_match_the_rust_reference() {
     use OperandMajorMode::K;
     let (two, s) = (CtaGroup::TWO, OperandSource::SMEM);
-    // M = 256 (Layout A) and M = 128 (Layout B): each CTA its half of A and B, SFA of its rows
-    // and all of SFB in its own TMEM.
+    // M = 256 (Layout A): each CTA its half of A and B, SFA of its rows and all of SFB in its
+    // own TMEM. A B200 gives the same.
     let op = MmaMXF8F6F4Op::new(DType::F8E4M3FN, DType::F4E2M1FN, (256, 128), two, s, K, K);
     let c = Case { pair: true, ..case(256, 128, 128, (Fmt::E4M3, Fmt::E2M1), false, 32) };
     run::<F8E4M3FN, u8, F8E8M0FNU>("bs_pair_mxf8f6f4", op, c);
+}
+
+/// A pair's M = 128 MMA uses the 2x2 data path (Layout B), which reads B's scale factors from
+/// somewhere else: staged as for M = 256, a B200 gave the columns of the second half of B the
+/// factors of the first. Until that layout is known the simulator does not run it.
+#[test]
+fn a_pairs_m128_scale_factors_are_not_modelled() {
+    let (two, s) = (CtaGroup::TWO, OperandSource::SMEM);
     let c = Case { pair: true, sf_e4m3: true, ..case(128, 128, 256, (Fmt::E2M1, Fmt::E2M1), true, 16) };
-    run::<F4E2M1FN, F4E2M1FN, F8E4M3FN>("bs_pair_nvf4", MmaMXF4NVF4Op::new(DType::F8E4M3FN, (128, 128), two, s), c);
+    let refused = std::panic::catch_unwind(|| {
+        run::<F4E2M1FN, F4E2M1FN, F8E4M3FN>("bs_pair_nvf4", MmaMXF4NVF4Op::new(DType::F8E4M3FN, (128, 128), two, s), c)
+    })
+    .unwrap_err();
+    let message = refused.downcast_ref::<String>().cloned().unwrap_or_default();
+    assert!(message.contains("the 2x2 data path") && message.contains("not modelled"), "{message}");
 }
 
 /// The K = 96 forms: three or six factors per MMA (the IDs and the second group of four

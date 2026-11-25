@@ -251,7 +251,7 @@ const LDSM_COLS: usize = 4 + 8 + 16 + 16 + 8 + 16 + 8 + 16 + 8 + 16 + 16 + 8 + 1
 /// Row `r` of the image as 16 8-bit containers, written from the PTX ISA's
 /// tables independently of the simulator: the bytes themselves, or 16
 /// 4-bit values packed from the least significant bit of the first 8 bytes
-/// (each placed in bits 2 to 5 of its container) or 16 6-bit values of the
+/// (each in bits 0 to 3 of its container, as a B200 loads them) or 16 6-bit values of the
 /// first 12 (bits 0 to 5); the rest is padding.
 fn expanded(image: &[u8], r: usize, unpack: Option<u32>) -> [u8; 16] {
     let row = &image[16 * r..16 * r + 16];
@@ -260,7 +260,7 @@ fn expanded(image: &[u8], r: usize, unpack: Option<u32>) -> [u8; 16] {
     };
     std::array::from_fn(|e| match unpack {
         None => row[e],
-        Some(4) => bits(e, 4) << 2,
+        Some(4) => bits(e, 4),
         Some(_) => bits(e, 6),
     })
 }

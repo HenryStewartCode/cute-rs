@@ -92,9 +92,10 @@ Known gaps besides the Hopper and datacenter-Blackwell hardware:
   1,600 TFLOP/s, level with cuBLAS, but CuTe DSL's own builds of the same kernels are 15 to 30%
   faster, and 40 to 80% faster for the dense GEMM example
   ([docs/testing.md](docs/testing.md#results-on-a-b200)). Hopper is not timed yet.
-* On the B200 a few simulated kernels disagree with the device: a CTA pair's NVFP4 scale
-  factors for B, `ldmatrix`'s 4-bit unpacking, `fma` with `oob` on NaN operands and the
-  scatter4 TMA store. [docs/limitations.md](docs/limitations.md) has the details.
+* On the B200 the simulator disagreed with the device in a few places. They are corrected
+  against the device's saved outputs, except a CTA pair's block-scaled MMA with M = 128:
+  where it wants B's scale factors is not known, so the simulator refuses it.
+  [docs/limitations.md](docs/limitations.md) has the details.
 * The JAX (`xla_ffi`) and TVM-FFI bindings are tested against hand-built call frames, not
   under JAX or `libtvm_ffi` themselves.
 * A CTA pair's B scale factors (the 2x2 data path of `make_tmem_layout_sfb`) are not laid
