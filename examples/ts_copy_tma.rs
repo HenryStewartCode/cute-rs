@@ -64,6 +64,8 @@ pub fn build(rows: usize, cols: usize, leader: bool) -> Kernel {
         let row_tile = Layout::new((1usize, TILE), (TILE, 1usize));
         let g2s = cpasync::CopyBulkTensorTileG2SOp::default();
         let (atom, tma_a) = cpasync::make_tiled_tma_atom(g2s, &a, row_tile.clone(), (1, TILE), 1).into();
+        // Prefetch the TMA descriptor (the barriers belong to the SmemAllocator).
+        if_(elect_one(), || cpasync::prefetch_descriptor(&atom));
         let num_warps_epilogue = 4;
         let mut pipeline_config = PipelineConfig::create_tma_async_pipeline_cfg(
             NUM_STAGES,
@@ -163,7 +165,10 @@ pub fn build(rows: usize, cols: usize, leader: bool) -> Kernel {
         let padding_schedule = schedule("padding_schedule", &[], |s, _| s.domain_loop(0, num_rows, 1, 1, |_| {}))
             .unwrap_or_else(|e| panic!("{e}"));
 
-        let load_task = Task::new("LoadTask", &[&input_gmem_resource], &[&smem_resource], 4, 1, load_schedule);
+        // The register budgets are the tutorial's `num_registers`: the load and padding tasks share
+        // warpgroup 1, so they take the same count.
+        let load_task = Task::new("LoadTask", &[&input_gmem_resource], &[&smem_resource], 4, 1, load_schedule)
+            .setmaxnreg_decrease(40);
         let store_task = Task::new(
             "StoreTask",
             &[&smem_resource],
@@ -171,8 +176,9 @@ pub fn build(rows: usize, cols: usize, leader: bool) -> Kernel {
             0,
             num_warps_epilogue as u32,
             store_schedule,
-        );
-        let padding_task = Task::new("PaddingTask", &[], &[], 5, 3, padding_schedule);
+        )
+        .setmaxnreg_decrease(160);
+        let padding_task = Task::new("PaddingTask", &[], &[], 5, 3, padding_schedule).setmaxnreg_decrease(40);
         let resource_dependency_graph = ResourceDependencyGraph::new()
             .depends_on(&smem_resource, [&input_gmem_resource])
             .depends_on(&output_gmem_resource, [&smem_resource]);

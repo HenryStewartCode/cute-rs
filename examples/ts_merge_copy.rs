@@ -62,6 +62,10 @@ pub fn build(n_elements: usize, tma_for_b: bool) -> Kernel {
             let g2s = cpasync::CopyBulkTensorTileG2SOp::default();
             cpasync::make_tiled_tma_atom(g2s, &gb, tile_b.clone(), (1, TILE_N), 1).into()
         });
+        // Prefetch B's TMA descriptor, as the tutorial does.
+        if let Some((atom, _)) = &tma {
+            if_(elect_one(), || cpasync::prefetch_descriptor(atom));
+        }
 
         // GmemA / GmemB: the offsets of this iteration's tiles.
         let offset_var = |name: &str| TaskLocalVariable::<Int32>::scalar(name, 0, "the GMEM offset of the tile");
@@ -201,8 +205,11 @@ pub fn build(n_elements: usize, tma_for_b: bool) -> Kernel {
             })
             .unwrap_or_else(|e| panic!("{e}"))
         };
-        let load_a_task = Task::new("LoadA", &[&gmem_a], &[&smem_a], 4, 1, load("load_a_schedule", &gmem_a, &smem_a));
-        let load_b_task = Task::new("LoadB", &[&gmem_b], &[&smem_b], 5, 1, load("load_b_schedule", &gmem_b, &smem_b));
+        // The register budgets are the tutorial's `num_registers` (warpgroup 1 shares one count).
+        let load_a_task = Task::new("LoadA", &[&gmem_a], &[&smem_a], 4, 1, load("load_a_schedule", &gmem_a, &smem_a))
+            .setmaxnreg_decrease(40);
+        let load_b_task = Task::new("LoadB", &[&gmem_b], &[&smem_b], 5, 1, load("load_b_schedule", &gmem_b, &smem_b))
+            .setmaxnreg_decrease(40);
         let store_schedule = schedule("store_schedule", &[&smem_a, &smem_b, &store_res, &ab_sync], |s, r| {
             let (smem_a_ref, smem_b_ref, store, group) = (r[0], r[1], r[2], r[3]);
             smem_a_ref.call("init_store_state");
@@ -219,10 +226,11 @@ pub fn build(n_elements: usize, tma_for_b: bool) -> Kernel {
             });
         })
         .unwrap_or_else(|e| panic!("{e}"));
-        let store_task = Task::new("StoreTask", &[&smem_a, &smem_b], &[&store_res], 0, NUM_STORE_WARPS, store_schedule);
+        let store_task = Task::new("StoreTask", &[&smem_a, &smem_b], &[&store_res], 0, NUM_STORE_WARPS, store_schedule)
+            .setmaxnreg_decrease(160);
         let padding_schedule = schedule("padding_schedule", &[], |s, _| s.domain_loop(0, num_iters, 1, 1, |_| {}))
             .unwrap_or_else(|e| panic!("{e}"));
-        let padding_task = Task::new("PaddingTask", &[], &[], 6, 2, padding_schedule);
+        let padding_task = Task::new("PaddingTask", &[], &[], 6, 2, padding_schedule).setmaxnreg_decrease(40);
 
         let resource_dependency_graph = ResourceDependencyGraph::new()
             .depends_on(&smem_a, [&gmem_a])

@@ -40,6 +40,8 @@
 //!   interop and benchmarking. `M`, `N` and `K` are tile multiples and fixed when the kernel
 //!   is built.
 //! - the stage counts are fixed ([`MixedInputGemm::stages`]) instead of filling shared memory.
+//! - no batch mode (the TMA copies are 2-D, the Python's 3-D), and the warps keep the register
+//!   budget they start with (the Python moves registers between its roles with `setmaxnreg`).
 //! - the transform warps convert their whole part of a stage at once (the Python works in
 //!   sub-tiles of at most 64 values to bound register use) and wait without `try_wait` peeks.
 //! - the packaged epilogue ([`epilogue_tma_store`]) drains the accumulator, as in
