@@ -11,7 +11,9 @@
 //! `KV=e4m3` or `KV=e5m2` picks an FP8 K/V cache (Float16 by default); compare with
 //! `batch_decode_fp8_flashinfer_bench.py`. With a Float16 cache it then checks and times
 //! the attention variants (soft-cap 30, window 1024; compare with
-//! `attention_variants_flashinfer_bench.py`).
+//! `attention_variants_flashinfer_bench.py`). `HD=64` or `HD=256` picks another head
+//! dimension and `DT=bf16` BFloat16 queries, cache and output (compare with
+//! `batch_decode_hd_flashinfer_bench.py`); the variants then run only with `VARIANTS=1`.
 
 #[cfg(feature = "cuda")]
 use std::error::Error;
@@ -28,8 +30,20 @@ fn gpu_main() -> Result<(), Box<dyn Error>> {
     let ctx = CudaContext::new(0)?;
     let tc = Toolchain::discover().ok_or("no mlir-opt found; set CUTE_MLIR_OPT")?;
     let kv = kv_dtype();
-    let ks = Kernels::with_kv(&ctx, &tc, STAGES, false, kv)?;
-    println!("device: {}, K/V {kv:?}, max concurrent decode CTAs: {}", ctx.name(), ks.max_grid);
+    let (hd, bf16) = shape();
+    let ks = Kernels::with_shape(&ctx, &tc, STAGES, false, kv, Variant::NONE, hd, bf16)?;
+    // Problems of this shape: head dimension `hd`, BFloat16 if asked, the cache quantised to `kv`.
+    let make = |lens: &[usize], ps: usize, h: usize, seed: u64| {
+        let p = Problem::new_hd(lens, ps, h, hd, seed);
+        (if bf16 { p.bf16() } else { p }).quantized(kv, 1.0, 1.0)
+    };
+    println!(
+        "device: {}, K/V {kv:?}, head dim {hd}, {}, max concurrent decode CTAs: {}",
+        ctx.name(),
+        if bf16 { "bf16" } else { "f16" },
+        ks.max_grid
+    );
+    let tol_o = if bf16 { 8e-3 } else { 2e-3 };
     // Correctness, split and unsplit, including realistic sizes.
     for (lens, ps, h) in [
         (vec![1usize, 7, 21, 40], 4usize, 2usize),
@@ -38,7 +52,7 @@ fn gpu_main() -> Result<(), Box<dyn Error>> {
         (vec![4096], 16, 8),
         ((0..64).map(|i| 50 + 31 * i).collect::<Vec<_>>(), 16, 8),
     ] {
-        let p = Problem::new(&lens, ps, h, 11).quantized(kv, 1.0, 1.0);
+        let p = make(&lens, ps, h, 11);
         let (plan, eo, el, _) = run(&ctx, &ks, &p, true, false)?;
         println!(
             "check batch {} page {ps} kv heads {h}: split {} ({} CTAs x {h}), max |o - ref| = {eo:.2e}, max |lse - ref| = {el:.2e}",
@@ -46,7 +60,7 @@ fn gpu_main() -> Result<(), Box<dyn Error>> {
             plan.split,
             plan.num_ctas()
         );
-        if !(eo < 2e-3 && el < 1e-3) {
+        if !(eo < tol_o && el < 1e-3) {
             return Err("out of tolerance".into());
         }
     }
@@ -59,14 +73,14 @@ fn gpu_main() -> Result<(), Box<dyn Error>> {
             return Err("out of tolerance".into());
         }
     }
-    // Timings: page size 16, 8 KV heads x 4 (32 query heads), head dim 128, f16.
+    // Timings: page size 16, 8 KV heads x 4 (32 query heads).
     println!("batch  kv_len  split  ctas   time(us)  graph(us)  decode(us)   GB/s (K+V read, graph)");
     for batch in [1usize, 16, 64] {
         for kv_len in [1024usize, 4096] {
-            let p = Problem::new(&vec![kv_len; batch], 16, 8, 3).quantized(kv, 1.0, 1.0);
+            let p = make(&vec![kv_len; batch], 16, 8, 3);
             let (plan, _, _, t) = run(&ctx, &ks, &p, false, true)?;
             let (t, tg, td) = t.unwrap();
-            let bytes = (2 * batch * kv_len * 8 * HEAD_DIM * kv.bytes()) as f64;
+            let bytes = (2 * batch * kv_len * 8 * hd * kv.bytes()) as f64;
             println!(
                 "{batch:5}  {kv_len:6}  {:5}  {:4}  {t:9.1}  {tg:9.1}  {td:9.1}  {:8.1}",
                 plan.split,
@@ -75,8 +89,9 @@ fn gpu_main() -> Result<(), Box<dyn Error>> {
             );
         }
     }
-    if kv == KvDtype::F16 {
-        variants(&ctx, &tc)?;
+    // The variants run in the default shape, or in another with `VARIANTS=1`.
+    if kv == KvDtype::F16 && ((hd == HEAD_DIM && !bf16) || std::env::var_os("VARIANTS").is_some()) {
+        variants(&ctx, &tc, hd, bf16)?;
     }
     Ok(())
 }
@@ -84,7 +99,12 @@ fn gpu_main() -> Result<(), Box<dyn Error>> {
 /// The attention variants on the GPU: checks against the f64 reference, then CUDA-graph
 /// timings on the shapes above (soft-cap 30, window 1024).
 #[cfg(feature = "cuda")]
-fn variants(ctx: &CudaContext, tc: &Toolchain) -> Result<(), Box<dyn Error>> {
+fn variants(ctx: &CudaContext, tc: &Toolchain, hd: usize, bf16: bool) -> Result<(), Box<dyn Error>> {
+    let new = |lens: &[usize], ps: usize, h: usize, seed: u64| {
+        let p = Problem::new_hd(lens, ps, h, hd, seed);
+        if bf16 { p.bf16() } else { p }
+    };
+    let tol_o = if bf16 { 8e-3 } else { 2e-3 };
     type Make = fn(Problem) -> Problem;
     let cases: [(&str, Make); 4] = [
         ("soft-cap 30", |p| p.with_soft_cap(30.0)),
@@ -93,21 +113,29 @@ fn variants(ctx: &CudaContext, tc: &Toolchain) -> Result<(), Box<dyn Error>> {
         ("soft-cap 5 + window 100", |p| p.with_soft_cap(5.0).with_window(100)),
     ];
     for (name, make) in cases {
-        let ks =
-            Kernels::with_variant(ctx, tc, STAGES, false, KvDtype::F16, make(Problem::new(&[1], 16, 1, 1)).variant)?;
+        let ks = Kernels::with_shape(
+            ctx,
+            tc,
+            STAGES,
+            false,
+            KvDtype::F16,
+            make(Problem::new(&[1], 16, 1, 1)).variant,
+            hd,
+            bf16,
+        )?;
         for (lens, ps, h) in [
             ((0..8).map(|i| 300 + 397 * i).collect::<Vec<_>>(), 16usize, 8usize),
             (vec![4096], 16, 8),
             (vec![1, 7, 21, 1500], 4, 2),
         ] {
-            let p = make(Problem::new(&lens, ps, h, 11));
+            let p = make(new(&lens, ps, h, 11));
             let (plan, eo, el, _) = run(ctx, &ks, &p, true, false)?;
             println!(
                 "check {name}, batch {}: split {}, |o - ref| = {eo:.2e}, |lse - ref| = {el:.2e}",
                 lens.len(),
                 plan.split
             );
-            if !(eo < 2e-3 && el < 1e-3) {
+            if !(eo < tol_o && el < 1e-3) {
                 return Err("out of tolerance".into());
             }
         }
@@ -117,7 +145,7 @@ fn variants(ctx: &CudaContext, tc: &Toolchain) -> Result<(), Box<dyn Error>> {
         println!("{name}: batch  kv_len  split  ctas  graph(us)");
         for batch in [1usize, 16, 64] {
             for kv_len in [1024usize, 4096] {
-                let p = make(Problem::new(&vec![kv_len; batch], 16, 8, 3));
+                let p = make(new(&vec![kv_len; batch], 16, 8, 3));
                 let (plan, _, _, t) = run(ctx, &ks, &p, false, true)?;
                 println!(
                     "{name}: {batch:5}  {kv_len:6}  {:5}  {:4}  {:9.1}",
@@ -129,6 +157,13 @@ fn variants(ctx: &CudaContext, tc: &Toolchain) -> Result<(), Box<dyn Error>> {
         }
     }
     Ok(())
+}
+
+/// The head dimension from `HD` (128 by default) and whether `DT=bf16`.
+#[cfg(feature = "cuda")]
+fn shape() -> (usize, bool) {
+    let hd = std::env::var("HD").ok().map_or(HEAD_DIM, |v| v.parse().expect("HD is 64, 128 or 256"));
+    (hd, std::env::var("DT").is_ok_and(|v| v == "bf16"))
 }
 
 /// The K/V cache type from `KV` (`f16`, `e4m3` or `e5m2`).
@@ -172,6 +207,18 @@ fn main() {
             plan.split
         );
         assert!(eo < 4e-3 && el < 1e-3, "out of tolerance");
+    }
+    // Head dimensions 64 and 256, and BFloat16, split and unsplit.
+    for (hd, bf16) in [(64usize, false), (256, false), (128, true), (64, true), (256, true)] {
+        let p = Problem::new_hd(&[1, 7, 21, 40], 4, 2, hd, 7);
+        let p = if bf16 { p.bf16() } else { p };
+        let (plan, eo, el) = simulate(&p, 12, 1);
+        println!(
+            "  head dim {hd}, {}, split {}: max |o - ref| = {eo:.2e}, max |lse - ref| = {el:.2e}",
+            if bf16 { "bf16" } else { "f16" },
+            plan.split
+        );
+        assert!(eo < if bf16 { 8e-3 } else { 2e-3 } && el < 1e-3, "out of tolerance");
     }
     match Toolchain::discover() {
         Some(tc) => {

@@ -73,11 +73,17 @@
 //! * ALiBi: `s * sm_scale + slope[head] * kv_idx` ([`alibi_slopes`]), not combined with
 //!   soft-cap.
 //!
+//! **Head dims and BFloat16** ([`kernel_shape`], [`Problem::new_hd`], [`Problem::bf16`]): head
+//! dim 64, 128 or 256 and, build-time, BFloat16 queries, cache and output (FlashInfer's
+//! `fa2` instantiations); the geometry follows FlashInfer's `vec = max(16 / sizeof(KV),
+//! head_dim / 32)`. The head-dim-128 Float16 kernels are unchanged.
+//!
 //! The plain kernel is unchanged: each variant's code is only built into its own kernel.
 //!
 //! Not yet covered:
 //! * RoPE in the kernel;
-//! * the HND layout and other head dims or group sizes;
+//! * the HND layout and other group sizes;
+//! * FP8 caches at head dims other than 128, and FP8 with BFloat16 queries;
 //! * CUDA-graph mode (FlashInfer then always splits, into fixed-size buffers).
 //!
 //! Every request must have at least one token.
@@ -130,17 +136,35 @@ impl KvDtype {
         16 / self.bytes()
     }
     pub fn bdx(self) -> usize {
-        HEAD_DIM / self.vec()
+        self.bdx_hd(HEAD_DIM)
+    }
+    /// [`KvDtype::bdx`] for head dimension `head_dim` (FlashInfer: `HEAD_DIM / vec_size`).
+    pub fn bdx_hd(self, head_dim: usize) -> usize {
+        head_dim / self.vec_hd(head_dim)
+    }
+    /// Elements per thread for head dimension `head_dim`: FlashInfer's
+    /// `max(16 / sizeof(DTypeKV), HEAD_DIM / 32)`.
+    pub fn vec_hd(self, head_dim: usize) -> usize {
+        self.vec().max(head_dim / 32)
     }
     /// `BDZ`: 128 threads in all (FlashInfer's `get_heuristic_num_threads` for group 4).
     pub fn bdz(self) -> usize {
-        128 / (self.bdx() * BDY)
+        self.bdz_hd(HEAD_DIM)
+    }
+    pub fn bdz_hd(self, head_dim: usize) -> usize {
+        128 / (self.bdx_hd(head_dim) * BDY)
     }
     pub fn tokens_per_iter(self) -> usize {
-        self.bdz() * TOKENS_PER_Z
+        self.tokens_per_iter_hd(HEAD_DIM)
+    }
+    pub fn tokens_per_iter_hd(self, head_dim: usize) -> usize {
+        self.bdz_hd(head_dim) * TOKENS_PER_Z
     }
     pub fn block(self) -> [u32; 3] {
-        [self.bdx() as u32, BDY as u32, self.bdz() as u32]
+        self.block_hd(HEAD_DIM)
+    }
+    pub fn block_hd(self, head_dim: usize) -> [u32; 3] {
+        [self.bdx_hd(head_dim) as u32, BDY as u32, self.bdz_hd(head_dim) as u32]
     }
     fn suffix(self) -> &'static str {
         match self {
@@ -314,23 +338,49 @@ pub fn kernel_variant_kv(partition: bool, stages: usize, ragged: bool, kv: KvDty
 
 /// [`kernel_variant_kv`] built for an attention [`Variant`] (any but `custom_mask`).
 pub fn kernel_full(partition: bool, stages: usize, ragged: bool, kv: KvDtype, variant: Variant) -> Kernel {
+    kernel_shape(partition, stages, ragged, kv, variant, HEAD_DIM, false)
+}
+
+/// [`kernel_full`] for head dimension `head_dim` (64, 128 or 256; FP8 only at 128) and, with
+/// `bf16`, BFloat16 queries, cache and output instead of Float16 (`kv` must then be
+/// [`KvDtype::F16`], which stands for the unquantised two-byte cache). FlashInfer's
+/// geometry: `VEC = max(16 / sizeof(DTypeKV), head_dim / 32)`, `BDX = head_dim / VEC`,
+/// `BDZ = 128 / (BDX * BDY)`: 64 is `(8, 4, 4)` and 256 is `(32, 4, 1)`.
+pub fn kernel_shape(
+    partition: bool,
+    stages: usize,
+    ragged: bool,
+    kv: KvDtype,
+    variant: Variant,
+    head_dim: usize,
+    bf16: bool,
+) -> Kernel {
     assert!(!variant.custom_mask, "decode has no custom mask");
     assert!(!(variant.logits_soft_cap && variant.alibi), "soft-cap with ALiBi is not supported");
-    match kv {
-        KvDtype::F16 => build::<F16, 8>(partition, stages, ragged, variant),
-        KvDtype::E4M3 => build::<F8E4M3FN, 16>(partition, stages, ragged, variant),
-        KvDtype::E5M2 => build::<F8E5M2, 16>(partition, stages, ragged, variant),
+    assert!(matches!(head_dim, 64 | 128 | 256), "head dim {head_dim} not supported");
+    assert!(
+        kv == KvDtype::F16 || (head_dim == 128 && !bf16),
+        "FP8 K/V is built for head dim 128 and Float16 queries only"
+    );
+    match (kv, bf16) {
+        (KvDtype::F16, false) => build::<F16, 8>(partition, stages, ragged, variant, head_dim),
+        (KvDtype::F16, true) => build::<BF16, 8>(partition, stages, ragged, variant, head_dim),
+        (KvDtype::E4M3, _) => build::<F8E4M3FN, 16>(partition, stages, ragged, variant, head_dim),
+        (KvDtype::E5M2, _) => build::<F8E5M2, 16>(partition, stages, ragged, variant, head_dim),
     }
 }
 
 /// The element type of a K/V cache: how a vector of it widens to Float32.
 pub trait KvElem: Numeric + Copy {
     const KV: KvDtype;
+    /// The type of the queries and the output (Float16, but BFloat16 for a BFloat16 cache).
+    type Out: Numeric + Copy;
     fn widen(v: &[Value<Self>]) -> Vec<Float32>;
 }
 
 impl KvElem for F16 {
     const KV: KvDtype = KvDtype::F16;
+    type Out = F16;
     fn widen(v: &[Value<Self>]) -> Vec<Float32> {
         v.iter().map(|x| x.to::<f32>()).collect()
     }
@@ -346,8 +396,18 @@ fn widen_fp8<F: KvElem + Fp8Format>(v: &[Value<F>]) -> Vec<Float32> {
         .collect()
 }
 
+/// BFloat16 queries, cache and output; its `KV` is the two-byte class, [`KvDtype::F16`].
+impl KvElem for BF16 {
+    const KV: KvDtype = KvDtype::F16;
+    type Out = BF16;
+    fn widen(v: &[Value<Self>]) -> Vec<Float32> {
+        v.iter().map(|x| x.to::<f32>()).collect()
+    }
+}
+
 impl KvElem for F8E4M3FN {
     const KV: KvDtype = KvDtype::E4M3;
+    type Out = F16;
     fn widen(v: &[Value<Self>]) -> Vec<Float32> {
         widen_fp8(v)
     }
@@ -355,29 +415,39 @@ impl KvElem for F8E4M3FN {
 
 impl KvElem for F8E5M2 {
     const KV: KvDtype = KvDtype::E5M2;
+    type Out = F16;
     fn widen(v: &[Value<Self>]) -> Vec<Float32> {
         widen_fp8(v)
     }
 }
 
 /// The decode kernel over `KV` elements, `VEC` (16 bytes) per thread.
-fn build<KV: KvElem, const VEC: usize>(partition: bool, stages: usize, ragged: bool, variant: Variant) -> Kernel {
+fn build<KV: KvElem, const VEC: usize>(
+    partition: bool,
+    stages: usize,
+    ragged: bool,
+    variant: Variant,
+    head_dim: usize,
+) -> Kernel {
     assert!(stages >= 2, "the decode kernel needs at least 2 stages");
     let kv = KV::KV;
-    assert_eq!(VEC, kv.vec());
-    let (bdx, bdz) = (kv.bdx(), kv.bdz());
-    let tokens_per_iter = kv.tokens_per_iter();
-    let stage_elems = tokens_per_iter * HEAD_DIM;
+    let bf16 = std::any::TypeId::of::<KV>() == std::any::TypeId::of::<BF16>();
+    assert_eq!(VEC, kv.vec_hd(head_dim));
+    let (bdx, bdz) = (kv.bdx_hd(head_dim), kv.bdz_hd(head_dim));
+    let tokens_per_iter = kv.tokens_per_iter_hd(head_dim);
+    let stage_elems = tokens_per_iter * head_dim;
     let layout = if ragged { "ragged" } else { "paged" };
     let base_name = format!(
-        "flashinfer_batch_decode_{layout}{}{}{}",
+        "flashinfer_batch_decode_{layout}{}{}{}{}{}",
         if partition { "_split" } else { "" },
         kv.suffix(),
-        variant.suffix()
+        variant.suffix(),
+        if head_dim == HEAD_DIM { String::new() } else { format!("_hd{head_dim}") },
+        if bf16 { "_bf16" } else { "" }
     );
     let name = if stages == STAGES { base_name } else { format!("{base_name}_s{stages}") };
-    Kernel::builder(&name).block_dim(kv.block()).build(|| {
-        let q = param_ptr::<F16>("q");
+    Kernel::builder(&name).block_dim(kv.block_hd(head_dim)).build(|| {
+        let q = param_ptr::<KV::Out>("q");
         let k_cache = param_ptr::<KV>("k_cache");
         let v_cache = param_ptr::<KV>("v_cache");
         let kv_indptr = param_ptr::<i32>("kv_indptr");
@@ -386,7 +456,7 @@ fn build<KV: KvElem, const VEC: usize>(partition: bool, stages: usize, ragged: b
         let request_indices = param_ptr::<i32>("request_indices");
         let kv_tile_indices = param_ptr::<i32>("kv_tile_indices");
         let o_indptr = param_ptr::<i32>("o_indptr");
-        let o = param_ptr::<F16>("o");
+        let o = param_ptr::<KV::Out>("o");
         let lse = param_ptr::<f32>("lse");
         let tmp_o = param_ptr::<f32>("tmp_o");
         let tmp_lse = param_ptr::<f32>("tmp_lse");
@@ -403,7 +473,7 @@ fn build<KV: KvElem, const VEC: usize>(partition: bool, stages: usize, ragged: b
         let kv_head = block_idx().y;
         let b = request_indices.load_at(block_idx().x);
         let chunk = kv_tile_indices.load_at(block_idx().x);
-        let hd = HEAD_DIM as i32;
+        let hd = head_dim as i32;
         let qo_head = kv_head * GROUP as i32 + ty;
         let num_qo_heads = num_kv_heads * GROUP as i32;
         let qo_row = (b * num_qo_heads + qo_head) * hd + tx * VEC as i32;
@@ -411,7 +481,7 @@ fn build<KV: KvElem, const VEC: usize>(partition: bool, stages: usize, ragged: b
         // This thread's query slice, in Float32 registers (16-byte loads: one for a
         // Float16 cache, two for FP8).
         let q_vec: Vec<Float32> = (0..VEC / 8)
-            .flat_map(|h| load_vector::<F16, 8>(&q.offset(qo_row + 8 * h as i32), LoadOptions::default()))
+            .flat_map(|h| load_vector::<KV::Out, 8>(&q.offset(qo_row + 8 * h as i32), LoadOptions::default()))
             .map(|x| x.to::<f32>())
             .collect();
 
@@ -461,7 +531,7 @@ fn build<KV: KvElem, const VEC: usize>(partition: bool, stages: usize, ragged: b
         let (k_g, v_g) = (vecs(&k_cache), vecs(&v_cache));
         let smem_vecs = |t: &Tensor<KV>| make_tensor(&t.ptr(), Layout::col_major((VEC, stages * stage_elems / VEC)));
         let (k_s, v_s) = (smem_vecs(&k_smem), smem_vecs(&v_smem));
-        let hv = (HEAD_DIM / VEC) as i32;
+        let hv = (head_dim / VEC) as i32;
 
         // This thread's token of iteration `iter` (one per `(ty, tz)` row; TILE = 1).
         // Tokens past the chunk's end are clamped to its last token (a valid address);
@@ -553,7 +623,7 @@ fn build<KV: KvElem, const VEC: usize>(partition: bool, stages: usize, ragged: b
         // Merge the BDZ partial states of each query head. (For Float16, reusing the K/V
         // stages for these buffers, as FlashInfer does, lets 10 rather than 7 blocks share
         // an SM, but the planner then splits into more chunks and batch 1 measured slower.)
-        let o_layout = Layout::col_major(bdz * BDY * HEAD_DIM);
+        let o_layout = Layout::col_major(bdz * BDY * head_dim);
         let o_smem = if reuse {
             // Every thread's copies (over-the-end prefetches included) have landed.
             sync_threads();
@@ -592,7 +662,7 @@ fn build<KV: KvElem, const VEC: usize>(partition: bool, stages: usize, ragged: b
                 if partition {
                     tmp_o.store_at(tmp_base + e as i32, oe * inv_d);
                 } else {
-                    o.store_at(qo_row + e as i32, (oe * inv_d).to::<F16>());
+                    o.store_at(qo_row + e as i32, (oe * inv_d).to::<KV::Out>());
                 }
             }
             if_(tx.eq(0), || {
@@ -620,17 +690,32 @@ pub mod mp {
 /// `(batch, num_qo_heads)`, `HEAD_DIM` threads, one output element each. Request `b`'s
 /// states are rows `o_indptr[b] .. o_indptr[b + 1]` of `tmp_o`/`tmp_lse`.
 pub fn merge_kernel() -> Kernel {
+    merge_kernel_shape(HEAD_DIM, false)
+}
+
+/// [`merge_kernel`] for head dimension `head_dim` (`head_dim` threads per block) and, with
+/// `bf16`, a BFloat16 output.
+pub fn merge_kernel_shape(head_dim: usize, bf16: bool) -> Kernel {
+    let name = match (head_dim == HEAD_DIM, bf16) {
+        (true, false) => "flashinfer_merge_states".to_string(),
+        (_, false) => format!("flashinfer_merge_states_hd{head_dim}"),
+        (_, true) => format!("flashinfer_merge_states_hd{head_dim}_bf16"),
+    };
+    if bf16 { merge_build::<BF16>(&name, head_dim) } else { merge_build::<F16>(&name, head_dim) }
+}
+
+fn merge_build<O: Numeric + Copy>(name: &str, head_dim: usize) -> Kernel {
     /// Rows merged per step.
     const MERGE_UNROLL: usize = 8;
-    Kernel::builder("flashinfer_merge_states").block_dim([HEAD_DIM as u32, 1, 1]).build(|| {
+    Kernel::builder(name).block_dim([head_dim as u32, 1, 1]).build(|| {
         let tmp_o = param_ptr::<f32>("tmp_o");
         let tmp_lse = param_ptr::<f32>("tmp_lse");
         let o_indptr = param_ptr::<i32>("o_indptr");
-        let o = param_ptr::<F16>("o");
+        let o = param_ptr::<O>("o");
         let lse = param_ptr::<f32>("lse");
         let num_qo_heads = param_scalar::<i32>("num_qo_heads");
         let (e, b, h) = (thread_idx().x, block_idx().x, block_idx().y);
-        let hd = HEAD_DIM as i32;
+        let hd = head_dim as i32;
         let m = Var::new(Float32::from(-1.0e30f32));
         let d = Var::new(Float32::from(0.0f32));
         let acc = Var::new(Float32::from(0.0f32));
@@ -664,7 +749,7 @@ pub fn merge_kernel() -> Kernel {
             acc.set(an);
             m.set(m_new);
         });
-        o.store_at((b * num_qo_heads + h) * hd + e, (acc.get() / d.get()).to::<F16>());
+        o.store_at((b * num_qo_heads + h) * hd + e, (acc.get() / d.get()).to::<O>());
         if_(e.eq(0), || lse.store_at(b * num_qo_heads + h, m.get() + d.get().log2()));
     })
 }
@@ -752,6 +837,11 @@ pub struct Problem {
     pub kv_lens: Vec<usize>,
     pub page_size: usize,
     pub num_kv_heads: usize,
+    /// The head dimension (64, 128 or 256).
+    pub head_dim: usize,
+    /// BFloat16 queries, cache and output ([`Problem::bf16`]). The host vectors below then
+    /// hold the BFloat16 values (exact in Float16), uploaded as BFloat16.
+    pub bf16: bool,
     pub q: Vec<F16>,
     pub k_cache: Vec<F16>,
     pub v_cache: Vec<F16>,
@@ -777,6 +867,11 @@ pub struct Problem {
 
 impl Problem {
     pub fn new(kv_lens: &[usize], page_size: usize, num_kv_heads: usize, seed: u64) -> Problem {
+        Self::new_hd(kv_lens, page_size, num_kv_heads, HEAD_DIM, seed)
+    }
+
+    /// [`Problem::new`] for head dimension `head_dim` (scale `1/sqrt(head_dim)`).
+    pub fn new_hd(kv_lens: &[usize], page_size: usize, num_kv_heads: usize, head_dim: usize, seed: u64) -> Problem {
         let mut state = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
         let mut rnd = move || {
             state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
@@ -801,19 +896,21 @@ impl Problem {
         }
         let kv_last_page_len = kv_lens.iter().map(|&l| (l - (l.div_ceil(page_size) - 1) * page_size) as i32).collect();
         let n_qo = num_kv_heads * GROUP;
-        let cache = num_pages * page_size * num_kv_heads * HEAD_DIM;
+        let cache = num_pages * page_size * num_kv_heads * head_dim;
         let mut fill = |n: usize, scale: f32| (0..n).map(|_| F16::from_f32(rnd() * scale)).collect::<Vec<_>>();
         Problem {
             kv_lens: kv_lens.to_vec(),
             page_size,
             num_kv_heads,
-            q: fill(batch * n_qo * HEAD_DIM, 1.0),
+            head_dim,
+            bf16: false,
+            q: fill(batch * n_qo * head_dim, 1.0),
             k_cache: fill(cache, 1.0),
             v_cache: fill(cache, 1.0),
             kv_indptr,
             kv_indices,
             kv_last_page_len,
-            sm_scale: 1.0 / (HEAD_DIM as f32).sqrt(),
+            sm_scale: 1.0 / (head_dim as f32).sqrt(),
             kv_dtype: KvDtype::F16,
             k_fp8: vec![],
             v_fp8: vec![],
@@ -824,6 +921,24 @@ impl Problem {
             window_left: -1,
             alibi_slopes: vec![],
         }
+    }
+
+    /// This problem with BFloat16 queries, cache and output: the data rounded to BFloat16
+    /// (to nearest even; the reference then uses the rounded values), the kernels built
+    /// for BFloat16 ([`kernel_shape`]).
+    pub fn bf16(mut self) -> Problem {
+        assert_eq!(self.kv_dtype, KvDtype::F16, "BFloat16 has no FP8 cache");
+        // Rounding a Float16 value to 8 significant bits stays exact in Float16.
+        let round = |v: &mut Vec<F16>| {
+            for x in v.iter_mut() {
+                *x = F16::from_f32(BF16::from_f32(x.to_f32()).to_f32());
+            }
+        };
+        for v in [&mut self.q, &mut self.k_cache, &mut self.v_cache] {
+            round(v);
+        }
+        self.bf16 = true;
+        self
     }
 
     /// This problem with its K/V cache quantised to `kv` with scales `k_scale`,
@@ -847,9 +962,14 @@ impl Problem {
     /// A problem over contiguous K/V (`[sum(kv_lens), num_kv_heads, HEAD_DIM]`) with random
     /// contents.
     pub fn new_ragged(kv_lens: &[usize], num_kv_heads: usize, seed: u64) -> Problem {
+        Self::new_ragged_hd(kv_lens, num_kv_heads, HEAD_DIM, seed)
+    }
+
+    /// [`Problem::new_ragged`] for head dimension `head_dim`.
+    pub fn new_ragged_hd(kv_lens: &[usize], num_kv_heads: usize, head_dim: usize, seed: u64) -> Problem {
         // A one-token-page problem, its pages gathered into token order.
-        let p = Problem::new(kv_lens, 1, num_kv_heads, seed);
-        let row = num_kv_heads * HEAD_DIM;
+        let p = Problem::new_hd(kv_lens, 1, num_kv_heads, head_dim, seed);
+        let row = num_kv_heads * head_dim;
         let gather = |cache: &[F16]| -> Vec<F16> {
             p.kv_indices
                 .iter()
@@ -861,7 +981,8 @@ impl Problem {
     }
 
     /// A problem on given tensors: `q [batch, num_kv_heads * GROUP, HEAD_DIM]`, contiguous
-    /// `k`, `v [sum(kv_lens), num_kv_heads, HEAD_DIM]`, scale `1/sqrt(HEAD_DIM)`.
+    /// `k`, `v [sum(kv_lens), num_kv_heads, HEAD_DIM]`, scale `1/sqrt(HEAD_DIM)`. The head
+    /// dimension is `q.len() / (batch * num_kv_heads * GROUP)`.
     pub fn from_ragged(kv_lens: &[usize], num_kv_heads: usize, q: Vec<F16>, k: Vec<F16>, v: Vec<F16>) -> Problem {
         assert!(kv_lens.iter().all(|&l| l > 0), "every request needs a token");
         let kv_indptr: Vec<i32> = std::iter::once(0)
@@ -870,20 +991,24 @@ impl Problem {
                 Some(*a)
             }))
             .collect();
-        assert_eq!(q.len(), kv_lens.len() * num_kv_heads * GROUP * HEAD_DIM);
-        assert_eq!(k.len(), *kv_indptr.last().unwrap() as usize * num_kv_heads * HEAD_DIM);
+        let head_dim = q.len() / (kv_lens.len() * num_kv_heads * GROUP);
+        assert!(matches!(head_dim, 64 | 128 | 256), "head dim {head_dim} not supported");
+        assert_eq!(q.len(), kv_lens.len() * num_kv_heads * GROUP * head_dim);
+        assert_eq!(k.len(), *kv_indptr.last().unwrap() as usize * num_kv_heads * head_dim);
         assert_eq!(v.len(), k.len());
         Problem {
             kv_lens: kv_lens.to_vec(),
             page_size: RAGGED,
             num_kv_heads,
+            head_dim,
+            bf16: false,
             q,
             k_cache: k,
             v_cache: v,
             kv_indptr,
             kv_indices: vec![0],
             kv_last_page_len: vec![1; kv_lens.len()],
-            sm_scale: 1.0 / (HEAD_DIM as f32).sqrt(),
+            sm_scale: 1.0 / (head_dim as f32).sqrt(),
             kv_dtype: KvDtype::F16,
             k_fp8: vec![],
             v_fp8: vec![],
@@ -952,7 +1077,7 @@ impl Problem {
 
     /// The decode kernel for this problem's layout.
     pub fn kernel(&self, partition: bool) -> Kernel {
-        kernel_full(partition, STAGES, self.is_ragged(), self.kv_dtype, self.variant)
+        kernel_shape(partition, STAGES, self.is_ragged(), self.kv_dtype, self.variant, self.head_dim, self.bf16)
     }
 
     /// The plan over each request's visible pages (with a window, only the window's, as
@@ -964,11 +1089,11 @@ impl Problem {
     }
 
     pub fn launch(&self, plan: &Plan) -> LaunchConfig {
-        LaunchConfig::new([plan.num_ctas() as u32, self.num_kv_heads as u32, 1], self.kv_dtype.block())
+        LaunchConfig::new([plan.num_ctas() as u32, self.num_kv_heads as u32, 1], self.kv_dtype.block_hd(self.head_dim))
     }
 
     pub fn merge_launch(&self) -> LaunchConfig {
-        LaunchConfig::new([self.kv_lens.len() as u32, self.num_qo_heads() as u32, 1], [HEAD_DIM as u32, 1, 1])
+        LaunchConfig::new([self.kv_lens.len() as u32, self.num_qo_heads() as u32, 1], [self.head_dim as u32, 1, 1])
     }
 
     /// Rows of split-KV scratch the plan needs (at least one, so buffers are never empty).
@@ -980,8 +1105,9 @@ impl Problem {
     pub fn args(&self, plan: &Plan) -> Vec<KernelArg> {
         let n_o = self.q.len();
         let rows = Self::tmp_rows(plan);
+        let hd = self.head_dim;
         vec![
-            KernelArg::buffer(&self.q),
+            self.half_arg(&self.q),
             self.cache_arg(&self.k_cache, &self.k_fp8),
             self.cache_arg(&self.v_cache, &self.v_fp8),
             KernelArg::i32(self.kv_indptr.clone()),
@@ -990,9 +1116,9 @@ impl Problem {
             KernelArg::i32(plan.request_indices.clone()),
             KernelArg::i32(plan.kv_tile_indices.clone()),
             KernelArg::i32(plan.o_indptr.clone()),
-            KernelArg::buffer(&vec![F16::from_f32(0.0); n_o]),
-            KernelArg::f32(vec![0.0; n_o / HEAD_DIM]),
-            KernelArg::f32(vec![0.0; rows * self.num_qo_heads() * HEAD_DIM]),
+            self.half_arg(&vec![F16::from_f32(0.0); n_o]),
+            KernelArg::f32(vec![0.0; n_o / hd]),
+            KernelArg::f32(vec![0.0; rows * self.num_qo_heads() * hd]),
             KernelArg::f32(vec![0.0; rows * self.num_qo_heads()]),
             KernelArg::ScalarI32(self.page_size as i32),
             KernelArg::ScalarI32(self.num_kv_heads as i32),
@@ -1005,10 +1131,19 @@ impl Problem {
         ]
     }
 
+    /// A Float16 (or, for a BFloat16 problem, BFloat16) buffer argument of the host values.
+    fn half_arg(&self, v: &[F16]) -> KernelArg {
+        if self.bf16 {
+            KernelArg::buffer(&v.iter().map(|x| BF16::from_f32(x.to_f32())).collect::<Vec<_>>())
+        } else {
+            KernelArg::buffer(v)
+        }
+    }
+
     /// A cache argument of the problem's element type.
     fn cache_arg(&self, f16: &[F16], fp8: &[u8]) -> KernelArg {
         match self.kv_dtype {
-            KvDtype::F16 => KernelArg::buffer(f16),
+            KvDtype::F16 => self.half_arg(f16),
             KvDtype::E4M3 => KernelArg::buffer(&fp8.iter().map(|&b| F8E4M3FN(b)).collect::<Vec<_>>()),
             KvDtype::E5M2 => KernelArg::buffer(&fp8.iter().map(|&b| F8E5M2(b)).collect::<Vec<_>>()),
         }
@@ -1021,7 +1156,8 @@ impl Problem {
         let (hkv, n_qo, ps) = (self.num_kv_heads, self.num_qo_heads(), self.page_tokens());
         let f = |x: F16| x.to_f32() as f64;
         let mut o = vec![0f32; self.q.len()];
-        let mut lse = vec![0f32; self.q.len() / HEAD_DIM];
+        let hd = self.head_dim;
+        let mut lse = vec![0f32; self.q.len() / hd];
         let (sm, cap) = (self.sm_scale as f64 * self.k_scale as f64, self.logits_soft_cap as f64);
         for b in 0..self.kv_lens.len() {
             let (first, n) = self.visible(b);
@@ -1029,16 +1165,16 @@ impl Problem {
                 let start = self.kv_indptr[b] as usize;
                 let row =
                     if self.is_ragged() { start + t } else { self.kv_indices[start + t / ps] as usize * ps + t % ps };
-                (row * hkv + h) * HEAD_DIM
+                (row * hkv + h) * hd
             };
             for qh in 0..n_qo {
                 let h = qh / GROUP;
-                let qrow = (b * n_qo + qh) * HEAD_DIM;
+                let qrow = (b * n_qo + qh) * hd;
                 let slope = self.alibi_slopes.get(qh).map_or(0.0, |&x| x as f64);
                 let s: Vec<f64> = (first..first + n)
                     .map(|t| {
                         let a = addr(t, h);
-                        let qk = (0..HEAD_DIM).map(|e| f(self.q[qrow + e]) * f(self.k_cache[a + e])).sum::<f64>();
+                        let qk = (0..hd).map(|e| f(self.q[qrow + e]) * f(self.k_cache[a + e])).sum::<f64>();
                         self.variant.ref_logit(qk, sm, cap, slope, 0, t)
                     })
                     .collect();
@@ -1046,7 +1182,7 @@ impl Problem {
                 let w: Vec<f64> = s.iter().map(|x| (x - mx).exp()).collect();
                 let sum: f64 = w.iter().sum();
                 lse[b * n_qo + qh] = ((mx + sum.ln()) * std::f64::consts::LOG2_E) as f32;
-                for e in 0..HEAD_DIM {
+                for e in 0..hd {
                     let acc: f64 = (0..n).map(|i| w[i] * f(self.v_cache[addr(first + i, h) + e])).sum();
                     o[qrow + e] = (acc / sum * self.v_scale as f64) as f32;
                 }
@@ -1106,11 +1242,17 @@ pub fn execute(p: &Problem, plan: &Plan) -> (Vec<f32>, Vec<f32>) {
             args[p::LSE].clone(),
             KernelArg::ScalarI32(p.num_qo_heads() as i32),
         ];
-        merge_kernel().simulate(p.merge_launch(), &mut margs).unwrap_or_else(|e| panic!("merge: {e}"));
+        merge_kernel_shape(p.head_dim, p.bf16)
+            .simulate(p.merge_launch(), &mut margs)
+            .unwrap_or_else(|e| panic!("merge: {e}"));
         args[p::O] = margs[mp::O].clone();
         args[p::LSE] = margs[mp::LSE].clone();
     }
-    let o: Vec<f32> = args[p::O].to_vec::<F16>().into_iter().map(|x| x.to_f32()).collect();
+    let o: Vec<f32> = if p.bf16 {
+        args[p::O].to_vec::<BF16>().into_iter().map(|x| x.to_f32()).collect()
+    } else {
+        args[p::O].to_vec::<F16>().into_iter().map(|x| x.to_f32()).collect()
+    };
     (o, args[p::LSE].as_f32().to_vec())
 }
 
@@ -1124,7 +1266,7 @@ pub mod gpu {
     use cute::prelude::*;
     use cute::testing::{BenchmarkOptions, benchmark};
 
-    use super::{KvDtype, Plan, Problem, Variant, kernel_full, max_error, merge_kernel};
+    use super::{KvDtype, Plan, Problem, Variant, kernel_shape, max_error, merge_kernel_shape};
 
     /// The three kernels, compiled and loaded once, the decode kernels with `stages`
     /// shared-memory stages, for paged or (`ragged`) contiguous K/V.
@@ -1134,6 +1276,9 @@ pub mod gpu {
         pub kv: KvDtype,
         /// The attention variant the decode kernels are built for.
         pub variant: Variant,
+        /// The head dimension, and whether queries, cache and output are BFloat16.
+        pub head_dim: usize,
+        pub bf16: bool,
         pub decode: (Kernel, CudaFunction<'c>),
         pub split: (Kernel, CudaFunction<'c>),
         pub merge: (Kernel, CudaFunction<'c>),
@@ -1180,6 +1325,22 @@ pub mod gpu {
             kv: KvDtype,
             variant: Variant,
         ) -> Result<Kernels<'c>, Box<dyn Error>> {
+            Self::with_shape(ctx, tc, stages, ragged, kv, variant, super::HEAD_DIM, false)
+        }
+
+        /// [`Kernels::with_variant`] for head dimension `head_dim` and, with `bf16`,
+        /// BFloat16 queries, cache and output ([`kernel_shape`]).
+        #[allow(clippy::too_many_arguments)]
+        pub fn with_shape(
+            ctx: &'c CudaContext,
+            tc: &Toolchain,
+            stages: usize,
+            ragged: bool,
+            kv: KvDtype,
+            variant: Variant,
+            head_dim: usize,
+            bf16: bool,
+        ) -> Result<Kernels<'c>, Box<dyn Error>> {
             let arch = ctx.best_target(tc).ok_or("no target for this GPU")?;
             // Contraction (on by default) fuses the softmax's multiply-adds into `fma`, as
             // nvcc does for FlashInfer; without it the main loop runs about a fifth more
@@ -1190,14 +1351,14 @@ pub mod gpu {
                 Ok((k, f))
             };
             let (decode, split, merge) = (
-                load(kernel_full(false, stages, ragged, kv, variant))?,
-                load(kernel_full(true, stages, ragged, kv, variant))?,
-                load(merge_kernel())?,
+                load(kernel_shape(false, stages, ragged, kv, variant, head_dim, bf16))?,
+                load(kernel_shape(true, stages, ragged, kv, variant, head_dim, bf16))?,
+                load(merge_kernel_shape(head_dim, bf16))?,
             );
-            let threads = kv.block().iter().product::<u32>();
+            let threads = kv.block_hd(head_dim).iter().product::<u32>();
             let per_sm = split.1.max_active_blocks_per_multiprocessor(threads, 0)? as usize;
             let sms = HardwareInfo::new(0)?.get_device_multiprocessor_count()? as usize;
-            Ok(Kernels { ragged, kv, variant, decode, split, merge, max_grid: per_sm * sms })
+            Ok(Kernels { ragged, kv, variant, head_dim, bf16, decode, split, merge, max_grid: per_sm * sms })
         }
     }
 
@@ -1257,6 +1418,9 @@ pub mod gpu {
         if ks.kv != p.kv_dtype {
             return Err("the kernels' K/V element type differs from the problem's".into());
         }
+        if (ks.head_dim, ks.bf16) != (p.head_dim, p.bf16) {
+            return Err("the kernels' head dimension or Q/O type differs from the problem's".into());
+        }
         if ks.variant != p.variant {
             return Err("the kernels' attention variant differs from the problem's".into());
         }
@@ -1300,7 +1464,11 @@ pub mod gpu {
         launch(&stream, 0)?;
         stream.synchronize()?;
         let out = if fetch {
-            let o: Vec<f32> = bufs[super::p::O].to_vec::<F16>()?.into_iter().map(|x| x.to_f32()).collect();
+            let o: Vec<f32> = if p.bf16 {
+                bufs[super::p::O].to_vec::<u16>()?.into_iter().map(|x| BF16(x).to_f32()).collect()
+            } else {
+                bufs[super::p::O].to_vec::<F16>()?.into_iter().map(|x| x.to_f32()).collect()
+            };
             Some((o, bufs[super::p::LSE].to_vec::<f32>()?))
         } else {
             None

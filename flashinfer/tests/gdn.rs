@@ -140,3 +140,44 @@ fn prefill_options_match_reference() {
         println!("prefill {opts:?}: state {es:.2e} out {eo:.2e}");
     }
 }
+
+/// FlashInfer's non-transposed `[K, V]` state (`gated_delta_rule_decode`), all state dtypes,
+/// single- and multi-token, with pools and padding, split and unsplit launches.
+#[test]
+fn kv_layout_matches_reference() {
+    let base = Options { kv_layout: true, ..Options::default() };
+    for (opts, state, shape) in [
+        (base, StateDtype::F32, (3usize, 2usize, 4usize, 128usize, 64usize)),
+        (base, StateDtype::BF16, (3, 2, 4, 128, 64)),
+        (base, StateDtype::F16, (2, 2, 2, 128, 128)),
+        (Options { tokens: 3, ..base }, StateDtype::F32, (3, 2, 4, 128, 64)),
+        (Options { has_indices: true, has_out_indices: true, ..base }, StateDtype::BF16, (7, 2, 4, 128, 64)),
+        (Options { tokens: 2, update_state: false, ..base }, StateDtype::F32, (3, 2, 4, 64, 32)),
+        (Options { tokens: 2, has_indices: true, ..base }, StateDtype::F32, (6, 2, 2, 256, 32)),
+    ] {
+        for num_sms in [1, 100] {
+            let mut p = Problem::new(Dtype::BF16, state, opts, shape, 31);
+            p.num_sms = num_sms;
+            simulate(&p);
+        }
+    }
+}
+
+/// FlashInfer's per-token pool scatter (`ssm_state_indices`): every token's state to its own
+/// slot, the read slot left alone; with a pool (padding), and in the `[K, V]` layout.
+#[test]
+fn per_token_scatter_matches_reference() {
+    let base = Options { per_token_slots: true, ..Options::default() };
+    for (opts, state) in [
+        (Options { tokens: 3, ..base }, StateDtype::F32),
+        (Options { tokens: 4, has_indices: true, ..base }, StateDtype::BF16),
+        (Options { tokens: 2, has_indices: true, kv_layout: true, ..base }, StateDtype::F32),
+        (Options { tokens: 3, kv_layout: true, ..base }, StateDtype::F16),
+    ] {
+        for num_sms in [1, 100] {
+            let mut p = Problem::new(Dtype::F16, state, opts, (6, 2, 4, 128, 64), 37);
+            p.num_sms = num_sms;
+            simulate(&p);
+        }
+    }
+}

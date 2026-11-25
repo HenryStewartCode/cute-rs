@@ -171,3 +171,41 @@ fn window_plan_and_variant_ptx() {
     let ptx = kernel_full(false, STAGES, false, KvDtype::F16, v).compile_with(&tc, &opts).unwrap().ptx().to_string();
     assert!(ptx.contains("tanh.approx.f32"));
 }
+
+/// Head dimensions 64 and 256 and BFloat16 queries/cache/output (FlashInfer's fa2 decode
+/// instantiations), paged and ragged, whole and split, plain and with variants, against the
+/// f64 reference (on the BFloat16-rounded inputs; the output is rounded to BFloat16, so its
+/// tolerance is wider).
+#[test]
+fn head_dims_and_bf16_match_reference() {
+    for hd in [64usize, 128, 256] {
+        for bf16 in [false, true] {
+            if hd == 128 && !bf16 {
+                continue; // the original kernels, covered above
+            }
+            let tol = if bf16 { 8e-3 } else { 2e-3 };
+            let paged = |p: Problem| if bf16 { p.bf16() } else { p };
+            let p = paged(Problem::new_hd(&[1, 7, 21, 40], 4, 2, hd, 7));
+            for (max_grid, min_chunk, split) in [(1000, 32, false), (12, 1, true)] {
+                let (plan, eo, el) = simulate(&p, max_grid, min_chunk);
+                assert_eq!(plan.split, split);
+                assert!(eo < tol && el < 1e-3, "hd {hd} bf16 {bf16} split {split}: |o| {eo:.2e}, |lse| {el:.2e}");
+            }
+            let p = paged(Problem::new_ragged_hd(&[1, 7, 21, 40], 1, hd, 5)).with_soft_cap(5.0).with_window(20);
+            let (_, eo, el) = simulate(&p, 6, 1);
+            assert!(eo < tol && el < 1e-3, "ragged hd {hd} bf16 {bf16} cap + win: |o| {eo:.2e}, |lse| {el:.2e}");
+        }
+    }
+}
+
+/// The new shapes' launch geometry is FlashInfer's, and the head-dim-128 Float16 kernel
+/// keeps its name (so its PTX is the original's).
+#[test]
+fn head_dim_geometry() {
+    assert_eq!(KvDtype::F16.block_hd(64), [8, 4, 4]);
+    assert_eq!(KvDtype::F16.block_hd(128), [16, 4, 2]);
+    assert_eq!(KvDtype::F16.block_hd(256), [32, 4, 1]);
+    let k = |hd, bf16| kernel_shape(false, STAGES, false, KvDtype::F16, Variant::NONE, hd, bf16);
+    assert_eq!(k(128, false).name(), "flashinfer_batch_decode_paged");
+    assert_eq!(k(256, true).name(), "flashinfer_batch_decode_paged_hd256_bf16");
+}

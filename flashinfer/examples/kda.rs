@@ -77,6 +77,78 @@ fn gpu_main() -> Result<(), Box<dyn Error>> {
             }
         }
     }
+    // Packed varlen (`cu_seqlens`) and `num_accepted_tokens`, as FlashInfer's spec decode.
+    for state in [StateDtype::F32, StateDtype::BF16] {
+        for (opts, shape, lens) in [
+            (
+                Options { varlen: true, has_indices: true, ..lower },
+                (9usize, 2usize, 4usize, 128usize, 64usize),
+                vec![1usize; 9],
+            ),
+            (
+                Options {
+                    tokens: 3,
+                    varlen: true,
+                    has_indices: true,
+                    per_token_slots: true,
+                    has_accepted: true,
+                    ..lower
+                },
+                (9, 2, 4, 128, 64),
+                vec![3, 3, 2, 0, 3, 1, 3, 3, 2],
+            ),
+        ] {
+            let mut p = Problem::new_varlen(Dtype::BF16, state, opts, shape, &lens, 13);
+            p.num_sms = sms;
+            let ((es, eo), _) = run(&ctx, &mut ks, &p, true, false)?;
+            println!(
+                "check varlen {} {shape:?} tokens {} accepted {}: state {es:.2e} out {eo:.2e}",
+                state.name(),
+                opts.tokens,
+                opts.has_accepted
+            );
+        }
+    }
+    println!("heads(q/v)  mode      batch  rows/blk unroll  time(us)    GB/s");
+    for (hq, hv) in [(16usize, 32usize)] {
+        for (mode, opts) in [
+            ("varlen T=1", Options { varlen: true, has_indices: true, ..base }),
+            ("T=4 slots", Options { tokens: 4, has_indices: true, per_token_slots: true, ..base }),
+            ("T=4 +acc", Options { tokens: 4, has_indices: true, per_token_slots: true, has_accepted: true, ..base }),
+            ("varlen T=4", Options { tokens: 4, varlen: true, has_indices: true, per_token_slots: true, ..base }),
+            (
+                "varlen T=4+acc",
+                Options {
+                    tokens: 4,
+                    varlen: true,
+                    has_indices: true,
+                    per_token_slots: true,
+                    has_accepted: true,
+                    ..base
+                },
+            ),
+        ] {
+            for batch in [1usize, 16, 64] {
+                let lens = vec![opts.tokens; batch];
+                let shape = (batch, hq, hv, 128, 128);
+                let mut p = if opts.varlen {
+                    Problem::new_varlen(Dtype::BF16, StateDtype::BF16, opts, shape, &lens, 3)
+                } else {
+                    Problem::new(Dtype::BF16, StateDtype::BF16, opts, shape, 3)
+                };
+                p.num_sms = sms;
+                let plan = p.plan();
+                let (_, t) = run(&ctx, &mut ks, &p, false, true)?;
+                let t = t.unwrap();
+                println!(
+                    "{hq:3}/{hv:<3}      {mode:14} {batch:5}  {:8} {:6}  {t:8.2}  {:7.1}",
+                    plan.rows_per_block,
+                    plan.unroll,
+                    p.bytes() / (t * 1e-6) / 1e9
+                );
+            }
+        }
+    }
     println!("heads(q/v)  T  batch  rows/blk unroll  time(us)    GB/s");
     for (hq, hv) in [(16usize, 32usize), (32, 32)] {
         for tokens in [1usize, 4] {

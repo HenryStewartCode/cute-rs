@@ -101,7 +101,12 @@
 //! `k_scale` folds into `sm_scale` on the host and `v_scale` scales the normalised output in
 //! the kernel (FlashInfer applies it afterwards); paged, ragged and single all share it.
 //!
-//! Not yet covered: RoPE in the kernel; the HND layout, other head dims; CUDA-graph planning (fixed-size buffers); FP8 queries.
+//! **Head dims and BFloat16** ([`kernel_shape`], [`Problem::new_hd`], [`Problem::bf16`]): head
+//! dim 64, 128 or 256 (256 plans only the 64- and 16-row tiles, as FlashInfer) and BFloat16
+//! queries, K/V and output (MMA and `P`/`O` conversions in BFloat16; FP8 only at head dim 128
+//! with Float16 queries). The head-dim-128 Float16 kernels' PTX is unchanged.
+//!
+//! Not yet covered: RoPE in the kernel; the HND layout, head dims other than 64/128/256; CUDA-graph planning (fixed-size buffers); FP8 queries.
 //! Every request must have at least one query and one KV token.
 //!
 //! `examples/prefill.rs` runs it on the simulator and, with `--features cuda` and `GPU=1`,
@@ -123,7 +128,13 @@ pub const RAGGED: usize = 0;
 
 /// FlashInfer's `FA2DetermineCtaTileQ` for head dim 128 on SM80 and newer.
 pub fn fa2_cta_tile_q(avg_packed_qo_len: usize) -> usize {
-    if avg_packed_qo_len > 64 {
+    fa2_cta_tile_q_hd(avg_packed_qo_len, HEAD_DIM)
+}
+
+/// [`fa2_cta_tile_q`] for head dimension `head_dim`: a head dimension of 256 never takes
+/// the 128-row tile (its output accumulator would overflow the registers).
+pub fn fa2_cta_tile_q_hd(avg_packed_qo_len: usize, head_dim: usize) -> usize {
+    if avg_packed_qo_len > 64 && head_dim < 256 {
         128
     } else if avg_packed_qo_len > 16 {
         64
@@ -169,7 +180,7 @@ impl TileConfig {
     }
 
     /// [`TileConfig::new_kv`] for head dimension `head_dim`.
-    pub(crate) fn new_kv_hd(
+    pub fn new_kv_hd(
         cta_tile_q: usize,
         max_smem_per_sm: usize,
         max_smem_per_block: usize,
@@ -203,8 +214,13 @@ impl TileConfig {
         TileConfig::new_kv(cta_tile_q, 102400, 101376, kv)
     }
 
+    /// [`TileConfig::sm89_kv`] for head dimension `head_dim`.
+    pub fn sm89_hd(cta_tile_q: usize, kv: KvDtype, head_dim: usize) -> TileConfig {
+        TileConfig::new_kv_hd(cta_tile_q, 102400, 101376, kv, head_dim)
+    }
+
     /// 16-byte vectors per row of K or V in shared memory (a row is `head_dim` elements).
-    pub(crate) fn kv_vecs_hd(&self, head_dim: usize) -> usize {
+    pub fn kv_vecs_hd(&self, head_dim: usize) -> usize {
         head_dim * self.kv.bytes() / 16
     }
 
@@ -223,7 +239,7 @@ impl TileConfig {
     }
 
     /// [`TileConfig::smem_elems`] for head dimension `head_dim`.
-    pub(crate) fn smem_elems_hd(&self, head_dim: usize) -> usize {
+    pub fn smem_elems_hd(&self, head_dim: usize) -> usize {
         let qkv = self.cta_tile_q * head_dim + 2 * self.cta_tile_kv() * self.kv_vecs_hd(head_dim) * 8;
         let sync = if self.num_warps_kv > 1 {
             2 * (self.num_warps_kv * self.cta_tile_q * head_dim + self.num_warps_kv * self.cta_tile_q * 2)
@@ -353,16 +369,30 @@ impl KvElem for F8E5M2 {
 /// contiguous `[total_kv, num_kv_heads, HEAD_DIM]`, `kv_indptr` counts tokens, and
 /// `kv_indices` and `kv_last_page_len` are not read.
 pub fn kernel(spec: &KernelSpec) -> Kernel {
+    kernel_shape(spec, HEAD_DIM, false)
+}
+
+/// [`kernel`] for head dimension `head_dim` (64, 128 or 256; FP8 only at 128; `spec.tile`
+/// must be built for it, [`TileConfig::sm89_hd`]) and, with `bf16`, BFloat16 queries, K/V
+/// and output (`spec.tile.kv` must be [`KvDtype::F16`], the unquantised two-byte cache).
+/// The head-dimension-128 Float16 kernel is the same code as [`kernel`]'s.
+pub fn kernel_shape(spec: &KernelSpec, head_dim: usize, bf16: bool) -> Kernel {
     match spec.tile.kv {
-        KvDtype::F16 => build::<F16>(spec),
-        KvDtype::E4M3 => build::<F8E4M3FN>(spec),
-        KvDtype::E5M2 => build::<F8E5M2>(spec),
+        KvDtype::F16 => build::<F16>(spec, head_dim, bf16),
+        KvDtype::E4M3 => build::<F8E4M3FN>(spec, head_dim, bf16),
+        KvDtype::E5M2 => build::<F8E5M2>(spec, head_dim, bf16),
     }
 }
 
-fn build<KV: KvElem>(spec: &KernelSpec) -> Kernel {
-    Kernel::builder(spec.name()).block_dim(spec.tile.block()).build(|| {
-        let prm = Params::declare::<KV>("");
+fn build<KV: KvElem>(spec: &KernelSpec, head_dim: usize, bf16: bool) -> Kernel {
+    let name = format!(
+        "{}{}{}",
+        spec.name(),
+        if head_dim == HEAD_DIM { String::new() } else { format!("_hd{head_dim}") },
+        if bf16 { "_bf16" } else { "" }
+    );
+    Kernel::builder(name).block_dim(spec.tile.block()).build(|| {
+        let prm = Params::declare_dt::<KV>("", bf16);
         let at = CtaCoords {
             lane: thread_idx().x,
             wq: thread_idx().y,
@@ -370,8 +400,8 @@ fn build<KV: KvElem>(spec: &KernelSpec) -> Kernel {
             kv_head: block_idx().y,
             cta: block_idx().x,
         };
-        let smem = make_smem_tensor_aligned::<F16>(Layout::col_major(spec.tile.smem_elems()), 16);
-        body::<KV>(spec, &prm, &smem, at);
+        let smem = make_smem_tensor_aligned::<F16>(Layout::col_major(spec.tile.smem_elems_hd(head_dim)), 16);
+        body_dt::<KV>(spec, head_dim, bf16, &prm, &smem, at);
     })
 }
 
@@ -408,10 +438,25 @@ impl Params {
     /// Declare the parameters of [`p`], each named `prefix` + its name; K and V are
     /// declared as `KV` and viewed as Float16 words.
     pub(crate) fn declare<KV: KvElem>(prefix: &str) -> Params {
+        Self::declare_dt::<KV>(prefix, false)
+    }
+
+    /// [`Params::declare`] with BFloat16 `q`, `k_cache`, `v_cache` and `o` when `bf16`
+    /// (viewed as Float16 words).
+    pub(crate) fn declare_dt<KV: KvElem>(prefix: &str, bf16: bool) -> Params {
         let n = |s: &str| format!("{prefix}{s}");
-        let q = param_ptr::<F16>(&n("q"));
-        let k_cache = recast_ptr::<F16, KV>(&param_ptr::<KV>(&n("k_cache")), None);
-        let v_cache = recast_ptr::<F16, KV>(&param_ptr::<KV>(&n("v_cache")), None);
+        let half = |name: &str| -> Ptr<F16> {
+            if bf16 { recast_ptr::<F16, BF16>(&param_ptr::<BF16>(&n(name)), None) } else { param_ptr::<F16>(&n(name)) }
+        };
+        let q = half("q");
+        let (k_cache, v_cache) = if bf16 {
+            (half("k_cache"), half("v_cache"))
+        } else {
+            (
+                recast_ptr::<F16, KV>(&param_ptr::<KV>(&n("k_cache")), None),
+                recast_ptr::<F16, KV>(&param_ptr::<KV>(&n("v_cache")), None),
+            )
+        };
         let qo_indptr = param_ptr::<i32>(&n("qo_indptr"));
         let kv_indptr = param_ptr::<i32>(&n("kv_indptr"));
         let kv_indices = param_ptr::<i32>(&n("kv_indices"));
@@ -420,7 +465,7 @@ impl Params {
         let qo_tile_indices = param_ptr::<i32>(&n("qo_tile_indices"));
         let kv_tile_indices = param_ptr::<i32>(&n("kv_tile_indices"));
         let o_indptr = param_ptr::<i32>(&n("o_indptr"));
-        let o = param_ptr::<F16>(&n("o"));
+        let o = half("o");
         let lse = param_ptr::<f32>(&n("lse"));
         let tmp_o = param_ptr::<f32>(&n("tmp_o"));
         let tmp_lse = param_ptr::<f32>(&n("tmp_lse"));
@@ -484,9 +529,33 @@ pub(crate) fn body<KV: KvElem>(spec: &KernelSpec, prm: &Params, smem: &Tensor<F1
 /// [`body`] for head dimension `head_dim` (64 or 128; 64 with a Float16 cache only), on a
 /// shared buffer of [`TileConfig::smem_elems_hd`] elements (used by the block-sparse port).
 pub(crate) fn body_hd<KV: KvElem>(spec: &KernelSpec, head_dim: usize, prm: &Params, smem: &Tensor<F16>, at: CtaCoords) {
+    body_dt::<KV>(spec, head_dim, false, prm, smem, at)
+}
+
+/// Reinterpret the bits of 16-bit values (an even number of them) as another 16-bit type.
+fn reinterpret16<A: Numeric, B: Numeric>(v: &[Value<A>]) -> Vec<Value<B>> {
+    v.chunks(2).flat_map(|w| unpack::<B, u32, 2>(pack::<A, u32, 2>([w[0], w[1]]))).collect()
+}
+
+/// [`body_hd`] with BFloat16 queries, K/V and output when `bf16` (head dimension 64, 128
+/// or 256, no FP8). The data moves as raw 16-bit words, typed Float16 throughout; only
+/// the MMAs and the conversions of `P` and `O` are BFloat16 (bit-reinterpreted at the
+/// MMA), so the Float16 code path is untouched.
+pub(crate) fn body_dt<KV: KvElem>(
+    spec: &KernelSpec,
+    head_dim: usize,
+    bf16: bool,
+    prm: &Params,
+    smem: &Tensor<F16>,
+    at: CtaCoords,
+) {
     let KernelSpec { tile, group, page_size, causal, partition, variant } = *spec;
     assert!(!(variant.logits_soft_cap && variant.alibi), "soft-cap with ALiBi is not supported");
-    assert!(head_dim == HEAD_DIM || (head_dim == 64 && KV::KV == KvDtype::F16), "head dim {head_dim} not supported");
+    assert!(
+        head_dim == HEAD_DIM || (matches!(head_dim, 64 | 256) && KV::KV == KvDtype::F16),
+        "head dim {head_dim} not supported"
+    );
+    assert!(!bf16 || KV::KV == KvDtype::F16, "BFloat16 has no FP8 cache");
     // 16-wide MMA tiles along the head dimension, and 16-byte vectors per row of Q or O.
     let (num_mma_d, row_vecs) = (head_dim / 16, head_dim / 8);
     let TileConfig { cta_tile_q, num_mma_q: nq, num_mma_kv: nkv, num_warps_q, num_warps_kv, .. } = tile;
@@ -580,7 +649,8 @@ pub(crate) fn body_hd<KV: KvElem>(spec: &KernelSpec, head_dim: usize, prm: &Para
         let q_words = make_tensor(q, Layout::col_major((2, BOUND / 2)));
         let ldsm = make_copy_atom::<F16>(CopyOp::LdMatrix { num: 4, trans: false });
         let ldsm_t = make_copy_atom::<F16>(CopyOp::LdMatrix { num: 4, trans: true });
-        let mma = make_tiled_mma(MmaF16BF16Op::new(DType::F16, DType::F32, (16, 8, 16)), Layout::col_major((1, 1, 1)));
+        let half = if bf16 { DType::BF16 } else { DType::F16 };
+        let mma = make_tiled_mma(MmaF16BF16Op::new(half, DType::F32, (16, 8, 16)), Layout::col_major((1, 1, 1)));
 
         // A predicated 16-byte cp.async (zero-filled when off) from global vector `gvec`
         // of `src` to shared vector `svec`.
@@ -598,6 +668,18 @@ pub(crate) fn body_hd<KV: KvElem>(spec: &KernelSpec, head_dim: usize, prm: &Para
         };
         // One m16n8k16 MMA: `a` (8 values), `b` (4) and `c` (4) in PTX register order.
         let mma16 = |a: &[Value<F16>], b: &[Value<F16>], c: &[Float32]| -> Vec<Float32> {
+            if bf16 {
+                let (fa, fb, fc) = (
+                    make_fragment::<BF16>((8, 1, 1)),
+                    make_fragment::<BF16>((4, 1, 1)),
+                    make_fragment::<f32>((4, 1, 1)),
+                );
+                fa.store_values(&reinterpret16::<F16, BF16>(a));
+                fb.store_values(&reinterpret16::<F16, BF16>(b));
+                fc.store_values(c);
+                gemm(&mma, &fc, &fa, &fb, &fc);
+                return fc.values();
+            }
             let (fa, fb, fc) =
                 (make_fragment::<F16>((8, 1, 1)), make_fragment::<F16>((4, 1, 1)), make_fragment::<f32>((4, 1, 1)));
             fa.store_values(a);
@@ -768,7 +850,17 @@ pub(crate) fn body_hd<KV: KvElem>(spec: &KernelSpec, head_dim: usize, prm: &Para
         let o_state = Var::new(vec![zero; nq * num_mma_d * 8]);
         let m_state = Var::new(vec![Float32::from(f32::NEG_INFINITY); nq * 2]);
         let d_state = Var::new(vec![Float32::from(1.0f32); nq * 2]);
-        let ones = vec![Value::<F16>::from(F16::from_f32(1.0)); 4];
+        // 1.0 in the data type (BFloat16's bits for BFloat16), for the row sums.
+        let ones = vec![Value::<F16>::from(if bf16 { F16(0x3F80) } else { F16::from_f32(1.0) }); 4];
+        // Float32 values rounded to the data type, as words typed Float16.
+        let to_half = |x: &[Float32]| -> Vec<Value<F16>> {
+            if bf16 {
+                let b: Vec<Value<BF16>> = x.iter().map(|v| v.to::<BF16>()).collect();
+                reinterpret16::<BF16, F16>(&b)
+            } else {
+                x.iter().map(|v| v.to::<F16>()).collect()
+            }
+        };
 
         for_range(0, num_iterations, 1, |iter| {
             // Page-table reads for the next tile, first used after this tile's Q K^T.
@@ -926,7 +1018,7 @@ pub(crate) fn body_hd<KV: KvElem>(spec: &KernelSpec, head_dim: usize, prm: &Para
             sync_threads();
 
             // P in f16 (the A operand), row sums by an MMA against ones, then O += P V.
-            let p16: Vec<Value<F16>> = p.iter().map(|x| x.to::<F16>()).collect();
+            let p16: Vec<Value<F16>> = to_half(&p);
             for mq in 0..nq {
                 for mk in 0..nkv {
                     let at = (mq * nkv + mk) * 8;
@@ -1137,7 +1229,7 @@ pub(crate) fn body_hd<KV: KvElem>(spec: &KernelSpec, head_dim: usize, prm: &Para
                             for j in 0..2 {
                                 let at = (mq * num_mma_d + md) * 8 + 4 * n + 2 * j;
                                 let pair = (vec + (8 * row_vecs * j) as i32) * 4 + lane % 4;
-                                let vals: Vec<Value<F16>> = o_v[at..at + 2].iter().map(|x| x.to::<F16>()).collect();
+                                let vals: Vec<Value<F16>> = to_half(&o_v[at..at + 2]);
                                 s_pairs.slice((.., pair)).store_values(&vals);
                             }
                         }
@@ -1223,10 +1315,26 @@ impl Plan {
         max_grid: usize,
         min_chunk_pages: usize,
     ) -> Plan {
+        Self::with_min_chunk_hd(qo_lens, kv_pages, page_size, group, num_kv_heads, max_grid, min_chunk_pages, HEAD_DIM)
+    }
+
+    /// [`Plan::with_min_chunk`] for head dimension `head_dim` (the query tile and the tile
+    /// shape depend on it; chunks do not).
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_min_chunk_hd(
+        qo_lens: &[usize],
+        kv_pages: &[usize],
+        page_size: usize,
+        group: usize,
+        num_kv_heads: usize,
+        max_grid: usize,
+        min_chunk_pages: usize,
+        head_dim: usize,
+    ) -> Plan {
         let batch = qo_lens.len();
         let packed: Vec<usize> = qo_lens.iter().map(|l| l * group).collect();
-        let cta_tile_q = fa2_cta_tile_q(packed.iter().sum::<usize>() / batch);
-        let tile = TileConfig::sm89(cta_tile_q);
+        let cta_tile_q = fa2_cta_tile_q_hd(packed.iter().sum::<usize>() / batch, head_dim);
+        let tile = TileConfig::sm89_hd(cta_tile_q, KvDtype::F16, head_dim);
         let max_batch_if_split = max_grid / num_kv_heads;
         let max_kv = kv_pages.iter().copied().max().unwrap_or(1).max(1);
         let ctas = |c: usize| {
@@ -1276,7 +1384,19 @@ impl Plan {
     /// max_grid / (num_kv_heads * tiles)` chunks, KV chunks of `max(ceil(kv_len /
     /// max_chunks), 256)` tokens, split when there is more than one.
     pub fn single(qo_len: usize, kv_len: usize, group: usize, num_kv_heads: usize, max_grid: usize) -> Plan {
-        let cta_tile_q = fa2_cta_tile_q(qo_len * group);
+        Self::single_hd(qo_len, kv_len, group, num_kv_heads, max_grid, HEAD_DIM)
+    }
+
+    /// [`Plan::single`] for head dimension `head_dim`.
+    pub fn single_hd(
+        qo_len: usize,
+        kv_len: usize,
+        group: usize,
+        num_kv_heads: usize,
+        max_grid: usize,
+        head_dim: usize,
+    ) -> Plan {
+        let cta_tile_q = fa2_cta_tile_q_hd(qo_len * group, head_dim);
         let q_tiles = (qo_len * group).div_ceil(cta_tile_q);
         let max_chunks = max_grid / (num_kv_heads * q_tiles);
         let chunk = if max_chunks > 0 { kv_len.div_ceil(max_chunks).max(256) } else { kv_len };
@@ -1294,7 +1414,7 @@ impl Plan {
             }
         }
         Plan {
-            tile: TileConfig::sm89(cta_tile_q),
+            tile: TileConfig::sm89_hd(cta_tile_q, KvDtype::F16, head_dim),
             split,
             kv_chunk_size: chunk,
             request_indices,
@@ -1307,8 +1427,13 @@ impl Plan {
 
     /// This plan with the tile shape of a K/V cache of type `kv` (the planner's chunks
     /// do not depend on it, as FlashInfer's).
-    pub fn for_kv(mut self, kv: KvDtype) -> Plan {
-        self.tile = TileConfig::sm89_kv(self.tile.cta_tile_q, kv);
+    pub fn for_kv(self, kv: KvDtype) -> Plan {
+        self.for_kv_hd(kv, HEAD_DIM)
+    }
+
+    /// [`Plan::for_kv`] for head dimension `head_dim`.
+    pub fn for_kv_hd(mut self, kv: KvDtype, head_dim: usize) -> Plan {
+        self.tile = TileConfig::sm89_hd(self.tile.cta_tile_q, kv, head_dim);
         self
     }
 
@@ -1331,6 +1456,11 @@ pub struct Problem {
     pub num_kv_heads: usize,
     pub group: usize,
     pub causal: bool,
+    /// The head dimension (64, 128 or 256).
+    pub head_dim: usize,
+    /// BFloat16 queries, cache and output ([`Problem::bf16`]); the host vectors then hold
+    /// the BFloat16 values (exact in Float16), uploaded as BFloat16.
+    pub bf16: bool,
     pub q: Vec<F16>,
     pub k_cache: Vec<F16>,
     pub v_cache: Vec<F16>,
@@ -1372,6 +1502,22 @@ impl Problem {
         causal: bool,
         seed: u64,
     ) -> Problem {
+        Self::new_hd(qo_lens, kv_lens, page_size, num_kv_heads, group, causal, HEAD_DIM, seed)
+    }
+
+    /// [`Problem::new`] for head dimension `head_dim` (scale `1/sqrt(head_dim)`).
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_hd(
+        qo_lens: &[usize],
+        kv_lens: &[usize],
+        page_size: usize,
+        num_kv_heads: usize,
+        group: usize,
+        causal: bool,
+        head_dim: usize,
+        seed: u64,
+    ) -> Problem {
+        assert!(matches!(head_dim, 64 | 128 | 256), "head dim {head_dim} not supported");
         assert_eq!(qo_lens.len(), kv_lens.len());
         assert!(qo_lens.iter().chain(kv_lens).all(|&l| l > 0), "every request needs queries and KV tokens");
         let mut state = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
@@ -1398,7 +1544,7 @@ impl Problem {
         }
         let kv_last_page_len = kv_lens.iter().map(|&l| (l - (l.div_ceil(page_size) - 1) * page_size) as i32).collect();
         let total_q: usize = qo_lens.iter().sum();
-        let cache = num_pages * page_size * num_kv_heads * HEAD_DIM;
+        let cache = num_pages * page_size * num_kv_heads * head_dim;
         // Large inputs are filled from a cheap repeating pattern (the f64 reference is
         // only run on small ones).
         let mut fill = |n: usize| -> Vec<F16> {
@@ -1416,14 +1562,15 @@ impl Problem {
             num_kv_heads,
             group,
             causal,
-            q: fill(total_q * num_kv_heads * group * HEAD_DIM),
+            head_dim,
+            q: fill(total_q * num_kv_heads * group * head_dim),
             k_cache: fill(cache),
             v_cache: fill(cache),
             qo_indptr,
             kv_indptr,
             kv_indices,
             kv_last_page_len,
-            sm_scale: 1.0 / (HEAD_DIM as f32).sqrt(),
+            sm_scale: 1.0 / (head_dim as f32).sqrt(),
             ..Problem::no_variant()
         }
     }
@@ -1438,10 +1585,24 @@ impl Problem {
         causal: bool,
         seed: u64,
     ) -> Problem {
+        Self::new_ragged_hd(qo_lens, kv_lens, num_kv_heads, group, causal, HEAD_DIM, seed)
+    }
+
+    /// [`Problem::new_ragged`] for head dimension `head_dim`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_ragged_hd(
+        qo_lens: &[usize],
+        kv_lens: &[usize],
+        num_kv_heads: usize,
+        group: usize,
+        causal: bool,
+        head_dim: usize,
+        seed: u64,
+    ) -> Problem {
         // A one-token-page problem has the ragged layout up to its page table, which the
         // ragged problem drops.
-        let p = Problem::new(qo_lens, kv_lens, 1, num_kv_heads, group, causal, seed);
-        let row = num_kv_heads * HEAD_DIM;
+        let p = Problem::new_hd(qo_lens, kv_lens, 1, num_kv_heads, group, causal, head_dim, seed);
+        let row = num_kv_heads * head_dim;
         let gather = |cache: &[F16]| -> Vec<F16> {
             p.kv_indices
                 .iter()
@@ -1476,8 +1637,10 @@ impl Problem {
                 .collect()
         };
         let (qo_indptr, kv_indptr) = (indptr(qo_lens), indptr(kv_lens));
-        assert_eq!(q.len(), *qo_indptr.last().unwrap() as usize * num_kv_heads * group * HEAD_DIM);
-        assert_eq!(k.len(), *kv_indptr.last().unwrap() as usize * num_kv_heads * HEAD_DIM);
+        let head_dim = q.len() / (*qo_indptr.last().unwrap() as usize * num_kv_heads * group);
+        assert!(matches!(head_dim, 64 | 128 | 256), "head dim {head_dim} not supported");
+        assert_eq!(q.len(), *qo_indptr.last().unwrap() as usize * num_kv_heads * group * head_dim);
+        assert_eq!(k.len(), *kv_indptr.last().unwrap() as usize * num_kv_heads * head_dim);
         assert_eq!(v.len(), k.len());
         Problem {
             qo_lens: qo_lens.to_vec(),
@@ -1486,6 +1649,7 @@ impl Problem {
             num_kv_heads,
             group,
             causal,
+            head_dim,
             q,
             k_cache: k,
             v_cache: v,
@@ -1493,7 +1657,7 @@ impl Problem {
             kv_indptr,
             kv_indices: vec![0],
             kv_last_page_len: vec![1; qo_lens.len()],
-            sm_scale: 1.0 / (HEAD_DIM as f32).sqrt(),
+            sm_scale: 1.0 / (head_dim as f32).sqrt(),
             ..Problem::no_variant()
         }
     }
@@ -1507,6 +1671,8 @@ impl Problem {
             num_kv_heads: 1,
             group: 1,
             causal: false,
+            head_dim: HEAD_DIM,
+            bf16: false,
             q: vec![],
             k_cache: vec![],
             v_cache: vec![],
@@ -1529,6 +1695,24 @@ impl Problem {
             k_scale: 1.0,
             v_scale: 1.0,
         }
+    }
+
+    /// This problem with BFloat16 queries, cache and output: the data rounded to BFloat16
+    /// (to nearest even; the reference then uses the rounded values), the kernels built
+    /// for BFloat16 ([`kernel_shape`]).
+    pub fn bf16(mut self) -> Problem {
+        assert_eq!(self.kv_dtype, KvDtype::F16, "BFloat16 has no FP8 cache");
+        // Rounding a Float16 value to 8 significant bits stays exact in Float16.
+        let round = |v: &mut Vec<F16>| {
+            for x in v.iter_mut() {
+                *x = F16::from_f32(BF16::from_f32(x.to_f32()).to_f32());
+            }
+        };
+        for v in [&mut self.q, &mut self.k_cache, &mut self.v_cache] {
+            round(v);
+        }
+        self.bf16 = true;
+        self
     }
 
     /// This problem with its K/V cache quantised to `kv` with scales `k_scale`, `v_scale`
@@ -1646,9 +1830,9 @@ impl Problem {
 
     pub fn plan_with_min_chunk(&self, max_grid: usize, min_chunk_pages: usize) -> Plan {
         let packed: usize = self.qo_lens.iter().sum::<usize>() * self.group;
-        let cta_tile_q = fa2_cta_tile_q(packed / self.qo_lens.len());
+        let cta_tile_q = fa2_cta_tile_q_hd(packed / self.qo_lens.len(), self.head_dim);
         let pages: Vec<usize> = (0..self.qo_lens.len()).map(|b| self.plan_pages(b, cta_tile_q)).collect();
-        Plan::with_min_chunk(
+        Plan::with_min_chunk_hd(
             &self.qo_lens,
             &pages,
             self.page_tokens(),
@@ -1656,8 +1840,9 @@ impl Problem {
             self.num_kv_heads,
             max_grid,
             min_chunk_pages,
+            self.head_dim,
         )
-        .for_kv(self.kv_dtype)
+        .for_kv_hd(self.kv_dtype, self.head_dim)
     }
 
     pub fn spec(&self, plan: &Plan) -> KernelSpec {
@@ -1677,15 +1862,16 @@ impl Problem {
 
     /// The merge's launch: one CTA per (query token, query head).
     pub fn merge_launch(&self) -> LaunchConfig {
-        LaunchConfig::new([self.total_q() as u32, self.num_qo_heads() as u32, 1], [HEAD_DIM as u32, 1, 1])
+        LaunchConfig::new([self.total_q() as u32, self.num_qo_heads() as u32, 1], [self.head_dim as u32, 1, 1])
     }
 
     /// The prefill kernel's arguments, in the order of [`p`].
     pub fn args(&self, plan: &Plan) -> Vec<KernelArg> {
         let n_o = self.q.len();
         let rows = plan.tmp_rows();
+        let hd = self.head_dim;
         vec![
-            KernelArg::buffer(&self.q),
+            self.half_arg(&self.q),
             self.cache_arg(&self.k_cache, &self.k_fp8),
             self.cache_arg(&self.v_cache, &self.v_fp8),
             KernelArg::i32(self.qo_indptr.clone()),
@@ -1696,9 +1882,9 @@ impl Problem {
             KernelArg::i32(plan.qo_tile_indices.clone()),
             KernelArg::i32(plan.kv_tile_indices.clone()),
             KernelArg::i32(plan.o_indptr.clone()),
-            KernelArg::buffer(&vec![F16::from_f32(0.0); n_o]),
-            KernelArg::f32(vec![0.0; n_o / HEAD_DIM]),
-            KernelArg::f32(vec![0.0; rows * self.num_qo_heads() * HEAD_DIM]),
+            self.half_arg(&vec![F16::from_f32(0.0); n_o]),
+            KernelArg::f32(vec![0.0; n_o / hd]),
+            KernelArg::f32(vec![0.0; rows * self.num_qo_heads() * hd]),
             KernelArg::f32(vec![0.0; rows * self.num_qo_heads()]),
             KernelArg::i32(plan.merge_indptr.clone()),
             KernelArg::ScalarI32(self.num_kv_heads as i32),
@@ -1716,9 +1902,18 @@ impl Problem {
         ]
     }
 
+    /// A Float16 (or, for a BFloat16 problem, BFloat16) buffer argument of the host values.
+    fn half_arg(&self, v: &[F16]) -> KernelArg {
+        if self.bf16 {
+            KernelArg::buffer(&v.iter().map(|x| BF16::from_f32(x.to_f32())).collect::<Vec<_>>())
+        } else {
+            KernelArg::buffer(v)
+        }
+    }
+
     fn cache_arg(&self, f16: &[F16], fp8: &[u8]) -> KernelArg {
         match self.kv_dtype {
-            KvDtype::F16 => KernelArg::buffer(f16),
+            KvDtype::F16 => self.half_arg(f16),
             KvDtype::E4M3 => KernelArg::buffer(&fp8.iter().map(|&b| F8E4M3FN(b)).collect::<Vec<_>>()),
             KvDtype::E5M2 => KernelArg::buffer(&fp8.iter().map(|&b| F8E5M2(b)).collect::<Vec<_>>()),
         }
@@ -1733,26 +1928,27 @@ impl Problem {
         let f = |x: F16| x.to_f32() as f64;
         let (sm, cap) = (self.sm_scale as f64 * self.k_scale as f64, self.logits_soft_cap as f64);
         let mut o = vec![0f32; self.q.len()];
-        let mut lse = vec![0f32; self.q.len() / HEAD_DIM];
+        let hd = self.head_dim;
+        let mut lse = vec![0f32; self.q.len() / hd];
         for (b, (&qo_len, &kv_len)) in self.qo_lens.iter().zip(&self.kv_lens).enumerate() {
             let addr = |t: usize, h: usize| {
                 let start = self.kv_indptr[b] as usize;
                 let row =
                     if self.is_ragged() { start + t } else { self.kv_indices[start + t / ps] as usize * ps + t % ps };
-                (row * hkv + h) * HEAD_DIM
+                (row * hkv + h) * hd
             };
             for i in 0..qo_len {
                 let token = self.qo_indptr[b] as usize + i;
                 let visible: Vec<usize> = (0..kv_len).filter(|&t| self.visible(b, i, t)).collect();
                 for qh in 0..n_qo {
                     let h = qh / self.group;
-                    let qrow = (token * n_qo + qh) * HEAD_DIM;
+                    let qrow = (token * n_qo + qh) * hd;
                     let slope = self.alibi_slopes.get(qh).map_or(0.0, |&x| x as f64);
                     let s: Vec<f64> = visible
                         .iter()
                         .map(|&t| {
                             let a = addr(t, h);
-                            let qk = (0..HEAD_DIM).map(|e| f(self.q[qrow + e]) * f(self.k_cache[a + e])).sum::<f64>();
+                            let qk = (0..hd).map(|e| f(self.q[qrow + e]) * f(self.k_cache[a + e])).sum::<f64>();
                             self.variant.ref_logit(qk, sm, cap, slope, i, t)
                         })
                         .collect();
@@ -1760,7 +1956,7 @@ impl Problem {
                     let w: Vec<f64> = s.iter().map(|x| (x - mx).exp()).collect();
                     let sum: f64 = w.iter().sum();
                     lse[token * n_qo + qh] = ((mx + sum.ln()) * std::f64::consts::LOG2_E) as f32;
-                    for e in 0..HEAD_DIM {
+                    for e in 0..hd {
                         let acc: f64 =
                             visible.iter().zip(&w).map(|(&t, wt)| wt * f(self.v_cache[addr(t, h) + e])).sum();
                         o[qrow + e] = (acc / sum * self.v_scale as f64) as f32;
@@ -1781,9 +1977,9 @@ impl Problem {
             .map(|(&q, &k)| {
                 let (q, k) = (q as f64, k as f64);
                 if self.causal {
-                    (2.0 * k - q) * q * h * 2.0 * HEAD_DIM as f64
+                    (2.0 * k - q) * q * h * 2.0 * self.head_dim as f64
                 } else {
-                    4.0 * q * k * h * HEAD_DIM as f64
+                    4.0 * q * k * h * self.head_dim as f64
                 }
             })
             .sum()
@@ -1816,15 +2012,21 @@ pub fn simulate(p: &Problem, max_grid: usize, min_chunk_pages: usize) -> (Plan, 
 /// Run `p` under `plan` on the simulator; returns `o` (as f32) and `lse`.
 pub fn execute(p: &Problem, plan: &Plan) -> (Vec<f32>, Vec<f32>) {
     let mut args = p.args(plan);
-    let k = kernel(&p.spec(plan));
+    let k = kernel_shape(&p.spec(plan), p.head_dim, p.bf16);
     k.simulate(p.launch(plan), &mut args).unwrap_or_else(|e| panic!("{}: {e}", k.name()));
     if plan.split {
         let mut margs = merge_args(p, &args);
-        crate::decode::merge_kernel().simulate(p.merge_launch(), &mut margs).unwrap_or_else(|e| panic!("merge: {e}"));
+        crate::decode::merge_kernel_shape(p.head_dim, p.bf16)
+            .simulate(p.merge_launch(), &mut margs)
+            .unwrap_or_else(|e| panic!("merge: {e}"));
         args[p::O] = margs[crate::decode::mp::O].clone();
         args[p::LSE] = margs[crate::decode::mp::LSE].clone();
     }
-    let o: Vec<f32> = args[p::O].to_vec::<F16>().into_iter().map(|x| x.to_f32()).collect();
+    let o: Vec<f32> = if p.bf16 {
+        args[p::O].to_vec::<BF16>().into_iter().map(|x| x.to_f32()).collect()
+    } else {
+        args[p::O].to_vec::<F16>().into_iter().map(|x| x.to_f32()).collect()
+    };
     (o, args[p::LSE].as_f32().to_vec())
 }
 
@@ -1872,12 +2074,13 @@ impl Problem {
     pub fn single_plan(&self, max_grid: usize) -> Plan {
         assert_eq!(self.qo_lens.len(), 1, "a single-request plan needs one request");
         let kv = if self.windowed_causal() {
-            let cta_tile_q = fa2_cta_tile_q(self.qo_lens[0] * self.group);
+            let cta_tile_q = fa2_cta_tile_q_hd(self.qo_lens[0] * self.group, self.head_dim);
             self.kv_lens[0].min(self.window_left as usize + cta_tile_q)
         } else {
             self.kv_lens[0]
         };
-        Plan::single(self.qo_lens[0], kv, self.group, self.num_kv_heads, max_grid).for_kv(self.kv_dtype)
+        Plan::single_hd(self.qo_lens[0], kv, self.group, self.num_kv_heads, max_grid, self.head_dim)
+            .for_kv_hd(self.kv_dtype, self.head_dim)
     }
 }
 
@@ -1894,7 +2097,7 @@ pub mod gpu {
     use cute::prelude::*;
     use cute::testing::{BenchmarkOptions, benchmark};
 
-    use super::{KernelSpec, Plan, Problem, kernel, max_error};
+    use super::{KernelSpec, Plan, Problem, kernel_shape, max_error};
 
     type Loaded<'c> = Rc<(Kernel, CudaFunction<'c>)>;
 
@@ -1903,7 +2106,8 @@ pub mod gpu {
         ctx: &'c CudaContext,
         tc: Toolchain,
         opts: CompileOptions,
-        cache: RefCell<HashMap<KernelSpec, Loaded<'c>>>,
+        cache: RefCell<HashMap<(KernelSpec, usize, bool), Loaded<'c>>>,
+        merges: RefCell<HashMap<(usize, bool), Loaded<'c>>>,
         pub merge: (Kernel, CudaFunction<'c>),
         /// CTAs the planner assumes run at once: 2 per SM, as FlashInfer's.
         pub max_grid: usize,
@@ -1921,6 +2125,7 @@ pub mod gpu {
                 tc,
                 opts,
                 cache: RefCell::new(HashMap::new()),
+                merges: RefCell::new(HashMap::new()),
                 merge: (merge_k, merge_f),
                 max_grid: 2 * sms,
             })
@@ -1928,13 +2133,30 @@ pub mod gpu {
 
         /// The kernel for `spec`, compiled on first use.
         pub fn get(&self, spec: &KernelSpec) -> Result<Loaded<'c>, Box<dyn Error>> {
-            if let Some(k) = self.cache.borrow().get(spec) {
+            self.get_shape(spec, super::HEAD_DIM, false)
+        }
+
+        /// The kernel for `spec` at head dimension `head_dim` and Q/O type ([`kernel_shape`]).
+        pub fn get_shape(&self, spec: &KernelSpec, head_dim: usize, bf16: bool) -> Result<Loaded<'c>, Box<dyn Error>> {
+            if let Some(k) = self.cache.borrow().get(&(*spec, head_dim, bf16)) {
                 return Ok(k.clone());
             }
-            let k = kernel(spec);
+            let k = kernel_shape(spec, head_dim, bf16);
             let f = self.ctx.load(&k.compile_with(&self.tc, &self.opts)?)?;
             let loaded = Rc::new((k, f));
-            self.cache.borrow_mut().insert(*spec, loaded.clone());
+            self.cache.borrow_mut().insert((*spec, head_dim, bf16), loaded.clone());
+            Ok(loaded)
+        }
+
+        /// The merge kernel for head dimension `head_dim` and output type.
+        pub fn merge_shape(&self, head_dim: usize, bf16: bool) -> Result<Loaded<'c>, Box<dyn Error>> {
+            if let Some(k) = self.merges.borrow().get(&(head_dim, bf16)) {
+                return Ok(k.clone());
+            }
+            let k = crate::decode::merge_kernel_shape(head_dim, bf16);
+            let f = self.ctx.load(&k.compile_with(&self.tc, &self.opts)?)?;
+            let loaded = Rc::new((k, f));
+            self.merges.borrow_mut().insert((head_dim, bf16), loaded.clone());
             Ok(loaded)
         }
     }
@@ -2001,7 +2223,8 @@ pub mod gpu {
         time: Option<usize>,
     ) -> Result<(Option<(Vec<f32>, Vec<f32>)>, Option<f64>), Box<dyn Error>> {
         let ctx = ks.ctx;
-        let loaded = ks.get(&p.spec(plan))?;
+        let loaded = ks.get_shape(&p.spec(plan), p.head_dim, p.bf16)?;
+        let merge = ks.merge_shape(p.head_dim, p.bf16)?;
         let (pk, pf) = (&loaded.0, &loaded.1);
         let host = p.args(plan);
         let mut bufs = Vec::new();
@@ -2030,7 +2253,7 @@ pub mod gpu {
         let mut launch = |s: &cute::cuda::CudaStream<'_>, _w: usize| -> Result<(), Box<dyn Error>> {
             ctx.launch_builder(pk, pf, p.launch(plan)).stream(s).args(&args).submit()?;
             if plan.split {
-                ctx.launch_builder(&ks.merge.0, &ks.merge.1, p.merge_launch()).stream(s).args(&margs).submit()?;
+                ctx.launch_builder(&merge.0, &merge.1, p.merge_launch()).stream(s).args(&margs).submit()?;
             }
             Ok(())
         };
@@ -2038,7 +2261,11 @@ pub mod gpu {
         launch(&stream, 0)?;
         stream.synchronize()?;
         let out = if fetch {
-            let o: Vec<f32> = bufs[pp::O].to_vec::<F16>()?.into_iter().map(|x| x.to_f32()).collect();
+            let o: Vec<f32> = if p.bf16 {
+                bufs[pp::O].to_vec::<u16>()?.into_iter().map(|x| BF16(x).to_f32()).collect()
+            } else {
+                bufs[pp::O].to_vec::<F16>()?.into_iter().map(|x| x.to_f32()).collect()
+            };
             Some((o, bufs[pp::LSE].to_vec::<f32>()?))
         } else {
             None

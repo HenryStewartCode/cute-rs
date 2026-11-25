@@ -277,3 +277,54 @@ fn fp8_lowers_to_cvt() {
     assert!(ptx.contains("ldmatrix.sync.aligned.m8n8.x4.trans.shared.b16"));
     assert!(ptx.contains("cp.async.cg.shared.global"));
 }
+
+/// Head dimensions 64 and 256 and BFloat16 queries/K/V/output (FlashInfer's fa2 prefill
+/// instantiations), paged and ragged, causal and not, whole and split (so the merge runs
+/// too), against the f64 reference on the BFloat16-rounded inputs (the output is rounded to
+/// BFloat16, so its tolerance is wider). Head dimension 128 in Float16 is the original path.
+#[test]
+fn head_dims_and_bf16_match_reference() {
+    for hd in [64usize, 128, 256] {
+        for bf16 in [false, true] {
+            if hd == 128 && !bf16 {
+                continue;
+            }
+            let (to, tl) = if bf16 { (8e-3, 4e-3) } else { (4e-3, 2e-3) };
+            let make = |p: Problem| if bf16 { p.bf16() } else { p };
+            // A decode-like and a prefill-like batch (the 16- and 64/128-row query tiles).
+            for (qo, kv, group, causal) in
+                [(vec![1usize, 2, 3], vec![9usize, 40, 21], 4usize, false), (vec![20, 33], vec![37, 50], 2, true)]
+            {
+                let p = make(Problem::new_hd(&qo, &kv, 4, 2, group, causal, hd, 7));
+                for (max_grid, min_chunk) in [(1000, 32), (6, 1)] {
+                    let (plan, eo, el) = simulate(&p, max_grid, min_chunk);
+                    assert!(
+                        eo < to && el < tl,
+                        "hd {hd} bf16 {bf16} qo {qo:?} split {} tile {}: |o| {eo:.2e}, |lse| {el:.2e}",
+                        plan.split,
+                        plan.tile.cta_tile_q
+                    );
+                }
+            }
+            let p = make(Problem::new_ragged_hd(&[17, 5], &[30, 22], 1, 4, true, hd, 3)).with_soft_cap(5.0);
+            let (_, eo, el) = simulate(&p, 6, 1);
+            assert!(eo < to && el < tl, "ragged hd {hd} bf16 {bf16} cap: |o| {eo:.2e}, |lse| {el:.2e}");
+        }
+    }
+}
+
+/// Head dimension 256 never plans the 128-row tile; the new shapes keep distinct kernel
+/// names, and the original keeps its own (so its PTX is unchanged).
+#[test]
+fn head_dim_planning_and_names() {
+    assert_eq!(fa2_cta_tile_q_hd(500, 128), 128);
+    assert_eq!(fa2_cta_tile_q_hd(500, 256), 64);
+    assert_eq!(fa2_cta_tile_q_hd(10, 256), 16);
+    let p = Problem::new_hd(&[300], &[300], 16, 1, 1, true, 256, 1);
+    assert_eq!(p.plan(44).tile.cta_tile_q, 64);
+    let spec = p.spec(&p.plan(44));
+    assert_eq!(kernel_shape(&spec, 256, true).name(), format!("{}_hd256_bf16", spec.name()));
+    let q = Problem::new(&[300], &[300], 16, 1, 1, true, 1);
+    let qs = q.spec(&q.plan(44));
+    assert_eq!(kernel(&qs).name(), qs.name());
+}

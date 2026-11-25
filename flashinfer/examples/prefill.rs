@@ -16,6 +16,9 @@
 //! soft-cap 30, a causal custom mask; compare with `attention_variants_flashinfer_bench.py`),
 //! and an FP8 (E4M3 and E5M2) KV cache against Float16 on the shapes above (compare with
 //! `prefill_fp8_flashinfer_bench.py`); `FP8_ONLY=1` runs only the FP8 part.
+//! `HD=64` or `HD=256` picks another head dimension and `DT=bf16` BFloat16 queries, cache
+//! and output; the run then does the plain checks and causal timings in that shape only
+//! (compare with `prefill_flashinfer_bench.py` run with the same `HD` and `DT`).
 
 #[cfg(feature = "cuda")]
 use std::error::Error;
@@ -32,7 +35,20 @@ fn gpu_main() -> Result<(), Box<dyn Error>> {
     let ctx = CudaContext::new(0)?;
     let tc = Toolchain::discover().ok_or("no mlir-opt found; set CUTE_MLIR_OPT")?;
     let ks = Kernels::new(&ctx, tc)?;
-    println!("device: {}, planner grid: {} CTAs", ctx.name(), ks.max_grid);
+    let hd = std::env::var("HD").ok().map_or(HEAD_DIM, |v| v.parse().expect("HD is 64, 128 or 256"));
+    let bf16 = std::env::var("DT").is_ok_and(|v| v == "bf16");
+    let other_shape = hd != HEAD_DIM || bf16;
+    let tol_o = if bf16 { 8e-3 } else { 2e-3 };
+    let make = |qo: &[usize], kv: &[usize], page: usize, heads: usize, group: usize, causal: bool, seed: u64| {
+        let p = Problem::new_hd(qo, kv, page, heads, group, causal, hd, seed);
+        if bf16 { p.bf16() } else { p }
+    };
+    println!(
+        "device: {}, planner grid: {} CTAs, head dim {hd}, {}",
+        ctx.name(),
+        ks.max_grid,
+        if bf16 { "bf16" } else { "f16" }
+    );
     if std::env::var_os("FP8_ONLY").is_some() {
         return fp8(&ks);
     }
@@ -48,7 +64,7 @@ fn gpu_main() -> Result<(), Box<dyn Error>> {
         if std::env::var_os("SKIP_CHECKS").is_some() {
             break;
         }
-        let p = Problem::new(&qo, &kv, page, heads, group, causal, 11);
+        let p = make(&qo, &kv, page, heads, group, causal, 11);
         let (plan, eo, el, _) = run(&ks, &p, true, None)?;
         println!(
             "check qo {qo:?} kv {kv:?} page {page} heads {}/{heads} causal {causal}: tile {} split {} ({} CTAs x {heads}), \
@@ -58,16 +74,16 @@ fn gpu_main() -> Result<(), Box<dyn Error>> {
             plan.split,
             plan.num_ctas()
         );
-        if !(eo < 2e-3 && el < 1e-3) {
+        if !(eo < tol_o && el < if bf16 { 4e-3 } else { 1e-3 }) {
             return Err("out of tolerance".into());
         }
     }
-    // Timings: causal, page size 16, 8 KV heads x 4 (32 query heads), head dim 128, f16.
+    // Timings: causal, page size 16, 8 KV heads x 4 (32 query heads).
     println!("batch  qo=kv  causal  tile  split  ctas     gpu(us)   TFLOPS");
     let timings = std::env::var_os("VARIANTS_ONLY").is_none();
     for batch in if timings { vec![1usize, 8] } else { vec![] } {
         for n in [512usize, 2048, 8192] {
-            let p = Problem::new(&vec![n; batch], &vec![n; batch], 16, 8, 4, true, 3);
+            let p = make(&vec![n; batch], &vec![n; batch], 16, 8, 4, true, 3);
             let iterations = if batch * n * n <= 8 * 2048 * 2048 { 100 } else { 20 };
             let (plan, _, _, t) = run(&ks, &p, false, Some(iterations))?;
             let t = t.unwrap();
@@ -80,6 +96,9 @@ fn gpu_main() -> Result<(), Box<dyn Error>> {
                 p.flops() / (t * 1e-6) / 1e12
             );
         }
+    }
+    if other_shape {
+        return Ok(());
     }
     variants(&ks)?;
     fp8(&ks)
@@ -238,6 +257,21 @@ fn main() {
                 );
                 assert!(eo < 2e-3 && el < 1e-3, "out of tolerance");
             }
+        }
+    }
+    // Head dimensions 64 and 256 and BFloat16 (the 64-row and 16-row tiles), whole and split.
+    for (hd, bf16) in [(64usize, false), (256, false), (128, true), (64, true), (256, true)] {
+        let p = Problem::new_hd(&[9, 13], &[37, 13], 4, 1, 4, true, hd, 7);
+        let p = if bf16 { p.bf16() } else { p };
+        for grid in [1, 1000] {
+            let (plan, eo, el) = simulate(&p, grid, 1);
+            println!(
+                "head dim {hd} {}: tile {} split {}: max |o - ref| = {eo:.2e}, max |lse - ref| = {el:.2e}",
+                if bf16 { "bf16" } else { "f16" },
+                plan.tile.cta_tile_q,
+                plan.split
+            );
+            assert!(eo < if bf16 { 8e-3 } else { 2e-3 } && el < 1e-3, "out of tolerance");
         }
     }
     // An FP8 (E4M3) KV cache with scales, whole and split.

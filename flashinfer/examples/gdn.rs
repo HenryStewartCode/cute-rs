@@ -31,16 +31,26 @@ fn gpu_main() -> Result<(), Box<dyn Error>> {
         return prefill_gpu(&ctx, &mut ks);
     }
     let base = Options::default();
+    if std::env::var("ONLY").is_ok_and(|s| s == "extras") {
+        return extras_gpu(&ctx, &mut ks, sms);
+    }
     if std::env::var_os("SWEEP").is_some() {
         for state in [StateDtype::F32, StateDtype::BF16] {
             for batch in [1usize, 4, 16] {
                 for rpb in [128usize, 64, 32, 16, 8] {
                     for unroll in [1usize, 2, 4, 8] {
-                        if !(rpb / WARPS).is_multiple_of(unroll) {
+                        if !(rpb / WARPS).is_multiple_of(unroll)
+                            || (std::env::var_os("SWEEP_KV").is_some() && !unroll.is_multiple_of(16 / state.bytes()))
+                        {
                             continue;
                         }
                         let tokens: usize = std::env::var("SWEEP_T").ok().and_then(|s| s.parse().ok()).unwrap_or(1);
-                        let opts = Options { tokens, update_state: tokens == 1, ..base };
+                        let opts = Options {
+                            tokens,
+                            update_state: tokens == 1,
+                            kv_layout: std::env::var_os("SWEEP_KV").is_some(),
+                            ..base
+                        };
                         let mut p = Problem::new(Dtype::BF16, state, opts, (batch, 16, 32, 128, 128), 3);
                         p.plan_override = Some((rpb, unroll));
                         let (_, t) = run(&ctx, &mut ks, &p, false, true)?;
@@ -135,7 +145,59 @@ fn gpu_main() -> Result<(), Box<dyn Error>> {
             }
         }
     }
+    extras_gpu(&ctx, &mut ks, sms)?;
     prefill_gpu(&ctx, &mut ks)
+}
+
+/// The non-transposed `[K, V]` state (`gated_delta_rule_decode`) and the per-token pool scatter
+/// (`gated_delta_rule_mtp` with `ssm_state_indices`): checks, then CUDA-graph timings on
+/// Qwen3-Next heads (f32 state, as FlashInfer's).
+#[cfg(feature = "cuda")]
+fn extras_gpu(ctx: &CudaContext, ks: &mut Kernels<'_>, sms: usize) -> Result<(), Box<dyn Error>> {
+    let base = Options::default();
+    let kv = Options { kv_layout: true, ..base };
+    for state in [StateDtype::F32, StateDtype::BF16] {
+        for (opts, shape) in [
+            (kv, (5usize, 4usize, 8usize, 128usize, 128usize)),
+            (Options { tokens: 3, has_indices: true, ..kv }, (9, 2, 4, 128, 64)),
+            (Options { tokens: 4, per_token_slots: true, ..base }, (9, 2, 4, 128, 64)),
+            (
+                Options { tokens: 3, per_token_slots: true, has_indices: true, kv_layout: true, ..base },
+                (9, 2, 4, 128, 64),
+            ),
+        ] {
+            let mut p = Problem::new(Dtype::BF16, state, opts, shape, 11);
+            p.num_sms = sms;
+            let ((es, eo), _) = run(ctx, ks, &p, true, false)?;
+            println!(
+                "check {} {shape:?} tokens {} kv {} scatter: {}: state {es:.2e} out {eo:.2e}",
+                state.name(),
+                opts.tokens,
+                opts.kv_layout,
+                opts.per_token_slots
+            );
+        }
+    }
+    println!("mode            T  batch  rows/blk unroll  time(us)    GB/s");
+    let scatter = |tokens| Options { tokens, per_token_slots: true, ..base };
+    for (mode, tokens, opts) in
+        [("kv [K,V]", 1usize, kv), ("kv [K,V]", 4, Options { tokens: 4, ..kv }), ("scatter", 4, scatter(4))]
+    {
+        for batch in [1usize, 4, 16, 64] {
+            let mut p = Problem::new(Dtype::BF16, StateDtype::F32, opts, (batch, 16, 32, 128, 128), 3);
+            p.num_sms = sms;
+            let plan = p.plan();
+            let (_, t) = run(ctx, ks, &p, false, true)?;
+            let t = t.unwrap();
+            println!(
+                "{mode:12} {tokens:3}  {batch:5}  {:8} {:6}  {t:8.2}  {:7.1}",
+                plan.rows_per_block,
+                plan.unroll,
+                p.bytes() / (t * 1e-6) / 1e9
+            );
+        }
+    }
+    Ok(())
 }
 
 /// Prefill (`chunk_gated_delta_rule`): checks, then CUDA-graph timings on Qwen3-Next's heads

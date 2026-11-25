@@ -1,30 +1,35 @@
 # FlashInfer batch prefill over a paged KV cache (BatchPrefillWithPagedKVCacheWrapper,
 # backend "fa2") on the shapes of cute-rs's `prefill` example: batch {1, 8} x
 # qo_len = kv_len {512, 2048, 8192}, causal, page size 16, 32 query / 8 KV heads, head dim
-# 128, f16, NHD. GPU time from CUDA-graph replays (100 runs per graph), as cute-rs's
+# 128 (`HD`), f16 (`DT=bf16`), NHD. GPU time from CUDA-graph replays (100 runs per graph), as cute-rs's
 # `BenchmarkOptions::use_cuda_graphs(true)`. FLOPs as flashinfer.testing.attention_flops.
 #
 # Run on the pod:
 #   PATH=/workspace/fi-venv/bin:$PATH FLASHINFER_WORKSPACE_BASE=/workspace/cute-rs-builds/tmp/fi-jit \
 #     python fi_bench_prefill.py
+import os
+
 import torch
 import flashinfer
 
-HEAD_DIM, QO_HEADS, KV_HEADS, PAGE = 128, 32, 8, 16
+# `HD=64|256` and `DT=bf16` pick the head dimension and BFloat16 (cute-rs's prefill example
+# takes the same variables).
+HEAD_DIM, QO_HEADS, KV_HEADS, PAGE = int(os.environ.get("HD", 128)), 32, 8, 16
+DT = torch.bfloat16 if os.environ.get("DT") == "bf16" else torch.float16
 dev = "cuda"
 
 
 def problem(batch, qo_len, kv_len):
     pages_per = (kv_len + PAGE - 1) // PAGE
     num_pages = batch * pages_per + 2
-    k = torch.randn(num_pages, PAGE, KV_HEADS, HEAD_DIM, dtype=torch.float16, device=dev)
+    k = torch.randn(num_pages, PAGE, KV_HEADS, HEAD_DIM, dtype=DT, device=dev)
     v = torch.randn_like(k)
     perm = torch.randperm(num_pages, device=dev, dtype=torch.int32)
     indices = perm[: batch * pages_per].contiguous()
     kv_indptr = torch.arange(0, batch + 1, device=dev, dtype=torch.int32) * pages_per
     last = torch.full((batch,), kv_len - (pages_per - 1) * PAGE, device=dev, dtype=torch.int32)
     qo_indptr = torch.arange(0, batch + 1, device=dev, dtype=torch.int32) * qo_len
-    q = torch.randn(batch * qo_len, QO_HEADS, HEAD_DIM, dtype=torch.float16, device=dev)
+    q = torch.randn(batch * qo_len, QO_HEADS, HEAD_DIM, dtype=DT, device=dev)
     return q, k, v, qo_indptr, kv_indptr, indices, last
 
 
@@ -32,7 +37,7 @@ def wrapper(qo_indptr, kv_indptr, indices, last, causal):
     ws = torch.empty(256 * 1024 * 1024, dtype=torch.uint8, device=dev)
     w = flashinfer.BatchPrefillWithPagedKVCacheWrapper(ws, "NHD", backend="fa2")
     w.plan(qo_indptr, kv_indptr, indices, last, QO_HEADS, KV_HEADS, HEAD_DIM, PAGE,
-           causal=causal, q_data_type=torch.float16, kv_data_type=torch.float16)
+           causal=causal, q_data_type=DT, kv_data_type=DT)
     return w
 
 

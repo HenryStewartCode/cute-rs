@@ -115,6 +115,14 @@ pub struct Options {
     /// Steps per batch entry of the intermediate-state cache `[batch, cache_steps, HV, V, K]`
     /// (at least `tokens`), into which the state after every token is written; 0 for no cache.
     pub cache_steps: usize,
+    /// The state is FlashInfer's non-transposed `[slots, HV, K, V]` (V contiguous, as
+    /// `gated_delta_rule_decode`) rather than `[slots, HV, V, K]`. Not with `cache_steps`.
+    pub kv_layout: bool,
+    /// `ssm_state_indices` `[batch, tokens]` is given (FlashInfer's per-token pool scatter,
+    /// `tokens >= 2`, `update_state`, no `cache_steps`): the state after token `t` is written to
+    /// slot `ssm_state_indices[b, t]` and the final state is not written back to the read slot.
+    /// A negative entry skips that token's write (FlashInfer promises no padding here).
+    pub per_token_slots: bool,
 }
 
 impl Default for Options {
@@ -126,6 +134,8 @@ impl Default for Options {
             tokens: 1,
             update_state: true,
             cache_steps: 0,
+            kv_layout: false,
+            per_token_slots: false,
         }
     }
 }
@@ -142,10 +152,32 @@ pub struct Plan {
 impl Plan {
     /// Split a state over several blocks when `batch * hv` leaves the SMs short of blocks.
     pub fn new(batch: usize, hv: usize, v: usize, num_sms: usize) -> Plan {
+        Plan::with_min_rows(batch, hv, v, num_sms, WARPS)
+    }
+
+    /// The plan for the `[K, V]` state layout, where a warp takes `unroll` consecutive rows (whole
+    /// 16-byte vectors along `V` of an `S`-byte state) of every `K` column, so `rows_per_block`
+    /// is at least `4 * unroll`. One vector a lane and column while few states leave the SMs
+    /// short of work (many small blocks), two vectors (full 32-byte sectors) from `8 * num_sms`
+    /// states on; measured on an RTX 2000 Ada.
+    pub fn new_kv(batch: usize, hv: usize, v: usize, num_sms: usize, state_bytes: usize) -> Plan {
+        let vw = 16 / state_bytes;
+        let unroll = if batch * hv >= 8 * num_sms { 2 * vw } else { vw }.min(v / WARPS);
+        let mut plan = Plan::with_min_rows(batch, hv, v, num_sms, WARPS * unroll);
+        plan.rows_per_block = WARPS * unroll;
+        plan.unroll = unroll;
+        plan
+    }
+
+    fn with_min_rows(batch: usize, hv: usize, v: usize, num_sms: usize, min_rows: usize) -> Plan {
         assert!(v.is_multiple_of(WARPS), "V = {v} must be a multiple of {WARPS}");
         let states = batch * hv;
         let mut rows_per_block = v;
-        while rows_per_block > 8 && states * (v / rows_per_block) < 4 * num_sms && rows_per_block.is_multiple_of(8) {
+        while rows_per_block > 8
+            && rows_per_block > min_rows
+            && states * (v / rows_per_block) < 4 * num_sms
+            && rows_per_block.is_multiple_of(8)
+        {
             rows_per_block /= 2;
         }
         let per_warp = rows_per_block / WARPS;
@@ -159,8 +191,8 @@ fn c(v: f32) -> Float32 {
 }
 
 /// Parameter order of [`kernel`]: `state, q, k, v, a, b, A_log, dt_bias, out, state_indices,
-/// output_state_indices, intermediate_states, num_q_heads, num_v_heads, scale`. Absent index tensors still take a
-/// (one-element) buffer.
+/// output_state_indices, intermediate_states, num_q_heads, num_v_heads, scale, ssm_state_indices`.
+/// Absent index tensors still take a (one-element) buffer.
 pub fn kernel(input: Dtype, state: StateDtype, opts: Options, kdim: usize, vdim: usize, plan: Plan) -> Kernel {
     match (input, state) {
         (Dtype::F16, StateDtype::F16) => kernel_of::<F16, F16>(input, state, opts, kdim, vdim, plan),
@@ -189,14 +221,23 @@ fn kernel_of<T: Numeric, S: Numeric>(
     assert!(rpw.is_multiple_of(unroll));
     assert!(!opts.has_out_indices || opts.has_indices);
     assert!(opts.tokens >= 1 && (opts.cache_steps == 0 || opts.cache_steps >= opts.tokens));
+    assert!(!opts.per_token_slots || (opts.tokens >= 2 && opts.update_state && opts.cache_steps == 0));
+    assert!(!opts.kv_layout || opts.cache_steps == 0);
+    // Elements of a 16-byte vector of state; with the `[K, V]` layout a warp's rows are vectors.
+    let vw = 16 / state_dtype.bytes();
+    if opts.kv_layout {
+        assert!(kdim.is_multiple_of(32) && vdim.is_multiple_of(vw) && unroll.is_multiple_of(vw));
+    }
     let o = opts;
     let name = format!(
-        "flashinfer_gdn_{}_{}_k{kdim}_v{vdim}_r{rpb}_u{unroll}_{}{}{}_t{}_s{}_u{}",
+        "flashinfer_gdn_{}_{}_k{kdim}_v{vdim}_r{rpb}_u{unroll}_{}{}{}{}{}_t{}_s{}_u{}",
         input.name(),
         state_dtype.name(),
         o.l2norm as u8,
         o.has_indices as u8,
         o.has_out_indices as u8,
+        o.kv_layout as u8,
+        o.per_token_slots as u8,
         o.tokens,
         o.cache_steps,
         o.update_state as u8,
@@ -217,6 +258,7 @@ fn kernel_of<T: Numeric, S: Numeric>(
         let hq = param_scalar::<i32>("num_q_heads");
         let hv = param_scalar::<i32>("num_v_heads");
         let scale = param_scalar::<f32>("scale");
+        let ssm_indices = param_ptr::<i32>("ssm_state_indices");
 
         let tid = thread_idx().x;
         let lane = tid & 31;
@@ -259,8 +301,11 @@ fn kernel_of<T: Numeric, S: Numeric>(
                 true,
             ));
             let qk_base = (tok(t) * hq + qhead) * kdim as i32;
+            // Columns this lane holds: `nv` vectors of `vs` at `(lane + 32 j) * vs`, or in the `[K, V]`
+            // layout `K / 32` single columns `lane + 32 j`.
+            let (cn, cv) = if o.kv_layout { (kdim / 32, 1) } else { (nv, vs) };
             let load_k = |p: &Ptr<T>| -> Vec<Float32> {
-                (0..nv).flat_map(|j| load_n::<T>(&p.offset(qk_base + (lane + 32 * j as i32) * vs as i32), vs)).collect()
+                (0..cn).flat_map(|j| load_n::<T>(&p.offset(qk_base + (lane + 32 * j as i32) * cv as i32), cv)).collect()
             };
             let mut qr = load_k(&q);
             let mut kr = load_k(&k);
@@ -280,20 +325,67 @@ fn kernel_of<T: Numeric, S: Numeric>(
 
         let sv = (kdim / vs) as i32;
         let state_in = (load_slot * hv + vhead) * vdim as i32 + row_off;
-        let state_out = (store_slot * hv + vhead) * vdim as i32 + row_off;
         let vo = |t: usize| (tok(t) * hv + vhead) * vdim as i32 + row_off;
         let cache_base = |t: usize| ((batch * o.cache_steps as i32 + t as i32) * hv + vhead) * vdim as i32 + row_off;
         let first_row = warp * rpw as i32;
         let at = |base: Int32, r: &Int32, j: usize| ((base + *r) * sv + lane + 32 * j as i32) * vs as i32;
+        // Element offset of the `ch`-th vector of `vw` rows from `r0` of column `lane + 32 j`
+        // in the `[K, V]` layout.
+        let kv_at = |slot: Int32, r0: &Int32, ch: usize, j: usize| {
+            (slot * hv + vhead) * (kdim * vdim) as i32
+                + (lane + 32 * j as i32) * vdim as i32
+                + row_off
+                + *r0
+                + (ch * vw) as i32
+        };
+        let write_rows = |rows: &[Int32], cur: &[Vec<Float32>], slot: Int32, ok: Boolean| {
+            let guarded = |f: &dyn Fn()| {
+                if o.has_indices || o.per_token_slots {
+                    if_(ok, f);
+                } else {
+                    f();
+                }
+            };
+            if o.kv_layout {
+                for j in 0..kdim / 32 {
+                    for ch in 0..unroll / vw {
+                        let ptr = state.offset(kv_at(slot, &rows[0], ch, j));
+                        let vals: Vec<Float32> = cur[ch * vw..(ch + 1) * vw].iter().map(|row| row[j]).collect();
+                        guarded(&|| store_n::<S>(&ptr, &vals));
+                    }
+                }
+            } else {
+                let base = (slot * hv + vhead) * vdim as i32 + row_off;
+                for (r, row) in rows.iter().zip(cur) {
+                    for j in 0..nv {
+                        let ptr = state.offset(at(base, r, j));
+                        let vals = &row[j * vs..(j + 1) * vs];
+                        guarded(&|| store_n::<S>(&ptr, vals));
+                    }
+                }
+            }
+        };
         let run = |r0: Int32| {
             let rows: Vec<Int32> = (0..unroll).map(|i| r0 + i as i32).collect();
             let vvals: Vec<Vec<Float32>> =
                 (0..nt).map(|t| rows.iter().map(|r| v.load_at(vo(t) + *r).to::<f32>()).collect()).collect();
             // All state loads first.
-            let mut cur: Vec<Vec<Float32>> = rows
-                .iter()
-                .map(|r| (0..nv).flat_map(|j| load_n::<S>(&state.offset(at(state_in, r, j)), vs)).collect())
-                .collect();
+            let mut cur: Vec<Vec<Float32>> = if o.kv_layout {
+                let mut cur = vec![Vec::new(); unroll];
+                for j in 0..kdim / 32 {
+                    for ch in 0..unroll / vw {
+                        let vals = load_n::<S>(&state.offset(kv_at(load_slot, &rows[0], ch, j)), vw);
+                        for (e, x) in vals.into_iter().enumerate() {
+                            cur[ch * vw + e].push(x);
+                        }
+                    }
+                }
+                cur
+            } else {
+                rows.iter()
+                    .map(|r| (0..nv).flat_map(|j| load_n::<S>(&state.offset(at(state_in, r, j)), vs)).collect())
+                    .collect()
+            };
             for t in 0..nt {
                 // Per row: `S k` (all lanes need it), the delta `u` and the new row.
                 let mut partial: Vec<Float32> = Vec::with_capacity(unroll);
@@ -320,6 +412,10 @@ fn kernel_of<T: Numeric, S: Numeric>(
                 if_((lane & ((1 << idx_shift) - 1)).eq(0), || {
                     out.store_at(vo(t) + rows[0] + (lane >> idx_shift as i32), res.to::<T>())
                 });
+                if o.per_token_slots {
+                    let s = ssm_indices.load_at(batch * nt as i32 + t as i32);
+                    write_rows(&rows, &cur, s.max(0), valid & s.ge(0));
+                }
                 if o.cache_steps > 0 {
                     for (r, row) in rows.iter().zip(&cur) {
                         for j in 0..nv {
@@ -334,18 +430,8 @@ fn kernel_of<T: Numeric, S: Numeric>(
                     }
                 }
             }
-            if o.update_state {
-                for (r, row) in rows.iter().zip(&cur) {
-                    for j in 0..nv {
-                        let ptr = state.offset(at(state_out, r, j));
-                        let vals = &row[j * vs..(j + 1) * vs];
-                        if o.has_indices {
-                            if_(store_ok, || store_n::<S>(&ptr, vals));
-                        } else {
-                            store_n::<S>(&ptr, vals);
-                        }
-                    }
-                }
+            if o.update_state && !o.per_token_slots {
+                write_rows(&rows, &cur, store_slot, store_ok);
             }
         };
         if rpw == unroll {
@@ -432,6 +518,10 @@ pub struct Problem {
     pub indices: Vec<i32>,
     /// The slot written for each batch entry (with `opts.has_out_indices`).
     pub out_indices: Vec<i32>,
+    /// The slot of each `[batch, tokens]` token's state (with `opts.per_token_slots`); every
+    /// seventh is padding.
+    pub ssm_indices: Vec<i32>,
+    /// The state, `[slots, HV, V, K]` or, with `opts.kv_layout`, `[slots, HV, K, V]`.
     pub state0: Vec<f32>,
     pub q: Vec<f32>,
     pub kk: Vec<f32>,
@@ -464,6 +554,13 @@ impl Problem {
         let reads = if opts.has_indices { batch + 3 } else { batch };
         // Written slots live above the read ones, so no block reads what another writes.
         let slots = if opts.has_out_indices { 2 * reads } else { reads };
+        let nsc = batch * opts.tokens;
+        let ssm_indices: Vec<i32> = if opts.per_token_slots {
+            (0..nsc).map(|i| if i % 7 == 3 { -1 } else { (reads + (i * 5 + 1) % nsc) as i32 }).collect()
+        } else {
+            vec![]
+        };
+        let slots = if opts.per_token_slots { reads + nsc } else { slots };
         // A shuffled choice of distinct slots, with every fifth one padded.
         let indices: Vec<i32> = if opts.has_indices {
             (0..batch).map(|i| if i % 5 == 3 { -1 } else { ((i * 7 + 2) % reads) as i32 }).collect()
@@ -501,6 +598,7 @@ impl Problem {
             slots,
             indices,
             out_indices,
+            ssm_indices,
             state0,
             q,
             kk,
@@ -518,7 +616,11 @@ impl Problem {
         if let Some((rows_per_block, unroll)) = self.plan_override {
             return Plan { rows_per_block, unroll };
         }
-        Plan::new(self.batch, self.hv, self.v, self.num_sms)
+        if self.opts.kv_layout {
+            Plan::new_kv(self.batch, self.hv, self.v, self.num_sms, self.state.bytes())
+        } else {
+            Plan::new(self.batch, self.hv, self.v, self.num_sms)
+        }
     }
 
     pub fn kernel(&self) -> Kernel {
@@ -559,6 +661,7 @@ impl Problem {
             KernelArg::ScalarI32(self.hq as i32),
             KernelArg::ScalarI32(self.hv as i32),
             KernelArg::ScalarF32(self.scale),
+            idx(self.opts.per_token_slots, &self.ssm_indices),
         ]
     }
 
@@ -569,6 +672,11 @@ impl Problem {
         let (hq, hv, kd, vd, nt) = (self.hq, self.hv, self.k, self.v, self.opts.tokens);
         let steps = self.opts.cache_steps;
         let mut state: Vec<f64> = self.state0.iter().map(|&x| x as f64).collect();
+        // Element `i` of row `r` of head `h` of slot `sl`, in the layout of the state.
+        let kv = self.opts.kv_layout;
+        let at = |sl: i32, h: usize, r: usize, i: usize| {
+            if kv { ((sl as usize * hv + h) * kd + i) * vd + r } else { ((sl as usize * hv + h) * vd + r) * kd + i }
+        };
         let mut out = vec![0.0f64; self.batch * nt * hv * vd];
         let mut cache = vec![0.0f64; self.cache_len()];
         for b in 0..self.batch {
@@ -577,12 +685,11 @@ impl Problem {
             if slot < 0 {
                 continue;
             }
-            let write = out_slot >= 0 && self.opts.update_state;
+            let write = out_slot >= 0 && self.opts.update_state && !self.opts.per_token_slots;
             for h in 0..hv {
                 let g = h / (hv / hq);
                 for r in 0..vd {
-                    let base = |sl: i32| ((sl as usize * hv + h) * vd + r) * kd;
-                    let mut cur: Vec<f64> = (0..kd).map(|i| state[base(slot) + i]).collect();
+                    let mut cur: Vec<f64> = (0..kd).map(|i| state[at(slot, h, r, i)]).collect();
                     for t in 0..nt {
                         let tok = b * nt + t;
                         let x = self.a[tok * hv + h] as f64 + self.dt_bias[h] as f64;
@@ -609,10 +716,16 @@ impl Problem {
                             let at = (((b * steps + t) * hv + h) * vd + r) * kd;
                             cache[at..at + kd].copy_from_slice(&cur);
                         }
+                        if self.opts.per_token_slots && self.ssm_indices[tok] >= 0 {
+                            for (i, x) in cur.iter().enumerate() {
+                                state[at(self.ssm_indices[tok], h, r, i)] = *x;
+                            }
+                        }
                     }
                     if write {
-                        let at = base(out_slot);
-                        state[at..at + kd].copy_from_slice(&cur);
+                        for (i, x) in cur.iter().enumerate() {
+                            state[at(out_slot, h, r, i)] = *x;
+                        }
                     }
                 }
             }
@@ -644,7 +757,8 @@ impl Problem {
     pub fn bytes(&self) -> f64 {
         let o = &self.opts;
         let one = self.batch * self.hv * self.v * self.k * self.state.bytes();
-        let state = one * (1 + o.update_state as usize + if o.cache_steps > 0 { o.tokens } else { 0 });
+        let writes = if o.per_token_slots { o.tokens } else { o.update_state as usize };
+        let state = one * (1 + writes + if o.cache_steps > 0 { o.tokens } else { 0 });
         let io = self.batch * o.tokens * (2 * self.hq * self.k + 2 * self.hv * self.v + 2 * self.hv) * 2;
         (state + io) as f64
     }

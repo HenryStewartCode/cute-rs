@@ -46,7 +46,15 @@
 //!   also the one read; a negative slot skips that token's state write and zeroes its output).
 //!   `update_state = false` reads the pool only.
 //!
-//! Not covered: `cu_seqlens` packing, `num_accepted_tokens`, `initial_state_source`, the
+//! * **Packed varlen** (`varlen`, FlashInfer's `cu_seqlens`): the inputs and output are packed
+//!   `[total, ...]`, sequence `b` owning rows `cu_seqlens[b]..cu_seqlens[b + 1]` (at most `tokens`
+//!   of them); one block column per sequence as before. Tokens past the sequence's length write no
+//!   output and no state, as FlashInfer's `token_t < seq_len` guard. With `tokens > 1` the slots
+//!   are per token (`per_token_slots`). **`has_accepted`** is `num_accepted_tokens`: the read
+//!   slot is `indices[b, clamp(accepted[b] - 1, 0, tokens - 1)]`; a negative read slot reads
+//!   slot 0, as FlashInfer. Both only change addressing: the same kernel body.
+//!
+//! Not covered: `initial_state_source`, the
 //! frozen-verify kernels (`disable_state_update` with correction/kg caches), the Cake and
 //! Blackwell backends, the `q`/`k` head count unequal to a divisor of `HV` and strided inputs.
 
@@ -92,6 +100,15 @@ pub struct Options {
     pub update_state: bool,
     /// `state_indices` is `[batch, tokens]` and every token's state goes to its own slot.
     pub per_token_slots: bool,
+    /// Packed variable-length input (FlashInfer's `cu_seqlens`): `q`, `k`, `v`, `g`, `beta` and
+    /// the output hold `cu_seqlens[batch]` tokens in all, sequence `b` owning rows
+    /// `cu_seqlens[b]..cu_seqlens[b + 1]` (at most `tokens` of them; the grid still has one block
+    /// column per sequence). Tokens past a sequence's length write neither output nor state. With
+    /// `tokens > 1` this needs `per_token_slots`.
+    pub varlen: bool,
+    /// `num_accepted_tokens` `[batch]` is given (with `per_token_slots`, `tokens > 1`): the state
+    /// is read from slot `indices[b, clamp(accepted[b] - 1, 0, tokens - 1)]` instead of column 0.
+    pub has_accepted: bool,
 }
 
 impl Default for Options {
@@ -106,6 +123,8 @@ impl Default for Options {
             tokens: 1,
             update_state: true,
             per_token_slots: false,
+            varlen: false,
+            has_accepted: false,
         }
     }
 }
@@ -115,8 +134,9 @@ fn c(v: f32) -> Float32 {
 }
 
 /// Parameter order of [`kernel`]: `state, q, k, v, g, beta, A_log, dt_bias, out, state_indices,
-/// output_state_indices, num_q_heads, num_v_heads, scale, lower_bound`. Absent index tensors,
-/// `A_log` and `dt_bias` still take a (one-element) buffer.
+/// output_state_indices, num_q_heads, num_v_heads, scale, lower_bound, cu_seqlens,
+/// num_accepted_tokens`. Absent index tensors, `A_log`, `dt_bias`, `cu_seqlens` and
+/// `num_accepted_tokens` still take a (one-element) buffer.
 pub fn kernel(input: Dtype, state: StateDtype, opts: Options, kdim: usize, vdim: usize, plan: Plan) -> Kernel {
     match (input, state) {
         (Dtype::F16, StateDtype::F16) => kernel_of::<F16, F16>(input, state, opts, kdim, vdim, plan),
@@ -146,9 +166,11 @@ fn kernel_of<T: Numeric, S: Numeric>(
     assert!(!opts.has_out_indices || opts.has_indices);
     assert!(!opts.per_token_slots || (opts.has_indices && !opts.has_out_indices));
     assert!(opts.tokens >= 1);
+    assert!(!opts.has_accepted || (opts.per_token_slots && opts.tokens > 1));
+    assert!(!opts.varlen || opts.tokens == 1 || opts.per_token_slots);
     let o = opts;
     let name = format!(
-        "flashinfer_kda_{}_{}_k{kdim}_v{vdim}_r{rpb}_u{unroll}_{}{}{}{}{}{}{}_t{}_u{}",
+        "flashinfer_kda_{}_{}_k{kdim}_v{vdim}_r{rpb}_u{unroll}_{}{}{}{}{}{}{}{}{}_t{}_u{}",
         input.name(),
         state_dtype.name(),
         o.l2norm as u8,
@@ -158,6 +180,8 @@ fn kernel_of<T: Numeric, S: Numeric>(
         o.has_indices as u8,
         o.has_out_indices as u8,
         o.per_token_slots as u8,
+        o.varlen as u8,
+        o.has_accepted as u8,
         o.tokens,
         o.update_state as u8,
     );
@@ -177,6 +201,8 @@ fn kernel_of<T: Numeric, S: Numeric>(
         let hv = param_scalar::<i32>("num_v_heads");
         let scale = param_scalar::<f32>("scale");
         let lower_bound = param_scalar::<f32>("lower_bound");
+        let cu_seqlens = param_ptr::<i32>("cu_seqlens");
+        let accepted = param_ptr::<i32>("num_accepted_tokens");
 
         let tid = thread_idx().x;
         let lane = tid & 31;
@@ -186,11 +212,31 @@ fn kernel_of<T: Numeric, S: Numeric>(
         let row_off = block_idx().z * rpb as i32;
         let qhead = vhead / (hv / hq);
         let nt = o.tokens;
-        let tok = |t: usize| batch * nt as i32 + t as i32;
+        // Row of token `t` in the packed inputs and whether the sequence has that token.
+        let (toks, has_tok): (Vec<Int32>, Vec<Boolean>) = if o.varlen {
+            let start = cu_seqlens.load_at(batch);
+            let len = cu_seqlens.load_at(batch + 1) - start;
+            (0..nt)
+                .map(|t| {
+                    let ok = len.ge(t as i32 + 1);
+                    (select(ok, start + t as i32, 0i32), ok)
+                })
+                .unzip()
+        } else {
+            ((0..nt).map(|t| batch * nt as i32 + t as i32).collect(), vec![Boolean::constant(true); nt])
+        };
+        let tok = |t: usize| toks[t];
+        // Slot of token `t` in `state_indices` (`[batch, tokens]` with `per_token_slots`).
+        let sidx = |t: usize| batch * nt as i32 + t as i32;
 
         // Slots: read slot, per-token (or final) write slots and their validity.
-        let slot_in =
-            if o.has_indices { indices.load_at(if o.per_token_slots { tok(0) } else { batch }) } else { batch };
+        let read_col =
+            if o.has_accepted { (accepted.load_at(batch) - 1).max(0).min(nt as i32 - 1) } else { Int32::constant(0) };
+        let slot_in = if o.has_indices {
+            indices.load_at(if o.per_token_slots { sidx(0) + read_col } else { batch })
+        } else {
+            batch
+        };
         let valid = if o.has_indices { slot_in.ge(0) } else { Boolean::constant(true) };
         let load_slot = if o.has_indices { slot_in.max(0) } else { slot_in };
         let (store_slot, store_ok) = if o.has_out_indices {
@@ -203,7 +249,7 @@ fn kernel_of<T: Numeric, S: Numeric>(
         let tslots: Vec<(Int32, Boolean)> = (0..nt)
             .map(|t| {
                 if o.per_token_slots {
-                    let s = indices.load_at(tok(t));
+                    let s = indices.load_at(sidx(t));
                     (s.max(0), s.ge(0))
                 } else {
                     (store_slot, valid)
@@ -304,7 +350,7 @@ fn kernel_of<T: Numeric, S: Numeric>(
                 for j in 0..nv {
                     let ptr = state.offset(at(state_at(slot), r, j));
                     let vals = &row[j * vs..(j + 1) * vs];
-                    if o.has_indices {
+                    if o.has_indices || o.varlen {
                         if_(ok, || store_n::<S>(&ptr, vals));
                     } else {
                         store_n::<S>(&ptr, vals);
@@ -344,15 +390,15 @@ fn kernel_of<T: Numeric, S: Numeric>(
                 let (slot_t, ok_t) = tslots[t];
                 let live = if o.per_token_slots { ok_t } else { valid };
                 let res = select(live, sums, 0.0f32);
-                if_((lane & ((1 << idx_shift) - 1)).eq(0), || {
+                if_((lane & ((1 << idx_shift) - 1)).eq(0) & has_tok[t], || {
                     out.store_at(vo(t) + rows[0] + (lane >> idx_shift as i32), res.to::<T>())
                 });
                 if o.per_token_slots && o.update_state {
-                    write_rows(&rows, &cur, slot_t, ok_t);
+                    write_rows(&rows, &cur, slot_t, ok_t & has_tok[t]);
                 }
             }
             if o.update_state && !o.per_token_slots {
-                write_rows(&rows, &cur, store_slot, store_ok);
+                write_rows(&rows, &cur, store_slot, store_ok & has_tok[0]);
             }
         };
         if rpw == unroll {
@@ -448,6 +494,10 @@ pub struct Problem {
     pub beta: Vec<f32>,
     pub a_log: Vec<f32>,
     pub dt_bias: Vec<f32>,
+    /// Tokens of each sequence with `varlen` (`cu_seqlens` is their prefix sums); else empty.
+    pub seqlens: Vec<usize>,
+    /// `num_accepted_tokens` (with `has_accepted`); values outside `1..=tokens` are clamped.
+    pub accepted: Vec<i32>,
     /// The SM count the launch plan assumes.
     pub num_sms: usize,
     /// Override the launch plan's `(rows_per_block, unroll)` (for tuning).
@@ -460,11 +510,38 @@ impl Problem {
         input: Dtype,
         state: StateDtype,
         opts: Options,
+        shape: (usize, usize, usize, usize, usize),
+        seed: u64,
+    ) -> Problem {
+        assert!(!opts.varlen, "use Problem::new_varlen");
+        Self::build(input, state, opts, shape, vec![], seed)
+    }
+
+    /// A packed variable-length problem (`opts.varlen`): `shape.0` is the number of sequences,
+    /// `seqlens[b] <= opts.tokens` the tokens of sequence `b` (zero allowed).
+    pub fn new_varlen(
+        input: Dtype,
+        state: StateDtype,
+        opts: Options,
+        shape: (usize, usize, usize, usize, usize),
+        seqlens: &[usize],
+        seed: u64,
+    ) -> Problem {
+        assert!(opts.varlen && seqlens.len() == shape.0 && seqlens.iter().all(|&l| l <= opts.tokens));
+        Self::build(input, state, opts, shape, seqlens.to_vec(), seed)
+    }
+
+    fn build(
+        input: Dtype,
+        state: StateDtype,
+        opts: Options,
         (batch, hq, hv, k, v): (usize, usize, usize, usize, usize),
+        seqlens: Vec<usize>,
         seed: u64,
     ) -> Problem {
         assert!(hv.is_multiple_of(hq));
         let nt = opts.tokens;
+        let total = if opts.varlen { seqlens.iter().sum() } else { batch * nt };
         let mut rng = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
         let mut uni = move |lo: f32, hi: f32| {
             rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
@@ -496,13 +573,18 @@ impl Problem {
             |n: usize, lo: f32, hi: f32, r: &dyn Fn(f32) -> f32| (0..n).map(|_| r(uni(lo, hi))).collect::<Vec<f32>>();
         let (ri, rs) = (|x| input.round(x), |x| state.round(x));
         let state0 = mk(slots * hv * v * k, -1.0, 1.0, &rs);
-        let q = mk(batch * nt * hq * k, -1.0, 1.0, &ri);
-        let kk = mk(batch * nt * hq * k, -1.0, 1.0, &ri);
-        let vv = mk(batch * nt * hv * v, -1.0, 1.0, &ri);
+        let q = mk(total * hq * k, -1.0, 1.0, &ri);
+        let kk = mk(total * hq * k, -1.0, 1.0, &ri);
+        let vv = mk(total * hv * v, -1.0, 1.0, &ri);
         let (glo, ghi) = if opts.gate == Gate::Precomputed { (-1.5, 0.0) } else { (-1.5, 1.5) };
-        let g = mk(batch * nt * hv * k, glo, ghi, &ri);
-        let beta =
-            if opts.beta_is_logit { mk(batch * nt * hv, -3.0, 3.0, &ri) } else { mk(batch * nt * hv, 0.0, 1.0, &ri) };
+        let g = mk(total * hv * k, glo, ghi, &ri);
+        let beta = if opts.beta_is_logit { mk(total * hv, -3.0, 3.0, &ri) } else { mk(total * hv, 0.0, 1.0, &ri) };
+        // Mostly in range, with one zero and one above `tokens` (both clamped).
+        let accepted: Vec<i32> = if opts.has_accepted {
+            (0..batch).map(|i| [1, 2, 0, nt as i32 + 2, nt as i32][i % 5]).collect()
+        } else {
+            vec![]
+        };
         let a_log = mk(hq, -0.3, 0.3, &|x| x);
         let dt_bias = mk(hq * k, -0.3, 0.3, &|x| x);
         Problem {
@@ -527,6 +609,8 @@ impl Problem {
             beta,
             a_log,
             dt_bias,
+            seqlens,
+            accepted,
             num_sms: 22,
             plan_override: None,
         }
@@ -551,6 +635,21 @@ impl Problem {
         )
     }
 
+    /// Packed token offsets `[batch + 1]` (with `varlen`).
+    pub fn cu_seqlens(&self) -> Vec<i32> {
+        std::iter::once(0)
+            .chain(self.seqlens.iter().scan(0, |s, &l| {
+                *s += l as i32;
+                Some(*s)
+            }))
+            .collect()
+    }
+
+    /// Tokens of the packed inputs and output.
+    pub fn total_tokens(&self) -> usize {
+        if self.opts.varlen { self.seqlens.iter().sum() } else { self.batch * self.opts.tokens }
+    }
+
     /// The kernel's arguments (see [`kernel`]); the state is argument 0, the output 8.
     pub fn args(&self) -> Vec<KernelArg> {
         assert!(self.slots * self.hv * self.v * self.k < 1 << 31, "offsets are 32-bit");
@@ -564,28 +663,34 @@ impl Problem {
             self.input.buffer(&self.beta),
             KernelArg::f32(self.a_log.clone()),
             KernelArg::f32(self.dt_bias.clone()),
-            self.input.buffer(&vec![0.0; self.batch * self.opts.tokens * self.hv * self.v]),
+            self.input.buffer(&vec![0.0; self.total_tokens().max(1) * self.hv * self.v]),
             idx(self.opts.has_indices, &self.indices),
             idx(self.opts.has_out_indices, &self.out_indices),
             KernelArg::ScalarI32(self.hq as i32),
             KernelArg::ScalarI32(self.hv as i32),
             KernelArg::ScalarF32(self.scale),
             KernelArg::ScalarF32(self.lower_bound),
+            KernelArg::i32(if self.opts.varlen { self.cu_seqlens() } else { vec![0] }),
+            KernelArg::i32(if self.opts.has_accepted { self.accepted.clone() } else { vec![0] }),
         ]
     }
 
     /// The new state pool and the output in f64: `(state, out)`; FlashInfer's
     /// `naive_recurrent_kda` token by token, with the state in `[V, K]` order and the gates of
     /// `naive_kda_gate` / `naive_kda_lowerbound_gate`.
+    #[allow(clippy::needless_range_loop)]
     pub fn reference(&self) -> (Vec<f64>, Vec<f64>) {
         let (hq, hv, kd, vd, nt) = (self.hq, self.hv, self.k, self.v, self.opts.tokens);
         let o = &self.opts;
         let mut state: Vec<f64> = self.state0.iter().map(|&x| x as f64).collect();
-        let mut out = vec![0.0f64; self.batch * nt * hv * vd];
+        let mut out = vec![0.0f64; self.total_tokens() * hv * vd];
+        let cu = if o.varlen { self.cu_seqlens() } else { vec![] };
         for b in 0..self.batch {
+            let (first, len) = if o.varlen { (cu[b] as usize, self.seqlens[b]) } else { (b * nt, nt) };
+            let col = if o.has_accepted { (self.accepted[b] - 1).clamp(0, nt as i32 - 1) as usize } else { 0 };
             let slot_of = |t: usize| if o.per_token_slots { self.indices[b * nt + t] } else { 0 };
             let slot = if o.per_token_slots {
-                self.indices[b * nt].max(0)
+                self.indices[b * nt + col].max(0)
             } else if o.has_indices {
                 self.indices[b]
             } else {
@@ -600,8 +705,8 @@ impl Problem {
                 for r in 0..vd {
                     let base = |sl: i32| ((sl as usize * hv + h) * vd + r) * kd;
                     let mut cur: Vec<f64> = (0..kd).map(|i| self.state0[base(slot) + i] as f64).collect();
-                    for t in 0..nt {
-                        let tok = b * nt + t;
+                    for t in 0..len {
+                        let tok = first + t;
                         let beta = self.beta[tok * hv + h] as f64;
                         let beta = if o.beta_is_logit { 1.0 / (1.0 + (-beta).exp()) } else { beta };
                         let norm = |src: &[f32]| -> Vec<f64> {
@@ -642,7 +747,7 @@ impl Problem {
                             state[at..at + kd].copy_from_slice(&cur);
                         }
                     }
-                    if !o.per_token_slots && o.update_state && out_slot >= 0 {
+                    if !o.per_token_slots && o.update_state && out_slot >= 0 && len > 0 {
                         let at = base(out_slot);
                         state[at..at + kd].copy_from_slice(&cur);
                     }
@@ -682,7 +787,7 @@ impl Problem {
         } else {
             1
         };
-        let io = self.batch * o.tokens * (2 * self.hq * self.k + 3 * self.hv * self.v + self.hv) * 2;
+        let io = self.total_tokens() * (2 * self.hq * self.k + 3 * self.hv * self.v + self.hv) * 2;
         (one * (1 + writes) + io) as f64
     }
 }

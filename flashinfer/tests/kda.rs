@@ -120,3 +120,38 @@ fn eight_rows_in_flight_match_reference() {
     p.plan_override = Some((64, 8)); // 16 rows per warp
     simulate(&p);
 }
+
+/// Packed variable-length inputs (`cu_seqlens`), with `num_accepted_tokens` selecting the read
+/// checkpoint (including a zero and an out-of-range count), empty sequences, padding slots.
+#[test]
+fn varlen_and_accepted_match_reference() {
+    let base = Options {
+        gate: Gate::LowerBound,
+        has_dt_bias: true,
+        beta_is_logit: true,
+        has_indices: true,
+        varlen: true,
+        ..Options::default()
+    };
+    let lens = [3, 1, 0, 2, 3, 3, 1];
+    for (opts, state) in [
+        (Options { tokens: 1, ..base }, StateDtype::F32),
+        (Options { tokens: 1, has_indices: false, ..base }, StateDtype::BF16),
+        (Options { tokens: 3, per_token_slots: true, ..base }, StateDtype::F32),
+        (Options { tokens: 3, per_token_slots: true, has_accepted: true, ..base }, StateDtype::BF16),
+        (
+            Options { tokens: 3, per_token_slots: true, has_accepted: true, update_state: false, ..base },
+            StateDtype::F16,
+        ),
+    ] {
+        for num_sms in [1, 100] {
+            let l: Vec<usize> = lens.iter().map(|&x| x.min(opts.tokens)).collect();
+            let mut p = Problem::new_varlen(Dtype::F16, state, opts, (7, 2, 4, 128, 16), &l, 23);
+            p.num_sms = num_sms;
+            simulate(&p);
+        }
+    }
+    // Unpacked batches with accepted counts.
+    let opts = Options { tokens: 4, per_token_slots: true, has_accepted: true, ..Options { varlen: false, ..base } };
+    simulate(&Problem::new(Dtype::BF16, StateDtype::F32, opts, (6, 2, 4, 128, 16), 29));
+}

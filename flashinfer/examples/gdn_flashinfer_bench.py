@@ -108,6 +108,65 @@ def decode_bench():
 # its CuTe DSL SM80 kernel (`gdn_kernels/delta_rule_dsl/delta_rule_sm80.py`).
 from flashinfer.gdn_prefill import chunk_gated_delta_rule
 
+def extras_bench():
+    # Non-transposed [K, V] state (gated_delta_rule_decode, f32 state, T = 1) and the per-token pool
+    # scatter (gated_delta_rule_mtp with ssm_state_indices, T = 4, f32 pool).
+    from flashinfer.gdn_decode import gated_delta_rule_decode, gated_delta_rule_mtp
+
+    print("mode            T  batch  time(us)    GB/s")
+    for batch in (1, 4, 16, 64):
+        q = torch.randn(batch, 1, H, K, device=dev, dtype=torch.bfloat16)
+        k = torch.randn(batch, 1, H, K, device=dev, dtype=torch.bfloat16)
+        v = torch.randn(batch, 1, HV, K, device=dev, dtype=torch.bfloat16)
+        state = torch.randn(batch, HV, K, K, device=dev)
+        A_log = torch.randn(HV, device=dev) * 0.1
+        a = torch.randn(batch, 1, HV, device=dev, dtype=torch.bfloat16) * 0.1
+        dt_bias = torch.randn(HV, device=dev) * 0.1
+        b = torch.randn(batch, 1, HV, device=dev, dtype=torch.bfloat16)
+        out = torch.empty(batch, 1, HV, K, device=dev, dtype=torch.bfloat16)
+
+        def fn():
+            gated_delta_rule_decode(q=q, k=k, v=v, state=state, A_log=A_log, a=a, dt_bias=dt_bias, b=b,
+                                    scale=K ** -0.5, output=out, use_qk_l2norm=True, backend="flashinfer")
+
+        try:
+            t = graph_bench(fn)
+        except Exception as e:
+            print(f"kv [K,V]       1  {batch:5}  failed: {type(e).__name__}: {str(e)[:200]}")
+            continue
+        nbytes = 2 * state.numel() * 4 + (q.numel() + k.numel() + 2 * v.numel() + 2 * a.numel()) * 2
+        print(f"kv [K,V]       1  {batch:5}  {t:8.2f}  {nbytes / (t * 1e-6) / 1e9:7.1f}")
+    T = 4
+    for batch in (1, 4, 16, 64):
+        q = torch.randn(batch, T, H, K, device=dev, dtype=torch.bfloat16)
+        k = torch.randn(batch, T, H, K, device=dev, dtype=torch.bfloat16)
+        v = torch.randn(batch, T, HV, K, device=dev, dtype=torch.bfloat16)
+        pool = torch.randn(batch * (T + 1), HV, K, K, device=dev)
+        idx = torch.arange(batch, dtype=torch.int32, device=dev)
+        ssm = torch.arange(batch, batch * (T + 1), dtype=torch.int32, device=dev).reshape(batch, T)
+        A_log = torch.randn(HV, device=dev)
+        a = torch.randn(batch, T, HV, device=dev, dtype=torch.bfloat16)
+        dt_bias = torch.randn(HV, device=dev, dtype=torch.bfloat16)
+        b = torch.randn(batch, T, HV, device=dev, dtype=torch.bfloat16)
+        out = torch.empty(batch, T, HV, K, device=dev, dtype=torch.bfloat16)
+
+        def fn():
+            gated_delta_rule_mtp(q, k, v, pool, idx, A_log, a, dt_bias, b, K ** -0.5, out, None,
+                                 disable_state_update=False, use_qk_l2norm=True, ssm_state_indices=ssm)
+
+        try:
+            t = graph_bench(fn)
+        except Exception as e:
+            print(f"scatter        {T}  {batch:5}  failed: {type(e).__name__}: {str(e)[:200]}")
+            continue
+        sb = HV * K * K * 4 * batch
+        nbytes = sb * (1 + T) + batch * T * (2 * H * K + 2 * HV * K + 2 * HV) * 2
+        print(f"scatter        {T}  {batch:5}  {t:8.2f}  {nbytes / (t * 1e-6) / 1e9:7.1f}")
+
+
+if ONLY == "extras":
+    extras_bench()
+    raise SystemExit
 if ONLY != "prefill":
     decode_bench()
 if ONLY != "decode":
