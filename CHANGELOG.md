@@ -14,6 +14,12 @@ No version has been tagged yet; 0.1.0 will be the first.
 - A CUDA graph replay fails, instead of using freed device memory, once a `DeviceBuffer`
   its capture used has been dropped.
 
+### Added
+
+- On-device tests for the Blackwell custom-epilogue, `cute_ext` persistent and
+  task-scheduling GEMMs (`tests/gpu_blackwell_more.rs`; they need an sm_100 GPU).
+- Tests of `make_tiled_copy_c_atom` with one- and two-value atoms.
+
 ### Changed
 
 - Floating-point multiply-adds contract into `fma` by default

@@ -561,3 +561,8 @@
   assembled. Not modelled: the block-scaled sparse MMAs, TF32/I8/FP4 sparse MMAs, M = 64 sparse,
   `.ashift`, the Rubin `SM107MmaF16BF16SparseOp`/`SM107MmaFP8SparseOp` (listed in CuTe DSL's
   `__all__` but undefined in 4.8.1), and `sm107_tmem_sf_frg`.
+* `retile` with a one-value `make_tiled_copy_c_atom` copy: the copy's repeats over an m16n8
+  accumulator run over the row block first, while the fragment holds c0, c1, c2, c3, so
+  `retile(acc)` followed by `copy` stores c1 and c2 in each other's places. Pick the fragment
+  slot for each repeat yourself (as `tests/tiled_copy_c_atom.rs` does) or use an atom of two
+  values or more. Not compared with C++ CuTe on this case.

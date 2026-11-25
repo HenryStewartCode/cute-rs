@@ -133,6 +133,13 @@ if [ -n "$SUITE" ]; then
     CUTE_RS_EXPECT_SM=$CC cargo test --release --features cuda --test "$SUITE" -- --nocapture --test-threads=1 >"$OUT/$SUITE.log" 2>&1
     digest "$OUT/$SUITE.log" "$SUITE ($(( $(date +%s) - T0 )) s)" || STATUS=1
 fi
+# The other datacenter-Blackwell examples (custom epilogues, cute_ext and task scheduling).
+if [ "$SUITE" = gpu_blackwell ]; then
+    log "running gpu_blackwell_more (CUTE_RS_EXPECT_SM=$CC)"
+    T0=$(date +%s)
+    CUTE_RS_EXPECT_SM=$CC cargo test --release --features cuda --test gpu_blackwell_more -- --nocapture --test-threads=1 >"$OUT/gpu_blackwell_more.log" 2>&1
+    digest "$OUT/gpu_blackwell_more.log" "gpu_blackwell_more ($(( $(date +%s) - T0 )) s)" || STATUS=1
+fi
 
 # ---------------------------------------------------------------- 4. full suite
 if [ "$FULL" -eq 1 ]; then
