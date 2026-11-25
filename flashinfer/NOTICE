@@ -1,0 +1,10 @@
+cute-flashinfer
+Copyright 2026 Henry Stewart
+
+This crate ports kernels of FlashInfer (https://github.com/flashinfer-ai/flashinfer),
+licensed under the Apache License, Version 2.0:
+
+    Copyright (c) 2023-2026 by FlashInfer team.
+
+Files that translate FlashInfer source keep its copyright line and name the file they
+came from. See LICENSE-APACHE at the repository root for the licence text.

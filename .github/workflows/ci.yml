@@ -1,0 +1,48 @@
+# The simulator, MLIR lowering and PTX generation tests on every push and pull request.
+# GitHub's runners have no NVIDIA GPU, so the GPU tests (the `cuda` feature) only build here;
+# they run by hand on GPU machines (see README "Testing").
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  LLVM_VERSION: 22
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      # Pinned so that rustfmt's output matches the toolchain the code is formatted with
+      # (rustfmt's style changes between releases).
+      - uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo clippy --workspace --all-targets --features cuda -- -D warnings
+
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install mlir-opt (LLVM ${{ env.LLVM_VERSION }}, apt.llvm.org)
+        run: |
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+          echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-${LLVM_VERSION} main" \
+            | sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo apt-get update
+          sudo apt-get install -y mlir-${LLVM_VERSION}-tools llvm-${LLVM_VERSION}
+          echo "CUTE_MLIR_OPT=/usr/lib/llvm-${LLVM_VERSION}/bin/mlir-opt" >> "$GITHUB_ENV"
+      - run: cargo test --workspace --no-fail-fast
+      - name: Build the GPU tests
+        run: cargo test --workspace --features cuda --no-run

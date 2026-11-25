@@ -1,0 +1,160 @@
+[package]
+name = "cute-rs"
+version = "0.1.0"
+edition = "2024"
+description = "A CuTe-style GPU kernel DSL for Rust: layout algebra, tensors, copy/MMA atoms, MLIR/PTX code generation and a checking CPU simulator."
+readme = "README.md"
+license = "(MIT OR Apache-2.0) AND BSD-3-Clause"
+repository = "https://github.com/HenryStewartCode/cute-rs"
+
+[lib]
+name = "cute"
+path = "src/lib.rs"
+
+# FlashInfer's kernels, ported to cute-rs (Apache-2.0, FlashInfer's licence): `flashinfer/`.
+[workspace]
+members = ["flashinfer"]
+
+[features]
+# Launch compiled kernels on an NVIDIA GPU through the CUDA driver API
+# (libcuda is loaded at runtime with dlopen; nothing is linked at build time).
+cuda = []
+
+[dependencies]
+
+[[example]]
+name = "run_on_gpu"
+required-features = ["cuda"]
+
+[[example]]
+name = "cuda_graphs"
+required-features = ["cuda"]
+
+[[example]]
+name = "load_exported"
+required-features = ["cuda"]
+
+# A shared library of TVM-FFI functions (`__tvm_ffi_add_one`), loaded by
+# `tvm_ffi.load_module` from Python.
+[[example]]
+name = "tvm_ffi_add"
+crate-type = ["cdylib"]
+
+[[test]]
+name = "gpu"
+required-features = ["cuda"]
+
+[[test]]
+name = "gpu_launch"
+required-features = ["cuda"]
+
+[[test]]
+name = "gpu_iket"
+required-features = ["cuda"]
+
+[[test]]
+name = "cubin"
+required-features = ["cuda"]
+
+[[test]]
+name = "gpu_assert"
+required-features = ["cuda"]
+
+[[test]]
+name = "aot_gpu"
+required-features = ["cuda"]
+
+[[test]]
+name = "gpu_pdl_events"
+required-features = ["cuda"]
+
+[[test]]
+name = "gpu_external"
+required-features = ["cuda"]
+
+[[test]]
+name = "gpu_jit_cache"
+required-features = ["cuda"]
+
+[[test]]
+name = "gpu_tvm_ffi"
+required-features = ["cuda"]
+
+[[test]]
+name = "gpu_benchmark"
+required-features = ["cuda"]
+
+# Tensor maps and grid constants on a GPU (m7-tma-descriptor).
+[[test]]
+name = "gpu_tma"
+required-features = ["cuda"]
+
+# m7-tma-im2col and m7-tma-sm100-modes: the im2col and FP4/FP6 encoders against the validator
+[[test]]
+name = "gpu_tma_modes"
+required-features = ["cuda"]
+
+# PipelineAsync tokens, HardwareInfo and the persistent tile schedulers on a GPU
+# (m9-pipeline-async, m9-persistent-schedulers).
+[[test]]
+name = "gpu_async_sched"
+required-features = ["cuda"]
+
+[[test]]
+name = "gpu_task_scheduling"
+required-features = ["cuda"]
+
+# PipelineCpAsync, PipelineOrder and the grouped GEMM schedulers on a GPU
+# (m9-pipeline-cp-async-order, m9-grouped-gemm-schedulers).
+[[test]]
+name = "gpu_cpasync_grouped"
+required-features = ["cuda"]
+
+# WGMMA shared-memory descriptors on a GPU (m8-wgmma-core).
+[[test]]
+name = "gpu_wgmma"
+required-features = ["cuda"]
+
+# Several kernels in one module (m6b-multi-kernel): the GPU tests, and a shared library of
+# two TVM-FFI functions sharing one module (`__tvm_ffi_mk_stash`, `__tvm_ffi_mk_unstash`).
+[[test]]
+name = "gpu_multi_kernel"
+required-features = ["cuda"]
+
+[[example]]
+name = "tvm_ffi_module"
+crate-type = ["cdylib"]
+
+# External device functions, device functions and flag locks on a GPU (m11-extern-distributed).
+[[test]]
+name = "gpu_extern"
+required-features = ["cuda"]
+
+# Host tensor helpers, the device dtype conversion and stream interop on a GPU (m11-host-tensor-helpers).
+[[test]]
+name = "gpu_host_tensor"
+required-features = ["cuda"]
+
+[[test]]
+name = "gpu_raw_memory"
+required-features = ["cuda"]
+
+# The XLA FFI handler for JAX on a GPU (m11-framework-exports).
+[[test]]
+name = "gpu_xla_ffi"
+required-features = ["cuda"]
+
+# The Hopper and datacenter Blackwell examples on their GPUs (skipped elsewhere).
+[[test]]
+name = "gpu_hopper"
+required-features = ["cuda"]
+
+[[test]]
+name = "gpu_blackwell"
+required-features = ["cuda"]
+
+# The XLA FFI handler for JAX as a shared library (m11-framework-exports).
+[[example]]
+name = "xla_cutlass_call"
+crate-type = ["cdylib"]
+required-features = ["cuda"]
