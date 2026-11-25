@@ -8,3 +8,11 @@ licensed under the Apache License, Version 2.0:
 
 Files that translate FlashInfer source keep its copyright line and name the file they
 came from. See LICENSE-APACHE at the repository root for the licence text.
+
+Some files also translate NVIDIA CUTLASS (https://github.com/NVIDIA/cutlass), licensed
+under the BSD 3-Clause License:
+
+    Copyright (c) NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+Those files (currently src/prefill_sm100.rs) keep CUTLASS's copyright notice and full
+BSD-3-Clause licence text in their headers.

@@ -3,7 +3,7 @@ name = "cute-flashinfer"
 version = "0.1.0"
 edition = "2024"
 description = "FlashInfer's LLM-serving kernels (attention, sampling, normalisation, RoPE, ...) ported to cute-rs."
-license = "Apache-2.0"
+license = "Apache-2.0 AND BSD-3-Clause"
 repository = "https://github.com/HenryStewartCode/cute-rs"
 
 [lib]
