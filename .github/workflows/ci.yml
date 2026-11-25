@@ -1,6 +1,6 @@
 # The simulator, MLIR lowering and PTX generation tests on every push and pull request.
 # GitHub's runners have no NVIDIA GPU, so the GPU tests (the `cuda` feature) only build here;
-# they run by hand on GPU machines (see README "Testing").
+# they run by hand on GPU machines (see docs/testing.md).
 name: CI
 
 on:

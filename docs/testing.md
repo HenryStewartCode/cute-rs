@@ -1,0 +1,351 @@
+# Testing
+
+```bash
+cargo test
+```
+
+* `src/layout/tests.rs` covers the layout algebra: CuTe's documented examples
+  and the test vectors of CUTLASS 4.8.1's CuTe dialect documentation and
+  `cutlass_compiler` tests, written as layout strings, which parse
+  (`"(2,(3,4)):(1,(2,6))".parse::<Layout>()`, and `"(?,?):(?,1)"` with
+  runtime leaves). Brute-force property tests cover coalesce, composition,
+  complement, inverses, TV layouts, nullspace, `tile_to_shape` with an order,
+  `increment_coord`, `find` and weak congruence, and evaluate the algebra on
+  layouts with runtime extents and strides at random values, against the
+  same operations on the static layouts of those values, including
+  compositions whose right-hand runtime values stand for small values that
+  are multiples of nothing in particular.
+* `tests/launch_pdl.rs` covers griddepcontrol (validator, MLIR, sm_90 PTX and `ptxas`), the
+  `SimStream` PDL model (a dependent reading the producer's output or overwriting its input
+  before the wait is caught, a correct pair passes) and `programmatic_dependent_launch`;
+  `tests/dlpack.rs` builds DLPack managed tensors with counting deleters and covers
+  layouts, marking, dtype codes, errors, FP4 packing, the simulator on host tensors, cache
+  keys and `call_bypass_dlpack`; `tests/jit_cache.rs` covers the in-memory and on-disk
+  compile caches (a re-run of the test binary hits the disk) and `KernelCache`. With the
+  `cuda` feature, `tests/gpu_pdl_events.rs` (PDL, events, launch events, cooperative
+  launch), `tests/gpu_external.rs` (DLPack device tensors, raw pointers, views, null
+  pointers) and `tests/gpu_jit_cache.rs` (the module cache and unload callbacks) run on
+  the GPU.
+* `tests/tvm_ffi.rs` calls exported TVM-FFI functions through their C ABI with a stub
+  runtime: the ABI's layout, `kTVMFFIDLTensorPtr` and tensor-object arguments, scalars, and
+  every check failing with its exception kind and message. `tests/autotune.rs` covers
+  `workspace_count_for_l2`, `tune_by`'s skipping and selection, and the `Autotuner`'s cache.
+  With the `cuda` feature, `tests/gpu_tvm_ffi.rs` runs the exported functions on device
+  memory (on the environment's stream, proved by capturing the call into a graph, and from
+  an export), and with `CUTE_RS_TVM_FFI_LIB` set to the built `libtvm_ffi_add.so` a C
+  program compiled with `cc` calls the library with its own stubs, and
+  `CUTE_RS_TVM_FFI_PYTHON` (a Python with `tvm_ffi` and `torch`) runs
+  `examples/tvm_ffi/*.py` on torch tensors; `tests/gpu_benchmark.rs` ports the
+  `benchmark_autotune` notebook's walkthrough: stable times eager and from graphs,
+  workspace rotation with the device's count, graphs' lower overhead on a small kernel,
+  `tune` skipping the unbuildable and unimplementable tiles, and the `Autotuner` tuning
+  again only when `M` or `N` changes.
+* `tests/examples.rs` simulates every example and checks it against a CPU
+  reference. The GEMMs are bit-exact. The runtime-shape ports build each
+  kernel once and run it at several sizes, partial tiles and (for
+  `ampere_sgemm`) K below the K tile included.
+* `tests/ops.rs` checks every scalar operation and control-flow construct
+  against Rust semantics, and `tests/vars.rs` checks the IR that `Var`s
+  turn into (loop-carried values and `if` results) and more `Var`
+  patterns, simulated against Rust.
+* `tests/math.rs` sweeps every `cute::math` function on every type
+  (signed zeros, infinities, NaN, subnormals, extremes, known hard cases,
+  uniform and random samples; `CUTE_MATH_SWEEP=n` inputs per function, 2^14
+  by default) against an independent double-double reference
+  (`tests/math_ref`) and asserts the documented bounds in precise and fast
+  mode, and checks the rounding modes, `ftz` (also on `abs`, `min`, `max`
+  and `clamp`), `min`/`max`/`clamp`, the classifications, `ipowi`, `absi`,
+  the exact functions, and `abs`, `neg` and `copysign` as bit operations on
+  raw patterns (NaN payloads, signaling NaNs).
+* `tests/schedules.rs` holds the seeded schedules and independent thread
+  scheduling to planted bugs and divergent warps: a seed replays its run,
+  an `atomic_cas` race whose winner writes its id is reported by
+  `simulate_schedules` with the element and the two schedules, a producer
+  without back-pressure is reported as phase aliasing, a consumer that
+  polls `mbarrier_test_wait` once and reads anyway is caught only by
+  random completion, lane 0 waits on an mbarrier that lanes 1 to 31 of
+  its warp arrive at in the else-branch, divergent unaligned
+  `barrier.arrive`s complete a warp's arrival, a shuffle meets across the
+  two branches of an `if` (each lane sending its own branch's operand), a
+  vote that lanes which left a loop never reach is reported, and a
+  divergent `mma.sync` and an intra-warp deadlock are reported with each
+  group's lanes; a failing seed replays with the same step count.
+* `tests/diagnostics.rs` builds deliberately broken kernels and checks that
+  each bug is caught (races, missing waits, OOB, misalignment, divergent
+  barriers, barriers that cannot complete, mbarrier parity waits that pass
+  early, bulk copies missing from `expect_tx`, escaping values, a `Var` or
+  loop state whose type or register-tensor layout changes, a `Var`'s
+  alignment or constant relied on inside a loop that carries it, a register
+  fragment a runtime loop reads and then writes, a loop marked
+  `at_least_once` that runs zero times, a vectorize hint below sm_100,
+  `cute.math` options CuTe DSL rejects or PTX lacks, integer instructions on
+  types they do not take, warp collectives (votes too) run outside their
+  member masks or without all of their lanes, a shuffle reading a lane past
+  a short last warp, `redux.sync` kinds on types they do not
+  take, Float32 `redux.sync` for targets other than sm_100a, `fmax` with
+  `abs` for sm_80, a `warp_reduction` group of 12 lanes, half-precision
+  options CuTe DSL rejects (`sat` with `relu`, `ftz` on BFloat16, `oob`
+  with `ftz`, a predicate on fma), bf16x2 `add` for sm_89, the s2f6x2
+  conversion for sm_100, unsupported `cvt_i8_bf16_intrinsic` and
+  `sext_unpacked_i4_i8_intrinsic` lengths, `pack` widths that do not add
+  up, carry chains that
+  start nowhere, are broken by control flow, a call, inline PTX or a 64-bit
+  division by a runtime value, or switch between adding and subtracting,
+  inline PTX names without operands and operands without names, positional
+  operands in a named template, a predicated template of two instructions
+  or with a guard of its own, constraint strings that do not match their
+  operands or use codes NVPTX does not take, immediates that are not
+  integer constants, 32-bit addresses outside shared memory, hand-written
+  MLIR naming operands it lacks, inline statements without a simulation,
+  static-only layout operations on runtime extents and strides, a runtime
+  tiler stride that is 0 at launch, a `Tensor::size`, a register fragment,
+  a copy's per-thread chunk or rest mode, a gemm operand or an element-wise
+  loop with a runtime extent, an identity tensor made with one or divided
+  into one, a store past a runtime extent, accesses past the dynamic shared-memory
+  region's launch size, shared memory larger than any GPU gives a block,
+  `cp.async` tracked by an mbarrier whose count has no room for the tracked
+  arrivals, or read by a warp that has not waited for its phase (or for its
+  own `cp.async` group), a producer's ordinary stores read as if the
+  tracked arrival had released them, each combination of memory ordering
+  and cache hints that PTX's `ld`, `st` and `prefetch` refuse, a cluster
+  scope below sm_90, non-coherent loads of memory the kernel writes, an
+  access wider than its buffer's declared alignment, strong accesses of
+  different sizes to the same bytes, …). It also holds the race checker to
+  the PTX memory model on flag hand-offs: release and acquire, the fence
+  patterns, `st.release; st.relaxed`, release sequences through atomics and
+  copy atoms' memory orders are accepted, and each broken form (a relaxed
+  load or store where the pattern needs more, a missing fence, data written
+  after the release, another warp's store in between, a plain flag, an
+  acquire of part of a release) is reported.
+* `tests/atoms.rs` checks copy-atom and tiled-copy introspection and the
+  layouts of CuTe's tiled-copy constructors and `retile`, and
+  `make_cotiled_copy` against layouts worked by hand from CuTe's C++
+  algorithm.
+* `tests/dynamic_tensors.rs` applies every tiling and partitioning function
+  (`local_tile`, `local_tile_proj`, `local_partition`, the divides, the
+  partitions of tiled copies and MMAs, slicing, composition) to tensors of
+  runtime extents, evaluates the results at many extents, and holds them
+  to the same functions on static tensors where the tilers divide the
+  extents, and to the static-upper-bound layouts (static bounds, the same
+  runtime strides) on the tensors' own domains at any extents, partial
+  tiles included. It also checks that the size queries on tensors fold
+  where they can and evaluate to the static answers (an identity tensor's
+  cosize is the size of its coshape, as in CuTe), and that `runtime_gemm`
+  with runtime extents is correct on random small integers and gives the
+  static-bound kernel's bits, there and on random values whose sums round,
+  at several problem sizes from one built kernel.
+* `tests/int_facts.rs` checks how divisibility facts flow through value and
+  index arithmetic (`assume`, `get_divisibility`, floor division, the
+  `?{div=N}` and `?{i64}` printing), that an assumption is what lets a
+  vector copy through and costs no PTX instruction, that `i64` leaves make
+  64-bit offsets in the MLIR, the PTX and the simulator while the thread
+  arithmetic stays 32-bit, and `FastDivmod` prepared on the host; the
+  feature kernels `assume_vector_copy`, `int64_strides` and `fast_divmod`
+  run in the simulator and on the GPU, and `src/fast_divmod.rs` tests the
+  formula on every divisor up to 2^16 and on random ones up to 2^31 - 1.
+* `tests/mlir.rs` verifies every example with `mlir-opt` and checks its
+  sm_80 PTX for the expected instructions, as well as every `mma.sync` kind,
+  the named barriers, the SM80 and SM90 mbarrier operations, the effect of
+  the loop hints (`unroll=4` gives four copies of the body plus a
+  remainder, `unroll=1` `.pragma "nounroll"`, `unroll_full` a loop without a
+  branch, `at_least_once` a loop without the zero-trip check in front), and
+  every `cute::math` function on every type in both modes: precise PTX
+  contains no approximation and no libdevice call, fast PTX the
+  approximations the documentation names, and float `abs`, `neg` and
+  `copysign` are `and.bN` and `xor.bN`, never `abs.f32` or `neg.f32`, and
+  that each integer and bit instruction appears in the PTX as pure inline
+  assembly (`lop3` with its table as the immediate), that the warp
+  collectives are their PTX instructions: one `shfl.sync` per 32-bit word
+  with the segment masks and clamps as immediates, every `redux.sync`
+  kind, `match.{any,all}.sync` on `.b32` and `.b64`, `bar.warp.sync` with
+  constant and runtime masks, `max` and `min` in all eight modifier
+  combinations (PTX 7.2 on sm_86, refused on sm_80), and Float32
+  `redux.sync` for sm_100a (PTX 8.6), refused for every other target; that
+  carry chains keep their order in the PTX at O0 to O3, with nothing
+  between a carry-out and its carry-in that touches the flag (also
+  around 64-bit divisions by constants, warp collectives, the
+  special-register reads and `cp.async.mbarrier.arrive`), that named
+  inline PTX, raw inline assembly and hand-written MLIR are emitted as
+  translated (operand numbers, constraints, integer constants as
+  immediates, 32-bit shared addresses, guards, side effects, stores that a
+  memory clobber keeps between a store and the reload it forces, pointer
+  operands of MLIR operations), that an error of LLVM's that `mlir-opt`
+  prints (an unknown constraint) fails the compile on every installed
+  `mlir-opt`, even where it exits with success, that each memory ordering,
+  scope and cache hint of `load`, `store` and the G2R and R2G copy atoms
+  reaches the PTX as the qualifiers it names (plain ordered accesses as
+  LLVM atomics, PTX 7.4 for the hints and 8.2 for MMIO, strong vectors of
+  narrow elements with their element type), and that each `prefetch` form
+  is one instruction. The packed half-precision operations are their instructions with every
+  modifier, the predicated ones `@p`-guarded with the result tied to the
+  first operand, `fma` on BFloat16 values is `fma.rn.bf16`, the bf16x2,
+  `ex2.approx.ftz.bf16x2` and `.oob` forms are refused below sm_90 (`.oob`
+  raising sm_90's PTX version to 8.1), `cvt.rn.satfinite.bf16x2.f32` takes
+  element 1 first and raises the version to 8.1 on sm_80 and sm_89, the
+  int8 conversions are `dp4a.s32.s32` against one-hot masks and
+  `cvt.rn.f32.s32`, and the s2f6x2 conversions are refused for all but
+  sm_100a and sm_120a and verified as MLIR (and as PTX 9.1 when `mlir-opt`
+  is LLVM 23). It also compiles
+  kernels for each of sm_80, sm_86, sm_89, sm_90, sm_100 and sm_120. For
+  the compile options it checks that the split pipeline gives every example
+  and feature kernel, and a kernel for each of `cute::math`'s instruction
+  forms and a vectorized loop, the PTX of the single pipeline, and so does
+  MLIR 21's fallback pass list on every installed `mlir-opt` (at O0 to O2
+  too, for the examples); that 128-bit accesses, `mma.sync`, `ldmatrix`,
+  `cp.async` and inline PTX survive at O0 to O2; that line information maps
+  a known statement and a helper's operation to their Rust lines, locates
+  every operation and changes no instruction; and that stage hooks change
+  what they edit and nothing else. These tests are skipped when no
+  `mlir-opt` is found; when `ptxas` is installed (or named by
+  `$CUTE_PTXAS`), the sm_100a and sm_120 PTX of the vectorize hint is
+  assembled with it. The tests that run every installed `mlir-opt` skip
+  copies of a tile keep their 128-bit accesses, behind compares with the
+  runtime extents, and that `runtime_gemm`
+  with runtime extents issues the static-bound kernel's `mma.sync`,
+  `ldmatrix` and `cp.async` instructions in no more PTX.
+  those older than LLVM 21 (such as Ubuntu's LLVM 19), whose pipelines lack
+  options cute-rs uses; the version comes from `mlir-opt --version`.
+* `tests/artifacts.rs` runs a fake `ptxas` script (the exact command line,
+  the temporary directory removed, the old-toolkit and rejection errors), the
+  flag-to-JIT mapping, and kept artifacts in a temporary directory (the Mac
+  reports cubin and SASS as unavailable), the file names of variants of one
+  kernel and debug mode; with a real `ptxas` it checks the cubin, that
+  `--maxrregcount=32` lowers the register count `-v` reports, and that
+  `nvdisasm` shows the Rust lines. `tests/logging.rs` writes each log level to
+  a file and checks that nothing is formatted when logging is off.
+  `tests/cubin.rs` (feature `cuda`) runs five kernels through the `ptxas` cubin
+  and through the PTX JIT with identical results, `--maxrregcount` on the GPU,
+  the driver-linker cubin without `ptxas`, the JIT info and error logs,
+  deliberately invalid inline PTX, and the two `ptxas` 12.8 miscompiles.
+* `tests/ptxas.rs` compiles registered kernels for targets no available GPU
+  runs (the SM90 feature kernels, with the cluster registers and
+  `aggr_smem_size`, for sm_90, sm_90a, sm_100a and sm_120a; the integer and
+  bit instructions, the carry chains, the hand-written PTX and MLIR,
+  `dynamic_smem_size`, `get_dyn_smem_size` and `total_smem_size`,
+  `cp.async.mbarrier.arrive`, the ordered and cache-hinted loads and stores,
+  prefetches and G2R, R2G and cotiled copies, and every warp-collective
+  feature kernel (shuffles, reductions, `redux.sync`, `match.sync`,
+  `bar.warp.sync`, short warps) for every target; `fmax` and `fmin` for
+  every target from sm_86 on; the FP8 conversions for every target from
+  sm_89 on; Float32 `redux.sync` and the UE8M0 conversions for sm_100a; and the
+  packed half-precision, exp2 and conversion kernels for every target,
+  their SM90 forms from sm_90 on; and the kernels over tensors of runtime
+  extents, `dynamic_tiles` and `runtime_gemm` with runtime extents, for every
+  target; the SM90 builds of the warp-specialised examples and the
+  `cp_async_mbarrier_arrive` cluster kernel from sm_90 on) and
+  assembles their PTX with NVIDIA's `ptxas`, failing on any error. It is
+  skipped unless `ptxas` is on `PATH`.
+* `tests/gpu.rs` runs every example on a real GPU and on the simulator and
+  compares every output (the warp-specialised examples in their SM89
+  builds; their SM90 builds and the cluster kernel are simulated and
+  assembled only). Results must match bit for bit, except that
+  `mma.sync` kernels on data that has to round only need to agree within the
+  f32 summation error bound, because the GPU rounds differently from the
+  simulator. It also runs every `cute::math` function on the GPU (2^16
+  inputs per function and type, every bit pattern of the 16-bit types for
+  the unary functions): precise mode, the rounding modes, the `ftz` forms,
+  `absi`, and `abs`, `neg` and `copysign` (on NaN payloads, alone in a
+  kernel, on products, with constant signs and with their bits used as
+  integers) must give the simulator's bits, and fast mode and the explicit
+  approximations must stay within their documented bounds. It also runs
+  every kernel at O0 with line information, loads a kernel with each JIT
+  option, holds the kernels the simulator cannot run (inline PTX and MLIR
+  operations through pointers, memory clobbers, `nvvm.read.ptx.sreg.nsmid`
+  written as MLIR) to plain Rust, and, when the CUDA toolkit is installed,
+  assembles the SM90 kernels with `ptxas` for sm_90a and sm_100a and
+  checks with `nvdisasm -g -c` that the SASS shows the Rust lines. The packed half-precision
+  operations run over every Float16 value against 32 partners with every
+  option (and every BFloat16 value for BFloat16 fma), the Float32
+  conversions over half a million bit patterns, and must give the
+  simulator's bits; `ex2.approx.f16x2` runs on every input and must give
+  one of the two Float16 values on either side of the exact result (the
+  exact result itself when it is a Float16, and the correctly rounded one
+  when that is zero or infinite). A
+  kernel over tensors of runtime extents (`feature_kernels::dynamic_tiles`)
+  and `runtime_gemm` with runtime extents are each compiled once and run
+  at several problem sizes, against plain Rust, the simulator and, for the
+  GEMM, the static-bound kernel's bits, on random small integers and on
+  random values whose sums round. It runs
+  a dynamic shared-memory region behind static buffers at launch sizes from
+  512 bytes to the device's opt-in limit, through a window of exactly 48 KB
+  (and checks that a word more than the limit is refused), and reads the
+  shared-memory size registers, and the raw `%dynamic_smem_size` the launch
+  passes, for 19 layouts, static, in the dynamic window and with a region,
+  among them windows of exactly 128 bytes and 48 KB. The feature kernels
+  it runs that spin on an mbarrier give up after a bounded number of polls
+  and count it, so a lost arrival fails the test instead of hanging the GPU.
+  Run it with `cargo test --features cuda --test gpu`. It is skipped when
+  there is no GPU. Kernels run at the defaults plus the environment, so
+  `CUTE_RS_COMPILER_OPT=--opt-level=0` runs the whole suite at O0.
+* `tests/tensor_ssa.rs` checks what `TensorSsa` emits (a row-major 4x4
+  Float32 `load_ssa` is four 16-byte loads, one scalar operation per
+  element, nothing for broadcasting, sequential `max.NaN.f32` and add
+  chains for reductions, the paired FP8 `cvt` and the Int8 and Int4 to
+  BFloat16 fast paths), the build panics of its misuse, and
+  `print_tensor`'s text. Its kernels (`feature_kernels::tensor_ssa_cases`:
+  loads and stores, arithmetic and comparisons of every type, promotion,
+  broadcasting, indexing, reductions, the conversion matrix, the Float64
+  double-rounding regression, bitcasts and printing) run in
+  `tests/features.rs` and `tests/gpu.rs` with the rest.
+* `tests/numeric_types.rs` holds the type table to CuTe DSL's metadata, the
+  generated promotion table to an independent implementation of CuTe
+  DSL's rules (and mixed-type arithmetic to its types, statically), and
+  every narrow float codec to a search over the format's encodings, for
+  every encoding and an f32 sweep (ties, subnormals, the largest finite
+  values, overflow, signed zeros, infinities, NaNs) in each rounding mode,
+  with and without `.satfinite` and `.relu`.
+* `tests/features.rs` runs a kernel for every scalar type, operation and
+  intrinsic, for `Var`s, `carry_struct!` structs and the loop hints, for
+  layouts with runtime extents and strides evaluated at runtime coordinates,
+  and for tensors of launch-time extents tiled with `local_tile`, walked by
+  a `for_range` over the runtime number of tiles and copied by a tiled copy
+  under a bounds predicate (`tests/feature_kernels`, also at many extents
+  from one built kernel), and holds the simulator to a reference in
+  plain Rust (the carry chains against u128 arithmetic: 128-bit sums and
+  differences of four u32 words, 256-bit ones of four u64 words with
+  carries through every word, a 64x64->128 product from `mad_cc` and
+  `madc`, chains inside loops and branches, and chains around
+  divisions, warp collectives, the special-register reads and
+  `cp.async.mbarrier.arrive` that keep the flag). The GPU test then holds the
+  GPU to the simulator on the same kernels, except those needing SM90
+  (`feature_kernels::sm90`), which are simulated and compiled for sm_90
+  only, and Float32 `redux.sync` and the UE8M0 pairs
+  (`feature_kernels::sm100a`), simulated and compiled for sm_100a; `fmax`
+  and `fmin` (`feature_kernels::sm86`) run on GPUs from sm_86 on, and the
+  FP8 conversions (`feature_kernels::sm89`: every Float16 value to E4M3FN
+  and E5M2 with and without `.relu`, every byte back to Float16, an f32
+  sweep with ties, NaNs, infinities and the saturation boundaries through
+  each conversion, and every byte of every 8-bit format to Float32) from
+  sm_89 on. The type-system kernels (Boolean and TFloat32 conversions, an
+  MMA on TFloat32 fragments, mixed-type promotion, Int128 arithmetic at its
+  edge values with 128-bit scalars and buffers, Int4 over all 16 values) are
+  in `feature_kernels::all`. The warp collectives are checked against the PTX
+  ISA's pseudo-code written again in the tests: shuffles of Int8, Uint16,
+  Float16, BFloat16, Int32, Float32, Int64 and Float64 values in every
+  kind, over the whole warp, in segments of 8 and 16 lanes, past the warp's
+  ends and with member masks in divergent code (NaN payloads must arrive
+  unchanged), and with per-lane operands from the data (also over 200
+  random seeds); butterfly reductions over every group size; every integer
+  `redux.sync` kind; `match.any` and `match.all` on 32- and 64-bit values;
+  all of them over random partitions of the warp; `sync_warp` with
+  half-warp masks; `fmax` and `fmin` in all eight combinations of `abs`,
+  `nan` and `ftz` on every pair of signed zeros, infinities, NaNs (with
+  payloads, negative, signaling), subnormals and extremes; and Float32
+  `redux.sync` with `abs` and `nan`. The packed and scalar half-precision operations (every option, the tuple
+  forms, predicates), the conversions and `pack`/`unpack` are checked
+  against references written again from the PTX ISA in plain Rust (exact
+  results from an f64 sum and its error), on tables of signed zeros,
+  subnormals, extremes, ties, infinities and NaNs, on the input data and on
+  random bits over many seeds; `exp2_packed_f16x2` and the int8 and int4
+  conversions on every input. The simulator's own unit tests hold the
+  half-precision instructions to such a reference on every Float16 and
+  BFloat16 value against a set of partners, for each operation and option. The integer and bit kernels spread
+  their data over every bit (the generated 64-bit inputs are below 2^48), so
+  64-bit `mul_hi`, `bfe`, `bfi`, `clz` and `bfind` see negative values and
+  set high bits, and they try `bfe` and `bfi` at the ISA's edges as
+  constants, at runtime and one of each, including starts and lengths whose
+  low byte is 0 (0x100, 0x200). Hand-offs through flags in every ordered
+  form, every cache hint on every element type, strong vectors of 8- and
+  16-bit elements, the prefetches, tiled G2R and R2G copies with each
+  memory order and hint, and copies built by `make_cotiled_copy` run there
+  too, and so on the GPU.
