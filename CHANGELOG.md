@@ -13,12 +13,22 @@ No version has been tagged yet; 0.1.0 will be the first.
 - A value that is always zero (`x * 0`) counts as divisible by anything in alignment checks.
 - A CUDA graph replay fails, instead of using freed device memory, once a `DeviceBuffer`
   its capture used has been dropped.
+- A tcgen05 MN-major shared-memory operand is refused unless it pairs `MN_SW128_32B` with
+  32-bit elements and the other MN-major layouts with narrower ones: a B200 reads the other
+  pairings as zeros, which the simulator did not show.
+- The Hopper and Blackwell device tests compile a kernel for its own target (the sm_90 TMA
+  copy failed to compile on an sm_100 GPU).
 
 ### Added
 
 - On-device tests for the Blackwell custom-epilogue, `cute_ext` persistent and
   task-scheduling GEMMs (`tests/gpu_blackwell_more.rs`; they need an sm_100 GPU).
 - Tests of `make_tiled_copy_c_atom` with one- and two-value atoms.
+- `CUTE_RS_CROSSCHECK_GPU=<log file>` (with the `cuda` feature): every simulated kernel is
+  also run on GPU 0 and compared with the simulator, one `SAME`/`DIFF`/`SKIP`/`FAIL` line each.
+- `tests/gpu_blackwell_soak.rs`: each Blackwell GEMM launched 200 times and on about ten
+  shapes, every result checked (they need an sm_100 GPU; all pass on a B200).
+- TF32 and 8-bit tcgen05 tiles with MN-major operands in the tile tests.
 
 ### Changed
 

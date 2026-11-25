@@ -405,6 +405,90 @@ fn tf32_tiles_match_the_rust_reference() {
     }
 }
 
+/// A B200 reads MN-major TF32 operands correctly only in `MN_SW128_32B`; the other MN-major
+/// layouts give zeros there, so the descriptor refuses them.
+#[test]
+#[should_panic(expected = "needs the 128-byte swizzle with 32-byte atomicity")]
+fn tf32_mn_major_operands_need_the_32_byte_atomicity_swizzle() {
+    use OperandMajorMode::{K, MN};
+    use SmemLayoutAtomKind::*;
+    let op = MmaTF32Op::new((64, 64), CtaGroup::ONE, OperandSource::SMEM, MN, K);
+    let tile = Tile { m: 64, n: 64, k: 32, a: MN_SW128, b: K_SW128 };
+    tile_kernel::<f32, f32, f32>("umma_tf32_refused", op, tile, Arch::Sm100a);
+}
+
+/// TF32 with MN-major operands, in `MN_SW128_32B` (the MN-major 128-byte swizzle of 32-bit
+/// elements, and the only MN-major layout the hardware reads them in).
+#[test]
+fn tf32_mn_major_tiles_match_the_rust_reference() {
+    use OperandMajorMode::{K, MN};
+    use SmemLayoutAtomKind::*;
+    for (i, (tile, am, bm)) in [
+        (Tile { m: 64, n: 64, k: 32, a: MN_SW128_32B, b: K_SW128 }, MN, K),
+        (Tile { m: 64, n: 64, k: 32, a: K_SW128, b: MN_SW128_32B }, K, MN),
+        (Tile { m: 64, n: 64, k: 32, a: MN_SW128_32B, b: MN_SW128_32B }, MN, MN),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let Tile { m, n, k, .. } = tile;
+        let name = format!("umma_tf32_mn_{i}");
+        let op = MmaTF32Op::new((m, n), CtaGroup::ONE, OperandSource::SMEM, am, bm);
+        let kernel = tile_kernel::<f32, f32, f32>(&name, op, tile, Arch::Sm100a);
+        let (av, bv) = (small_halves(m * k, 5), small_halves(n * k, 9));
+        let mut args = vec![KernelArg::buffer(&av), KernelArg::buffer(&bv), KernelArg::buffer(&vec![0f32; m * n])];
+        assert_eq!(simulate(&kernel, &mut args, false), (k / 8) as u64, "{name}");
+        let at_a = |r: usize, kk: usize| if am == MN { av[kk * m + r] } else { av[r * k + kk] };
+        let at_b = |c: usize, kk: usize| if bm == MN { bv[kk * n + c] } else { bv[c * k + kk] };
+        let want = reference(at_a, at_b, (m, n, k, 8), |x| x);
+        assert_eq!(args[2].to_vec::<f32>(), want, "{name}");
+    }
+}
+
+/// 8-bit operands in the MN-major layouts the other tests do not use (`MN_SW128_32B` is for
+/// 32-bit elements only).
+#[test]
+fn i8_mn_major_layouts_match_the_rust_reference() {
+    use SmemLayoutAtomKind::*;
+    for (i, tile) in
+        [Tile { m: 64, n: 64, k: 64, a: MN_SW32, b: K_SW64 }, Tile { m: 64, n: 64, k: 64, a: MN_INTER, b: K_SW64 }]
+            .into_iter()
+            .enumerate()
+    {
+        let Tile { m, n, k, a: a_kind, b: b_kind } = tile;
+        let name = format!("umma_i8_mn_{i}");
+        let op = MmaI8Op::new(
+            DType::I8,
+            (m, n),
+            CtaGroup::ONE,
+            OperandSource::SMEM,
+            a_kind.major_mode(),
+            b_kind.major_mode(),
+        );
+        let kernel = tile_kernel::<i8, i8, i32>(&name, op, tile, Arch::Sm100a);
+        let mut r = lcg(31 + i as u64);
+        let mut vals = |len: usize| -> Vec<i32> { (0..len).map(|_| (r() % 256) as i32 - 128).collect() };
+        let (av, bv) = (vals(m * k), vals(n * k));
+        let order = |v: &[i32], rows: usize, kind: SmemLayoutAtomKind| -> Vec<i8> {
+            if kind.major_mode() == OperandMajorMode::K {
+                v.iter().map(|&x| x as i8).collect()
+            } else {
+                (0..rows * k).map(|i| v[(i % rows) * k + i / rows] as i8).collect()
+            }
+        };
+        let (a, b) = (order(&av, m, a_kind), order(&bv, n, b_kind));
+        let mut args = vec![KernelArg::buffer(&a), KernelArg::buffer(&b), KernelArg::buffer(&vec![0i32; m * n])];
+        assert_eq!(simulate(&kernel, &mut args, false), (k / 32) as u64, "{name}");
+        let got = args[2].to_vec::<i32>();
+        for row in 0..m {
+            for col in 0..n {
+                let want: i32 = (0..k).map(|kk| av[row * k + kk] * bv[col * k + kk]).sum();
+                assert_eq!(got[row * n + col], want, "{name}: C({row}, {col})");
+            }
+        }
+    }
+}
+
 /// s8 x s8 and u8 x u8 -> s32 over the whole 8-bit ranges, exact.
 #[test]
 fn i8_tiles_match_the_rust_reference() {

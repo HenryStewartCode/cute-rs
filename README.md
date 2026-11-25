@@ -75,22 +75,32 @@ What has run on real GPUs, and what has not:
 | SM80 / SM89 (Ampere, Ada) | an SM89 GPU | The full GPU suite passes |
 | SM120 (consumer Blackwell) | RTX 5090 | The full GPU suite passes, including TMA, the SM120 MMAs and the block-scaled warp MMAs |
 | SM90 (Hopper) | none yet | WGMMA, the Hopper GEMMs and FMHA are checked by the simulator and `ptxas` only |
-| SM100 / SM103 / SM107 (datacenter Blackwell, Rubin) | none yet | tcgen05, tensor memory, UMMA and CTA pairs are checked by the simulator and `ptxas` only |
+| SM100 (datacenter Blackwell) | B200 | The Blackwell device tests pass (tcgen05 GEMMs with and without CTA pairs, mixed-input, NVFP4, custom epilogues, task scheduling), as does a 200-launch stress test of each; the simulator's test suite was compared with the device kernel by kernel ([docs/testing.md](docs/testing.md#results-on-a-b200)) |
+| SM103 / SM107 (Blackwell Ultra, Rubin) | none yet | Checked by the simulator and `ptxas` only (SM107 by the simulator only) |
 
 `tests/gpu_hopper.rs` and `tests/gpu_blackwell.rs` run the Hopper and datacenter-Blackwell
 examples on those GPUs against CPU references, and time them (the `#[ignore]`d `bench_*`
-tests). `scripts/gpu-validate.sh` does a whole validation pass on a GPU machine in one go:
+tests). With `CUTE_RS_CROSSCHECK_GPU` set, every kernel the simulator tests run is also run
+on the GPU and compared. `scripts/gpu-validate.sh` does a whole validation pass on a GPU machine in one go:
 it installs Rust and `mlir-opt`, runs the architecture's suite, then the full suite, then the
 timings (with cuBLAS alongside when PyTorch is installed), and packs the results.
 `scripts/pod-run.sh` drives it on a rented machine over SSH (`start`, `status`, `fetch`).
 
 Known gaps besides the Hopper and datacenter-Blackwell hardware:
 
-* No performance comparison with CuTe DSL yet; the tests check results, not speed.
+* Speed: on a B200 at 8192 x 8192 x 8192 in Float16, the tutorial tcgen05 GEMMs run at about
+  1,600 TFLOP/s, level with cuBLAS, but CuTe DSL's own builds of the same kernels are 15 to 30%
+  faster, and 40 to 80% faster for the dense GEMM example
+  ([docs/testing.md](docs/testing.md#results-on-a-b200)). Hopper is not timed yet.
+* On the B200 a few simulated kernels disagree with the device: a CTA pair's NVFP4 scale
+  factors for B, `ldmatrix`'s 4-bit unpacking, `fma` with `oob` on NaN operands and the
+  scatter4 TMA store. [docs/limitations.md](docs/limitations.md) has the details.
 * The JAX (`xla_ffi`) and TVM-FFI bindings are tested against hand-built call frames, not
   under JAX or `libtvm_ffi` themselves.
 * A CTA pair's B scale factors (the 2x2 data path of `make_tmem_layout_sfb`) are not laid
   out yet.
+* Multicast memory (`MulticastGroup`) fails to create a group on a single B200
+  (`cuMulticastCreate` returns an invalid-value error); it has not run on a multi-GPU machine.
 * The JIT disk cache refuses a directory other users can write to, which includes network
   volumes that report mode 777; point `CUTE_RS_CACHE_DIR` at local disk there.
 

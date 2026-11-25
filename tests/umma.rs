@@ -301,10 +301,19 @@ fn umma_tiles_match_the_rust_reference() {
     run_tile::<F16, F16>("umma_128_f16_f16_kinter_mninter", 128, 128, K_INTER, MN_INTER);
     run_tile::<BF16, f32>("umma_128_bf16_f32_mninter_kinter", 128, 128, MN_INTER, K_INTER);
     run_tile::<F16, f32>("umma_64_f16_f32_ksw32_mnsw32", 64, 64, K_SW32, MN_SW32);
-    run_tile::<BF16, f32>("umma_64_bf16_f32_mnsw12832b_ksw64", 64, 64, MN_SW128_32B, K_SW64);
-    run_tile::<F16, F16>("umma_64_f16_f16_ksw64_mnsw12832b", 64, 64, K_SW64, MN_SW128_32B);
+    run_tile::<BF16, f32>("umma_64_bf16_f32_mnsw64_ksw64", 64, 64, MN_SW64, K_SW64);
+    run_tile::<F16, F16>("umma_64_f16_f16_ksw64_mnsw128", 64, 64, K_SW64, MN_SW128);
     run_tile::<F16, f32>("umma_64_f16_f32_mnsw64_ksw128", 64, 64, MN_SW64, K_SW128);
     run_tile::<BF16, f32>("umma_64_bf16_f32_mnsw32_mnsw128", 64, 64, MN_SW32, MN_SW128);
+}
+
+/// `MN_SW128_32B` is the MN-major swizzle of 32-bit elements: a B200 reads 16-bit operands
+/// laid out with it as zeros, so the descriptor refuses them.
+#[test]
+#[should_panic(expected = "is for MN-major operands of 32-bit elements")]
+fn the_32_byte_atomicity_swizzle_refuses_16_bit_operands() {
+    use SmemLayoutAtomKind::*;
+    tile_kernel::<BF16, f32>("umma_refused", 64, 64, MN_SW128_32B, K_SW64, Faults::default());
 }
 
 /// A 128x128x128 GEMM through two shared-memory stages of 32 columns of K: all threads

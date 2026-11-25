@@ -162,6 +162,10 @@ required-features = ["cuda"]
 name = "gpu_blackwell_more"
 required-features = ["cuda"]
 
+[[test]]
+name = "gpu_blackwell_soak"
+required-features = ["cuda"]
+
 # The XLA FFI handler for JAX as a shared library.
 [[example]]
 name = "xla_cutlass_call"

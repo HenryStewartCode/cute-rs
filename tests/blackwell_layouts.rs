@@ -285,8 +285,30 @@ fn descriptors_match_hand_computed_values() {
     assert_eq!(fields(K_INTER, UmmaLayoutType::SwizzleNone), 128 << 16 | 8 << 32 | 1 << 46);
     // MN-major SW128: 64-element MN blocks 1024 bytes apart (LBO 64), 8-row K blocks 2048 (SBO 128).
     assert_eq!(fields(MN_SW128, UmmaLayoutType::Swizzle128B), 64 << 16 | 128 << 32 | 1 << 46 | 2 << 61);
-    // MN-major SW128 with 32-byte atomicity: MN blocks 512 bytes apart (LBO 32), 4-row K blocks 1024 (SBO 64).
-    assert_eq!(fields(MN_SW128_32B, UmmaLayoutType::Swizzle128BBase32B), 32 << 16 | 64 << 32 | 1 << 46 | 1 << 61);
+    // MN-major SW128 with 32-byte atomicity is for 32-bit elements (the hardware reads other
+    // widths wrongly): for TF32 tiles of `tile_to_shape(atom, (128, 64))`, MN blocks 512 bytes
+    // apart (LBO 32), 4-row K blocks 2048 (SBO 128).
+    let tf32 = {
+        let atom = make_smem_layout_atom_dtype(MN_SW128_32B, DType::TF32);
+        let tiled = tile_to_shape(atom.outer(), (128, 64));
+        let tile = tiled_divide(&tiled, (128, 8)).mode(0);
+        let ty = UmmaLayoutType::Swizzle128BBase32B;
+        umma_desc_fields(&tile, OperandMajorMode::MN, ty, 32, UmmaDescEncoding::Sm100)
+            .unwrap_or_else(|e| panic!("MN_SW128_32B TF32: {e}"))
+            .encode(UmmaDescEncoding::Sm100)
+    };
+    assert_eq!(tf32, 32 << 16 | 128 << 32 | 1 << 46 | 1 << 61);
+    // The pairings the hardware does not take are refused.
+    let refused = |kind: SmemLayoutAtomKind, ty: UmmaLayoutType, dtype: DType| {
+        let atom = make_smem_layout_atom_dtype(kind, dtype);
+        let tiled = tile_to_shape(atom.outer(), (128, 64));
+        let tile = tiled_divide(&tiled, (128, 256 / dtype.bits())).mode(0);
+        umma_desc_fields(&tile, OperandMajorMode::MN, ty, dtype.bits(), UmmaDescEncoding::Sm100).unwrap_err()
+    };
+    let e = refused(MN_SW128_32B, UmmaLayoutType::Swizzle128BBase32B, DType::F16);
+    assert!(e.contains("32-bit elements, and these are 16-bit"), "{e}");
+    let e = refused(MN_SW128, UmmaLayoutType::Swizzle128B, DType::TF32);
+    assert!(e.contains("needs the 128-byte swizzle with 32-byte atomicity"), "{e}");
     // MN-major SW32: 16-element MN blocks 256 bytes apart (LBO 16), 8-row K blocks 2048 (SBO 128).
     assert_eq!(fields(MN_SW32, UmmaLayoutType::Swizzle32B), 16 << 16 | 128 << 32 | 1 << 46 | 6 << 61);
 }
@@ -322,6 +344,11 @@ fn decoded_descriptors_visit_the_swizzled_layouts_bytes() {
             let Some(kind) = kinds_for(ty, major) else { continue };
             for dtype in [DType::I8, DType::F16, DType::TF32] {
                 let bits = dtype.bits();
+                // An MN-major operand takes the 32-byte-atomicity swizzle exactly when its
+                // elements are 32 bits wide (`umma_desc_fields` refuses the other pairings).
+                if major == OperandMajorMode::MN && (ty == UmmaLayoutType::Swizzle128BBase32B) != (bits == 32) {
+                    continue;
+                }
                 let mma_k = 256 / bits;
                 for mn in [64usize, 128, 256] {
                     let atom = make_smem_layout_atom_dtype(kind, dtype);

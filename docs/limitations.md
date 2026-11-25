@@ -1,5 +1,33 @@
 # Limitations
 
+* Where the simulator and a B200 (sm_100a) disagree. These were found by running the
+  simulator's tests with `CUTE_RS_CROSSCHECK_GPU`
+  ([testing.md](testing.md#results-on-a-b200)); the device is the reference, and neither the
+  simulator nor, where it says so, the kernel has been corrected yet:
+  * A CTA pair's NVFP4 MMA (`MmaMXF4NVF4Op` with 16-element scale-factor vectors): the
+    columns of C that come from the second half of B are wrong on the device. The pair's B
+    scale factors are not where the hardware reads them, the same gap as
+    `make_tmem_layout_sfb`'s 2x2 data path. The single-CTA forms and a pair's `MmaMXF8F6F4Op`
+    agree.
+  * `ldmatrix`'s 4-bit unpacking form leaves each value in the low four bits of its byte on
+    the device; the simulator puts it two bits higher.
+  * `fma` with `oob` on Float16 and BFloat16: where the simulator gives zero for a NaN
+    operand, the device gives the NaN `0x7fff`.
+  * The scatter4 TMA store (`CopyBulkTensor2DScatter4S2GOp`) passes the validator and the
+    driver's compiler for sm_100a and then stops with an illegal-instruction error on the
+    device. The gather4 load runs.
+  * `aggr_smem_size` in a cluster of two: the simulator gives 3,200 bytes where the device
+    gives 3,088.
+  * These differ by nature and are not errors: which cluster cluster launch control cancels
+    first, and which cluster shape the device picks; how often a `try_wait` succeeds at once;
+    a collector `USE` after its source changed (the device reloads the operand, which the
+    simulator reports by default); tensor memory read without having been written;
+    approximate instructions and NaN payloads; sums whose order depends on timing, and
+    tensor-core sums of values that round; the bytes of a TMA descriptor; a dynamic
+    shared-memory size above what the device allows.
+* A tcgen05 operand in shared memory that is MN-major takes `MN_SW128_32B` exactly when its
+  elements are 32 bits wide. A B200 reads the other pairings as zeros, so the descriptor
+  refuses them when the kernel is built.
 * Launch ABI and attributes: a by-value struct's fields are read at multiples of their
   size, so a packed layout's misaligned fields cannot be read; `smem_overlay` takes two
   alternatives of one shared buffer each; under `ClusterShapes::Mixed` the simulator runs the

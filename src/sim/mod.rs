@@ -804,19 +804,31 @@ pub(crate) fn check_launch(
 impl Kernel {
     /// Run the kernel on the CPU. `args` holds one entry per parameter, in
     /// declaration order; output buffers are updated in place.
+    #[track_caller]
     pub fn simulate(&self, cfg: LaunchConfig, args: &mut [KernelArg]) -> Result<SimReport, SimError> {
         self.simulate_with(cfg, args, &SimOptions::default())
     }
 
     /// [`Kernel::simulate`] with explicit checking options.
+    ///
+    /// With the `cuda` feature and `CUTE_RS_CROSSCHECK_GPU` set, a successful simulation is
+    /// also run on GPU 0 and compared ([`cuda::crosscheck`](crate::cuda::crosscheck)).
+    #[track_caller]
     pub fn simulate_with(
         &self,
         cfg: LaunchConfig,
         args: &mut [KernelArg],
         opts: &SimOptions,
     ) -> Result<SimReport, SimError> {
+        #[cfg(feature = "cuda")]
+        let (before, caller) = (crate::cuda::crosscheck::snapshot(args), std::panic::Location::caller());
         let mut module = self.sim_module();
-        module.simulate_with(cfg, args, opts)
+        let result = module.simulate_with(cfg, args, opts);
+        #[cfg(feature = "cuda")]
+        if let (Some(before), Ok(_)) = (before, &result) {
+            crate::cuda::crosscheck::run(self, cfg, before, args, caller);
+        }
+        result
     }
 
     /// [`Kernel::simulate_with`] under every built-in [`Schedule`], each with

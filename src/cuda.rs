@@ -46,6 +46,7 @@ type CuGraph = *mut c_void;
 type CuGraphExec = *mut c_void;
 type CuEvent = *mut c_void;
 
+pub mod crosscheck;
 mod device;
 mod event;
 mod graph;

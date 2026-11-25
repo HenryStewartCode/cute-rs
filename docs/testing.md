@@ -349,3 +349,67 @@ cargo test
   16-bit elements, the prefetches, tiled G2R and R2G copies with each
   memory order and hint, and copies built by `make_cotiled_copy` run there
   too, and so on the GPU.
+
+## Checking the simulator against a GPU
+
+On a machine with a GPU, every simulated kernel can also be run on the device and
+compared. With the `cuda` feature, set `CUTE_RS_CROSSCHECK_GPU` to a log file:
+
+```bash
+CUTE_RS_CROSSCHECK_GPU=/tmp/crosscheck.log cargo test --release --features cuda
+```
+
+Each successful `Kernel::simulate` (or `simulate_with`) then compiles the kernel for GPU 0,
+runs it there on the arguments as they were before the simulation, and appends one line to
+the log: `SAME` when every buffer equals the simulator's bit for bit, `DIFF` with the
+argument, the number of differing elements and (for floats) the largest difference, `SKIP`
+when the device cannot run the kernel (with the reason), or `FAIL` when the launch failed. A
+`RUN` line is written before each launch, so a kernel that never returns on the device is
+the last line of the log. Nothing panics, and the tests' own results are unchanged, so the
+whole simulator suite becomes a check of the simulator's model of that GPU.
+(`cute::cuda::crosscheck` describes what can legitimately differ.)
+
+## Results on a B200
+
+One rented B200 (sm_100a, driver 595.112, LLVM 22.1, `ptxas` 12.8), on 2026-11-25.
+
+**Device tests.** `tests/gpu_blackwell.rs` and `tests/gpu_blackwell_more.rs` pass: the dense
+GEMM (one CTA, a CTA pair, a pair with multicast), the tutorial GEMMs (plain, warp-specialised,
+persistent, with cluster launch control and with preferred and fallback clusters), the mixed-input and NVFP4 GEMMs, the
+custom-epilogue, `cute_ext` persistent and task-scheduling GEMMs and the TMA copy.
+`tests/gpu_blackwell_soak.rs` passes too: every configuration launched 200 times on one
+shape and once on about ten more, each result equal to the CPU reference.
+
+**Simulator against device.** The test suite was run with `CUTE_RS_CROSSCHECK_GPU`
+(80 of the 119 test files: the GPU-only ones ran on their own, and the last 19, which cover features already run on an SM89 GPU, were left out). Of the simulated kernels the
+device could run, 15,140 runs gave exactly the simulator's buffers and 382 did not; 2,522
+were skipped (built for another architecture, mostly sm_110a, sm_90a and sm_120a) and 3
+failed to launch (the scatter4 store twice, and a shared-memory size above the device's
+limit). Most of the differences are of kinds that are not errors (the order a
+cluster scheduler works in, approximate instructions, NaN payloads, rounding inside the
+tensor cores, memory read without being written, TMA descriptor bytes). The ones that are
+errors are in [limitations.md](limitations.md): a CTA pair's NVFP4 scale factors for B,
+`ldmatrix`'s 4-bit unpacking, `fma` with `oob` on NaN operands, the scatter4 TMA store and
+`aggr_smem_size`. One more became a rule: an MN-major tcgen05 operand must pair
+`MN_SW128_32B` with 32-bit elements and the other MN-major layouts with narrower ones (the
+device read the other pairings as zeros), and the descriptor now refuses the rest.
+
+**Speed** at 8192 x 8192 x 8192, Float16 operands and result, Float32 accumulator. cute-rs
+is the fastest of 10 launches, timed on the host; CuTe DSL 4.8.1 is the same example run by
+NVIDIA's package, an average over 20 launches from CUDA events (Python's launch overhead
+included); cuBLAS is `torch.matmul`.
+
+| Kernel | cute-rs | CuTe DSL | cute-rs takes longer by |
+|---|---|---|---|
+| Tutorial GEMM, static persistent scheduler (`fp16_gemm_3`) | 0.68-0.70 ms (1,580-1,608 TFLOP/s) | 0.53 ms | 29-31% |
+| Tutorial GEMM, cluster launch control (`fp16_gemm_3_1`) | 0.69-0.70 ms | 0.60 ms | 15-16% |
+| Tutorial GEMM, preferred and fallback clusters (`fp16_gemm_4`) | 0.67-0.68 ms | 0.56 ms | 20-21% |
+| Dense GEMM, one CTA | 1.43-1.45 ms | 1.03 ms | 39-42% |
+| Dense GEMM, CTA pair | 1.55-1.57 ms | 0.85 ms | 82-83% |
+| Dense GEMM, CTA pair with multicast | 1.72-1.75 ms | 0.97 ms | 78-81% |
+| cuBLAS | 0.70 ms (1,571 TFLOP/s) | | |
+
+The NVFP4 GEMM takes 0.46-0.52 ms in cute-rs (about 2,100 TFLOP/s); CuTe DSL's example
+reports 0.21 ms, but with a cold cache and a different iteration count, so the two are not
+like for like. Raising LLVM's loop-unrolling limit (which unrolls the TMA load loops)
+changed none of the cute-rs times. Why CuTe DSL's builds are faster is not known yet.

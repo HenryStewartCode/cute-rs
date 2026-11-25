@@ -273,6 +273,24 @@ pub fn umma_desc_fields(
             (if swizzled { 128 / bits } else { l }, sbo, Box::new(canon), form)
         }
         OperandMajorMode::MN => {
+            // Measured on a B200 (sm_100a): an MN-major operand of 32-bit elements is read
+            // correctly only with the 32-byte-atomicity swizzle, and that swizzle only with
+            // 32-bit elements; the other pairings give zeros. CuTe's own selector
+            // (`sm100_smem_selector`) pairs them the same way.
+            let base32 = layout_type == UmmaLayoutType::Swizzle128BBase32B;
+            if base32 != (bits == 32) {
+                return Err(if base32 {
+                    format!(
+                        "the 128-byte swizzle with 32-byte atomicity (MN_SW128_32B) is for MN-major operands of \
+                         32-bit elements, and these are {bits}-bit: the hardware reads other widths wrongly"
+                    )
+                } else {
+                    format!(
+                        "an MN-major operand of 32-bit elements needs the 128-byte swizzle with 32-byte atomicity \
+                         (MN_SW128_32B), not {layout_type:?}: the hardware reads the other layouts wrongly"
+                    )
+                });
+            }
             let r = layout_type.k_rows();
             let block = w * t;
             if !mn.is_multiple_of(block) || !k.is_multiple_of(r) {

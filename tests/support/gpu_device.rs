@@ -63,10 +63,14 @@ impl Device {
         // Without contraction (cute-rs's default fuses `a * b + c` into `fma`): the tests check
         // results bit for bit against the simulator's CPU references, which round every
         // operation.
-        let options = CompileOptions::new().gpu_arch(self.arch).fp_contract(false);
+        // A kernel built for an architecture of its own (`KernelOptions::target`) is compiled
+        // for that one: the driver compiles its PTX for this device at load time (an sm_90
+        // kernel on an sm_100 GPU), and the load fails if the device cannot run it.
+        let arch = kernel.target().unwrap_or(self.arch);
+        let options = CompileOptions::new().gpu_arch(arch).fp_contract(false);
         let compiled = kernel
             .compile_with(&self.tc, &options)
-            .unwrap_or_else(|e| panic!("{}: compiling for {}: {e}", kernel.name(), self.arch));
+            .unwrap_or_else(|e| panic!("{}: compiling for {arch}: {e}", kernel.name()));
         let function = self.ctx.load(&compiled).unwrap_or_else(|e| panic!("{}: loading: {e}", kernel.name()));
         Loaded { device: self, kernel, function }
     }
