@@ -219,13 +219,13 @@ fn flag_handshake_on_the_gpu() {
 }
 
 #[test]
-fn multicast_needs_hardware_support() {
+fn multicast_needs_hardware_support_and_two_devices() {
     let Some((ctx, _)) = device() else { return };
+    let err = MulticastGroup::new(&[&ctx], 1 << 20).err().expect("no multicast memory on one device");
     if ctx.multicast_supported().unwrap() {
-        let g = MulticastGroup::new(&[&ctx], 1 << 20).unwrap_or_else(|e| panic!("{e}"));
-        assert!(g.size() >= 1 << 20 && g.multicast_ptr(0) != 0 && g.unicast_ptr(0) != 0);
-        return;
+        // The device can join a team, but one device is not a team (an H100 and a B200).
+        assert!(err.to_string().contains("needs at least two devices"), "{err}");
+    } else {
+        assert!(err.to_string().contains("does not support multicast memory"), "{err}");
     }
-    let err = MulticastGroup::new(&[&ctx], 1 << 20).err().expect("no multicast support");
-    assert!(err.to_string().contains("does not support multicast memory"), "{err}");
 }

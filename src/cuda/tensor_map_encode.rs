@@ -134,6 +134,24 @@ impl CudaContext {
                 code: base.code,
             });
         }
+        // The 4- and 6-bit encodings came with sm_100: an H100's driver refuses the valid ones too.
+        if result == CUDA_ERROR_INVALID_VALUE
+            && desc.data_type.group_slot_bytes().is_some()
+            && self.compute_capability().0 < 10
+        {
+            let (major, minor) = self.compute_capability();
+            let base = check(&self.api, result, "cuTensorMapEncodeTiled").unwrap_err();
+            return Err(CudaError {
+                message: format!(
+                    "{}: the 4- and 6-bit tensor-map types ({}) need compute capability 10.0 or newer, and {} is \
+                     sm_{major}{minor}",
+                    base.message,
+                    desc.data_type,
+                    self.name()
+                ),
+                code: base.code,
+            });
+        }
         check(&self.api, result, "cuTensorMapEncodeTiled")?;
         Ok(out)
     }

@@ -35,9 +35,20 @@ No version has been tagged yet; 0.1.0 will be the first.
 - `cute-flashinfer`: the `max_error` helpers of `decode`, `prefill`, `attention`, `mla`,
   `rope`, `sparse` and `xqa` return NaN when an output is NaN. They dropped it, so a NaN
   output passed the tests that used them; that hid the prefill fault above.
+- What the first run on an H100 showed (no fault in a kernel):
+  - the Hopper GEMM check allows for a Float16 accumulator's rounding over a long K
+    (`f16_accumulator_rounding`): at K = 1024 the device and the simulator, which agree bit
+    for bit, were outside the old tolerance;
+  - `MulticastGroup::new` refuses a team of one device with the reason (the driver makes
+    teams of two or more, and gave a bare invalid-value error for one);
+  - a tensor map of a packed 4- or 6-bit type on a GPU below sm_100 fails with the GPU it
+    needs, and the driver test expects that refusal.
 
 ### Added
 
+- Results of the first run on an H100 (`docs/testing.md`): the Hopper device tests pass, the
+  simulator agrees with the device on 18,998 of 20,370 kernel runs with no difference that is
+  an error, and the Hopper GEMM and FMHA are timed against cuBLAS and PyTorch.
 - `flashinfer-check/`: a check of the `cute-flashinfer` ports against FlashInfer itself.
   FlashInfer's Python package and the ports are given the same inputs on one GPU and their
   outputs compared under a rule per output (the same bytes, one representable value apart,

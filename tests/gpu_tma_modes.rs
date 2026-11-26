@@ -1,9 +1,9 @@
 //! The driver's tensor-map encoders against cute-rs's validator for the im2col descriptors
 //! (`cuTensorMapEncodeIm2col`) and the FP4/FP6 encodings
 //! (`cuTensorMapEncodeTiled` with `CU_TENSOR_MAP_DATA_TYPE_16U4_ALIGN8B`, `16U4_ALIGN16B`,
-//! `16U6_ALIGN16B`). Below compute capability 9.0 the driver encodes
-//! nothing but checks some fields first: what it rejects as invalid, cute-rs must reject
-//! too. Needs the `cuda` feature:
+//! `16U6_ALIGN16B`, which the driver takes from compute capability 10.0). Below compute
+//! capability 9.0 the driver encodes nothing but checks some fields first: what it rejects as
+//! invalid, cute-rs must reject too. Needs the `cuda` feature:
 //!
 //! ```text
 //! cargo test --release --features cuda --test gpu_tma_modes -- --nocapture
@@ -113,8 +113,15 @@ fn driver_encoding_agrees_with_the_validator() {
                 Err(e) => format!("rejects ({:?})", e.code),
             }
         );
+        // The 4- and 6-bit encodings came with sm_100: an sm_90 driver refuses the valid ones too
+        // (an H100 does), and says which device it needs.
+        let on_this_device = major >= 10 || d.data_type.group_slot_bytes().is_none();
+        if full && ours.is_ok() && !on_this_device {
+            let message = driver.as_ref().err().map_or("", |e| e.message.as_str());
+            assert!(message.contains("need compute capability 10.0"), "{name}: {message}");
+        }
         let bad = if full {
-            ours.is_ok() != driver.is_ok()
+            (ours.is_ok() && on_this_device) != driver.is_ok()
         } else {
             driver.is_ok()
                 || code == Some(CUDA_ERROR_INVALID_VALUE) && ours.is_ok()

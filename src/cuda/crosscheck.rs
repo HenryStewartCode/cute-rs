@@ -15,7 +15,8 @@
 //! * `FAIL`: the launch itself failed.
 //!
 //! A `RUN` line is written before each launch, so a kernel that never returns on the device
-//! can be found from the last line of the log. Nothing here panics and the simulation's own
+//! can be found from the last line of the log (there is no time limit: the run waits on such a
+//! kernel until its test is ended). Nothing here panics and the simulation's own
 //! result is returned unchanged, so a whole simulator test suite can be run against a GPU:
 //!
 //! ```text

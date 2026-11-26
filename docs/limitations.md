@@ -1,5 +1,11 @@
 # Limitations
 
+* What an H100 (sm_90) showed, from the same run of the simulator's tests
+  ([testing.md](testing.md#results-on-an-h100)): no error in a kernel or in the simulator.
+  Three things it settled: the Float16 and BFloat16 WGMMA kernels give the simulator's bits,
+  on inexact sums too, while an FP8 WGMMA differs in the last digits (0.007 at most on values
+  up to 25); the packed 4- and 6-bit tensor-map types need sm_100; and multicast memory needs
+  a team of at least two devices.
 * What a B200 (sm_100a) showed that the simulator did not, found by running the simulator's
   tests with `CUTE_RS_CROSSCHECK_GPU` ([testing.md](testing.md#results-on-a-b200)):
   * Still open: a CTA pair's block-scaled MMA with M = 128 (the PTX ISA's Layout B, the 2x2
@@ -566,7 +572,8 @@
   address, so kernels above 48 KB whose buffers sit at nonzero offsets, such as
   `hopper_gemm`'s TMA destinations and WGMMA descriptors, need LLVM 22 or newer. The
   simulator adds a WGMMA's products in order of K in Float32; the hardware's order is
-  undocumented, so only exact sums are known to match it.
+  undocumented. On an H100 the Float16 and BFloat16 kernels gave the same bits, on inexact
+  sums too; an FP8 kernel did not (see the top of this page).
 * TVM-FFI callables take positional DLPack tensors and scalars only (no TVM-FFI `Array`,
   `Map` or dataclass objects, defaults or keyword arguments), check their arguments on the
   host rather than in compiled code, and build one callable (and load one module) per

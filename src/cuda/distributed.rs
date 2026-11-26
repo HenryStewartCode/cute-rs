@@ -242,8 +242,9 @@ pub struct MulticastGroup<'c> {
 impl<'c> MulticastGroup<'c> {
     /// Make multicast memory of at least `bytes` bytes over the devices of `contexts` (one
     /// context per device, in rank order). Fails, saying why, when a device lacks multicast
-    /// support (`CU_DEVICE_ATTRIBUTE_MULTICAST_SUPPORTED`, which single GPUs and GPUs before
-    /// sm_90 lack) or the driver lacks the multicast API.
+    /// support (`CU_DEVICE_ATTRIBUTE_MULTICAST_SUPPORTED`, which GPUs before sm_90 lack), when
+    /// there are fewer than two devices (the driver makes no team of one), or when the driver
+    /// lacks the multicast API.
     pub fn new(contexts: &[&'c CudaContext], bytes: usize) -> Result<MulticastGroup<'c>, CudaError> {
         if contexts.is_empty() || bytes == 0 {
             return Err(err("MulticastGroup::new: needs at least one device and one byte"));
@@ -257,6 +258,15 @@ impl<'c> MulticastGroup<'c> {
                     ctx.ordinal()
                 )));
             }
+        }
+        // On one H100 `cuMulticastCreate` gives CUDA_ERROR_INVALID_VALUE for `numDevices` 1 and
+        // succeeds for 2, 4 and 8 (a single B200 gives the same error for 1).
+        if contexts.len() < 2 {
+            return Err(err(format!(
+                "MulticastGroup::new: multicast memory needs at least two devices, and this is a team of one ({}): \
+                 the driver refuses to make one (cuMulticastCreate gives CUDA_ERROR_INVALID_VALUE)",
+                contexts[0].name()
+            )));
         }
         let api = load_vmm()?;
         let ctx0 = contexts[0];

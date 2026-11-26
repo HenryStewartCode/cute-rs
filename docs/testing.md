@@ -365,7 +365,8 @@ the log: `SAME` when every buffer equals the simulator's bit for bit, `DIFF` wit
 argument, the number of differing elements and (for floats) the largest difference, `SKIP`
 when the device cannot run the kernel (with the reason), or `FAIL` when the launch failed. A
 `RUN` line is written before each launch, so a kernel that never returns on the device is
-the last line of the log. Nothing panics, and the tests' own results are unchanged, so the
+the last line of the log (the run waits on it: there is no time limit, so end that test and
+run the rest). Nothing panics, and the tests' own results are unchanged, so the
 whole simulator suite becomes a check of the simulator's model of that GPU.
 (`cute::cuda::crosscheck` describes what can legitimately differ.)
 
@@ -433,3 +434,73 @@ The NVFP4 GEMM takes 0.46-0.52 ms in cute-rs (about 2,100 TFLOP/s); CuTe DSL's e
 reports 0.21 ms, but with a cold cache and a different iteration count, so the two are not
 like for like. Raising LLVM's loop-unrolling limit (which unrolls the TMA load loops)
 changed none of the cute-rs times. Why CuTe DSL's builds are faster is not known yet.
+
+## Results on an H100
+
+One rented H100 (sm_90, driver 595.112, LLVM 22.1, `ptxas` 12.8), on 2026-11-26: the first
+time the Hopper kernels ran on a Hopper GPU.
+
+**Device tests.** `tests/gpu_hopper.rs` passes: the WGMMA dense GEMM (clusters, every major
+mode, two warpgroups, batches, Float16, BFloat16, FP8 and 8-bit integers, whole numbers and
+fractions), the persistent GEMM with the device's cluster count, and the FMHA forward. The
+first run of the whole suite gave 1,950 passes and 4 failures, none of them a fault in a
+kernel:
+
+* A GEMM with a Float16 accumulator over K = 1024 was outside the test's tolerance. The
+  simulator and the device give the same bits for it; it is the f64 reference that does not
+  round at every MMA. The tolerance now allows for that rounding, and a simulator test covers
+  the long K (`float16_accumulator_over_a_long_k`).
+* The driver refused the packed 4- and 6-bit tensor-map types, which a test expected it to
+  take: they came with sm_100. The test now expects the refusal below sm_100, and the error
+  says which GPU they need.
+* `MulticastGroup::new` failed for one device. The driver makes a team of 2, 4 or 8 devices
+  and refuses a team of one (the error a single B200 gave), so a team of one is now refused
+  with that reason.
+* A timing-stability test saw one slow launch while another job was using the GPU. It passed
+  when run again.
+
+With these corrected, the four pass on the device.
+
+**Simulator against device.** The whole test suite, the FlashInfer ports included, was run
+with `CUTE_RS_CROSSCHECK_GPU`. Of 20,370 kernel runs the device completed, 18,998 gave
+exactly the simulator's buffers and 1,239 did not; 133 failed to launch (120 with the packed
+4- and 6-bit tensor-map types and 10 with a preferred cluster shape, which need sm_100; 2
+multicast kernels on one GPU; 1 above the device's shared-memory limit) and 2,049 were
+skipped (built for another architecture, or using an instruction this GPU lacks). Of the
+kernels that are Hopper's own (WGMMA, the GEMMs, the FMHA), 597 runs were identical and 49
+differed.
+
+None of the differences is an error. They are of these kinds:
+
+* approximate instructions (`ex2.approx`, `lg2.approx`, `tanh.approx`, `rsqrt.approx`, the
+  fast `sin`, `cos`, `tan` and `pow`) and what is computed from them. 769 of the differences
+  are in the FlashInfer ports, and all but their top-k and routing ones (below) are of this
+  kind: a few steps of the output type, 0.004 at most. So are the FMHA's 48;
+* rounding inside the tensor cores: `mma.sync` with a Float32 accumulator differs from the
+  simulator's sum in the last digits, and one FP8 WGMMA GEMM by up to 0.007 on values up to
+  25. The Float16 and BFloat16 WGMMA kernels gave the simulator's bits, on fractions too;
+* values that hold addresses or driver encodings: tensor-map descriptor bytes, and WGMMA
+  descriptors (the device's shared memory starts 1,024 bytes up);
+* results that depend on the order threads run in: pipeline tokens, a compare-and-swap race,
+  the order of an unsorted top-k or routing result, and which of several tied scores a top-k
+  selection keeps;
+* NaN payloads.
+
+One kernel never finishes on the device: `no_back_pressure` of `tests/schedules.rs`, which is
+faulty on purpose (its producer laps the consumer, which the test shows the simulator
+reporting). The cross-check has no time limit, so that test file was run test by test with
+one.
+
+**Speed** at 8192 x 8192 x 8192, Float16 operands and result, Float32 accumulator, timed as
+on the B200; cuBLAS is `torch.matmul` and the attention reference is PyTorch's
+`scaled_dot_product_attention`. CuTe DSL was not timed here.
+
+| Kernel | cute-rs | Reference |
+|---|---|---|
+| Dense GEMM, cluster 2 x 1 | 2.23 ms (494 TFLOP/s) | cuBLAS 1.47 ms (748 TFLOP/s) |
+| Dense GEMM, cluster 1 x 2 | 2.21 ms (499 TFLOP/s) | |
+| Persistent GEMM | 2.15 ms (511 TFLOP/s) | |
+| FMHA, causal, batch 4, 16 heads, 4,096 tokens, head dimension 64 | 0.69 ms (199 TFLOP/s) | PyTorch 0.52 ms (262 TFLOP/s) |
+
+So cute-rs's Hopper GEMM takes about 50% longer than cuBLAS, and its FMHA about 30% longer
+than PyTorch's attention.

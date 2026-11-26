@@ -332,8 +332,9 @@ themselves are built and checked on a GPU (`tests/gpu_wgmma.rs`).
   issue in every warp, generic writes followed by `fence_view_async_shared`, no copy still
   writing them), and stay read until the wait: overwriting them is reported. Each
   accumulator starts from C (or 0) and adds its 16 products in order of K in Float32, then
-  rounds once to the accumulator type; the hardware's order is undocumented, so only exact
-  sums (small integers) are known to match it. The results land at the warp's covering
+  rounds once to the accumulator type; the hardware's order is undocumented. An H100 gave the
+  same bits for the Float16 and BFloat16 kernels, on inexact sums too
+  ([testing.md](testing.md#results-on-an-h100)). The results land at the warp's covering
   `wgmma.wait_group`; reading them earlier, an MMA whose accumulators another instruction
   accessed since the warp's last `wgmma.fence` (the PTX ISA's rule; chained MMAs of the
   same shape need none) and an MMA without any fence are reported. A descriptor with a
@@ -357,7 +358,8 @@ with `mlir-opt` and their PTX assembled with `ptxas` for sm_90a and sm_90.
 
 * **FP8 accumulation.** The simulator adds each MMA's 32 exact products to C in Float32 in
   order of K and rounds once; Hopper accumulates FP8 with less internal precision, so
-  hardware results match only within a tolerance unless the sums are exact.
+  hardware results match only within a tolerance unless the sums are exact (on an H100, 0.007
+  at most on values up to 25).
 * **Simulator, DSMEM.** An access reaches the peer's shared memory, with the cluster-wide
   vector clocks: races between CTAs are reported, and the peer must be known to have
   started (a cluster barrier, relaxed or not, or a release chain before the first access),

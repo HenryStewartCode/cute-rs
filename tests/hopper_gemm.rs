@@ -140,6 +140,18 @@ fn fractions_within_tolerance() {
     }
 }
 
+/// A Float16 accumulator over a long K (64 MMAs): its roundings add up to more than the
+/// output's own, which the check allows for ([`hopper_gemm::f16_accumulator_rounding`]).
+/// An H100 gives these bits, and a Float32 accumulator stays within the plain tolerance.
+#[test]
+fn float16_accumulator_over_a_long_k() {
+    for acc in [DType::F16, DType::F32] {
+        let g = gemm((DType::F16, DType::F16), DType::F16, acc, Majors::new('m', 'n', 'n'), (128, 64), (1, 1));
+        let problem = Problem { data: Data::Fractions, ..Problem::new(128, 64, 1024, 1) };
+        run(&g, &g.build(), &problem);
+    }
+}
+
 /// The CTA swizzle: with more than eight clusters along M, the first eight
 /// columns of clusters go through the regular groups and the rest through
 /// the tail; every tile is still written once.

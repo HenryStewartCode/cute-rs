@@ -1256,12 +1256,13 @@ pub fn reference(gemm: &HopperWgmmaGemmKernel, problem: &Problem) -> Vec<f64> {
 /// rounding the exact sum to C's type (integer accumulators wrap, which
 /// these sizes never reach); on fractions within `|got - want| <= 0.02 +
 /// 0.01 |want|`, which covers C's rounding (half an ulp: 2^-11 relative for
-/// Float16, 2^-8 for BFloat16, 2^-4 for E4M3 and 2^-3 for E5M2 outputs aside)
-/// and the accumulators' (Float16 accumulators round each partial sum).
+/// Float16, 2^-8 for BFloat16, 2^-4 for E4M3 and 2^-3 for E5M2 outputs aside),
+/// plus [`f16_accumulator_rounding`] for a Float16 accumulator.
 pub fn check(gemm: &HopperWgmmaGemmKernel, problem: &Problem, args: &[KernelArg]) {
     let want = reference(gemm, problem);
     let got = read(gemm.c_dtype, &args[6]);
     let name = gemm.name();
+    let acc_rounding = if gemm.acc_dtype == DType::F16 { f16_accumulator_rounding(&want, problem.mnkl.2) } else { 0.0 };
     let mut zeros = 0;
     for (i, (&g, &w)) in got.iter().zip(&want).enumerate() {
         match problem.data {
@@ -1271,6 +1272,7 @@ pub fn check(gemm: &HopperWgmmaGemmKernel, problem: &Problem, args: &[KernelArg]
             }
             Data::Fractions => {
                 let tol = if gemm.c_dtype.bits() == 8 { 0.02 + 0.13 * w.abs() } else { 0.02 + 0.01 * w.abs() };
+                let tol = tol + acc_rounding;
                 assert!((g - w).abs() <= tol, "{name} {:?}: C element {i}: got {g}, want {w}", problem.mnkl);
             }
         }
@@ -1278,6 +1280,21 @@ pub fn check(gemm: &HopperWgmmaGemmKernel, problem: &Problem, args: &[KernelArg]
     }
     // C starts out 0: inputs that leave most of it 0 would test little.
     assert!(zeros * 4 < want.len(), "{name}: {zeros} of the {} elements of C are 0", want.len());
+}
+
+/// What a Float16 accumulator's rounding adds to the difference from the f64 reference over
+/// `k` products. The accumulator is rounded at every MMA (16 products at a time), by up to
+/// half a Float16 step at the running sum's size, and the roundings add up like a random
+/// walk: `sqrt(k / 16)` steps, the step taken at the largest value of C. (Measured on an H100
+/// at K = 1024 with values up to 50: 0.13 at most, where this gives 0.25. The simulator
+/// rounds as the device does, bit for bit; it is the reference that does not round.)
+pub fn f16_accumulator_rounding(want: &[f64], k: usize) -> f64 {
+    let largest = want.iter().fold(0.0f64, |m, w| m.max(w.abs()));
+    if largest == 0.0 {
+        return 0.0;
+    }
+    let step = 2f64.powi(largest.log2().floor() as i32 - 10);
+    (k as f64 / 16.0).sqrt() * step
 }
 
 /// Simulate `kernel` (built from `gemm`) on `problem` and check it.
