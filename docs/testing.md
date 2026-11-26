@@ -375,6 +375,17 @@ whole simulator suite becomes a check of the simulator's model of that GPU.
 machine: a simulated kernel that has a saved run with the same inputs is compared with what
 the device gave then, which is how a correction to the simulator is checked without the GPU.
 
+## Checking the FlashInfer ports against FlashInfer
+
+[`flashinfer-check/`](../flashinfer-check) gives FlashInfer itself and the `cute-flashinfer`
+ports the same inputs on the same GPU and compares what they return, so the expected output
+is FlashInfer's and not a reference written beside the port. On an RTX 2000 Ada (SM89) with
+FlashInfer 0.7.5, 1,075 of 1,080 outputs over 18 modules agree (578 of them bit for bit); the
+other 5 are two faults it found in the ports, single decode with a sliding window and the
+large-vocabulary top-k sampling path.
+[Its README](../flashinfer-check/README.md#results) has the table, the rules and what is not
+compared.
+
 ## Results on a B200
 
 One rented B200 (sm_100a, driver 595.112, LLVM 22.1, `ptxas` 12.8), on 2026-11-25.

@@ -27,6 +27,12 @@ No version has been tagged yet; 0.1.0 will be the first.
 
 ### Added
 
+- `flashinfer-check/`: a check of the `cute-flashinfer` ports against FlashInfer itself.
+  FlashInfer's Python package and the ports are given the same inputs on one GPU and their
+  outputs compared under a rule per output (the same bytes, one representable value apart,
+  or a tolerance for sums). On an RTX 2000 Ada, 1,075 of 1,080 outputs over 18 modules agree;
+  the other 5 are two faults in the ports (single decode with a sliding window gives NaN; the
+  large-vocabulary top-k then top-p sampler draws a different token from FlashInfer's).
 - On-device tests for the Blackwell custom-epilogue, `cute_ext` persistent and
   task-scheduling GEMMs (`tests/gpu_blackwell_more.rs`; they need an sm_100 GPU).
 - Tests of `make_tiled_copy_c_atom` with one- and two-value atoms.

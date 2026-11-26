@@ -16,9 +16,10 @@ path = "src/lib.rs"
 [package.metadata.docs.rs]
 features = ["cuda"]
 
-# FlashInfer's kernels, ported to cute-rs (Apache-2.0, FlashInfer's licence): `flashinfer/`.
+# FlashInfer's kernels, ported to cute-rs (Apache-2.0, FlashInfer's licence): `flashinfer/`;
+# `flashinfer-check/` runs them on inputs saved from FlashInfer itself.
 [workspace]
-members = ["flashinfer"]
+members = ["flashinfer", "flashinfer-check"]
 
 [features]
 # Launch compiled kernels on an NVIDIA GPU through the CUDA driver API

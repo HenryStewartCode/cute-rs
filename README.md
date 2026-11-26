@@ -124,6 +124,8 @@ A few places to start; [docs/examples.md](docs/examples.md) describes all 42.
 
 The [`flashinfer/`](flashinfer) crate (`cute-flashinfer`) is a larger body of kernels written
 with cute-rs: ports of FlashInfer's attention, sampling and normalization kernels.
+[`flashinfer-check/`](flashinfer-check) runs them and FlashInfer itself on the same inputs and
+compares the outputs ([results](flashinfer-check/README.md#results)).
 
 ## How it works
 

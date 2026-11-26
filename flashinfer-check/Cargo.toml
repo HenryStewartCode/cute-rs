@@ -1,0 +1,21 @@
+[package]
+name = "cute-flashinfer-check"
+version = "0.1.0"
+edition = "2024"
+description = "Runs cute-flashinfer's kernels on inputs saved from FlashInfer itself, so that the two libraries' outputs can be compared."
+license = "Apache-2.0"
+repository = "https://github.com/HenryStewartCode/cute-rs"
+publish = false
+
+[features]
+# The check runs on an NVIDIA GPU; without this feature the crate builds nothing.
+cuda = ["cute-rs/cuda", "cute-flashinfer/cuda"]
+
+[dependencies]
+cute-rs = { path = ".." }
+cute-flashinfer = { path = "../flashinfer" }
+
+[[bin]]
+name = "fi-check"
+path = "src/main.rs"
+required-features = ["cuda"]

@@ -10,5 +10,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "cute-flashinfer-check"
+version = "0.1.0"
+dependencies = [
+ "cute-flashinfer",
+ "cute-rs",
+]
+
+[[package]]
 name = "cute-rs"
 version = "0.1.0"
