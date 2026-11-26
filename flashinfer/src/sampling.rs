@@ -2515,6 +2515,46 @@ pub fn compact_softmax_kernel() -> Kernel {
     })
 }
 
+/// Sort each row's `k` selected logits, largest first, as FlashInfer's fast path does
+/// (`top_k(..., sorted=True)`): the sampler walks the row in order, so the order decides which
+/// token a random number lands on. `vals`, `idx [batch, k]` (from [`Op::TopK`], in no fixed order)
+/// are written to `sorted_vals`, `sorted_idx` with equal values ordered by token index, lowest
+/// first. Parameters `vals`, `idx`, `sorted_vals`, `sorted_idx`, `k` (i32); one block of
+/// [`COMPACT_THREADS`] per row. Each element's place is the number of elements before it (`k`
+/// comparisons each), on the integer key that orders every Float32 value, so the places are
+/// always a permutation. Own code.
+pub fn compact_sort_kernel() -> Kernel {
+    let threads = COMPACT_THREADS as i32;
+    Kernel::builder("flashinfer_compact_sort").block_dim([threads as u32, 1, 1]).build(|| {
+        let vals = param_ptr::<f32>("vals");
+        let idx = param_ptr::<i32>("idx");
+        let sorted_vals = param_ptr::<f32>("sorted_vals");
+        let sorted_idx = param_ptr::<i32>("sorted_idx");
+        let k = param_scalar::<i32>("k");
+        let row = block_idx().x;
+        let tid = thread_idx().x;
+        let key = |x: Float32| {
+            let bits = x.bitcast::<i32>();
+            bits ^ ((bits >> 31) & 0x7FFF_FFFF)
+        };
+        for_range(0, (k + (threads - 1)) / threads, 1, |it| {
+            let i = it * threads + tid;
+            if_(i.lt(k), || {
+                let (v, token) = (vals.load_at(row * k + i), idx.load_at(row * k + i));
+                let mine = key(v);
+                let place = Var::new(Int32::from(0));
+                for_range(0, k, 1, |j| {
+                    let other = key(vals.load_at(row * k + j));
+                    let before = other.gt(mine) | (other.eq(mine) & idx.load_at(row * k + j).lt(token));
+                    place.set(place.get() + select(before, Int32::from(1), Int32::from(0)));
+                });
+                sorted_vals.store_at(row * k + place.get(), v);
+                sorted_idx.store_at(row * k + place.get(), token);
+            });
+        });
+    })
+}
+
 /// Map each row's local sample back to its vocabulary token: `out[row] = indices[row * k +
 /// local[row]]` (0 if the row was invalid). Parameters `indices [batch, k]`, `local`, `valid`,
 /// `out` (i32) and `k`; one block of 32 threads per row.
@@ -3408,9 +3448,11 @@ pub mod gpu {
     }
 
     /// `top_k_top_p_sampling_from_logits(filter_apply_order="top_k_first")` by FlashInfer's fast
-    /// path: [`Op::TopK`] selects the `k` largest logits (unsorted, with their indices), a compact
+    /// path: [`Op::TopK`] selects the `k` largest logits with their indices,
+    /// [`compact_sort_kernel`](super::compact_sort_kernel) puts them largest first, a compact
     /// softmax and the top-p sampler run over those `k` only, and the sample is mapped back to its
-    /// token. Scalar `k` (at most 1024) and `top_p` (`p.top_k[0]`, `p.top_p[0]`); ties at the k-th logit keep exactly `k` tokens (some of them).
+    /// token: FlashInfer's token for the same seed. Scalar `k` (at most 1024) and `top_p`
+    /// (`p.top_k[0]`, `p.top_p[0]`); ties at the k-th logit keep exactly `k` tokens (some of them).
     /// Returns `(tokens, valid, time)`.
     #[allow(clippy::type_complexity)]
     pub fn run_top_k_first_compact(
@@ -3427,7 +3469,8 @@ pub mod gpu {
         let kp = super::compact_width(k);
         let arch = ctx.best_target(tc).ok_or("no target for this GPU")?;
         let opts = CompileOptions::new().gpu_arch(arch);
-        let (csk, gk) = (super::compact_softmax_kernel(), super::gather_kernel());
+        let (sok, csk, gk) = (super::compact_sort_kernel(), super::compact_softmax_kernel(), super::gather_kernel());
+        let sof = ctx.load(&sok.compile_with(tc, &opts)?)?;
         let (csf, gf) = (ctx.load(&csk.compile_with(tc, &opts)?)?, ctx.load(&gk.compile_with(tc, &opts)?)?);
         let tcfg = OpConfig::for_batch(Op::TopK, b);
         oks.get(tcfg)?;
@@ -3437,6 +3480,7 @@ pub mod gpu {
         let up = |a: &KernelArg| ctx.upload(a);
         let inp = up(&KernelArg::buffer(&p.probs))?;
         let (vals, idx) = (ctx.alloc::<f32>(b * k)?, up(&KernelArg::buffer(&vec![-1i32; b * k]))?);
+        let (sorted_vals, sorted_idx) = (ctx.alloc::<f32>(b * k)?, up(&KernelArg::buffer(&vec![-1i32; b * k]))?);
         let probs_k = ctx.alloc::<f32>(b * kp)?;
         let (local, valid) = (up(&KernelArg::buffer(&vec![-1i32; b]))?, up(&KernelArg::buffer(&vec![-1i32; b]))?);
         let tokens = up(&KernelArg::buffer(&vec![-1i32; b]))?;
@@ -3455,7 +3499,14 @@ pub mod gpu {
             top_args.push(DeviceArg::Buffer(&ws_i));
             top_args.push(DeviceArg::Buffer(&ws_f_buf));
         }
-        let cs_args = [DeviceArg::Buffer(&vals), DeviceArg::Buffer(&probs_k), sc(k), sc(kp)];
+        let sort_args = [
+            DeviceArg::Buffer(&vals),
+            DeviceArg::Buffer(&idx),
+            DeviceArg::Buffer(&sorted_vals),
+            DeviceArg::Buffer(&sorted_idx),
+            sc(k),
+        ];
+        let cs_args = [DeviceArg::Buffer(&sorted_vals), DeviceArg::Buffer(&probs_k), sc(k), sc(kp)];
         let sampler_args = [
             DeviceArg::Buffer(&probs_k),
             DeviceArg::Buffer(&local),
@@ -3467,7 +3518,7 @@ pub mod gpu {
             DeviceArg::Scalar(KernelArg::Scalar { ty: DType::U64, bits: p.offset }),
         ];
         let g_args = [
-            DeviceArg::Buffer(&idx),
+            DeviceArg::Buffer(&sorted_idx),
             DeviceArg::Buffer(&local),
             DeviceArg::Buffer(&valid),
             DeviceArg::Buffer(&tokens),
@@ -3483,6 +3534,7 @@ pub mod gpu {
             for (kn, f) in oks.loaded(tcfg) {
                 ctx.launch_builder(kn, f, top_launch).stream(s).args(&top_args).submit()?;
             }
+            ctx.launch_builder(&sok, &sof, rows).stream(s).args(&sort_args).submit()?;
             ctx.launch_builder(&csk, &csf, rows).stream(s).args(&cs_args).submit()?;
             let (sk, sf) = ks.loaded(scfg);
             ctx.launch_builder(sk, sf, sampler_launch).stream(s).args(&sampler_args).submit()?;

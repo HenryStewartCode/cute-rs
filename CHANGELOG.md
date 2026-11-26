@@ -24,15 +24,25 @@ No version has been tagged yet; 0.1.0 will be the first.
   allocation unit; a scatter4 store with a negative coordinate is reported, like any other
   store's; and a CTA pair's block-scaled MMA with M = 128 is refused, as its scale-factor
   layout for B is not the one modelled.
+- `cute-flashinfer`, three faults that the check against FlashInfer found:
+  - single decode with a sliding window returned NaN when the cache was longer than the
+    window (the plan split the whole cache, but the kernel reads only the window);
+  - a causal prefill split into chunks returned NaN for the queries that see nothing of one
+    of their chunks, as after a cached prefix (such a chunk's share is now zero);
+  - top-k then top-p sampling on a vocabulary of 65,536 or more (k up to 256) now sorts the
+    kept values before it draws, as FlashInfer does, so it returns FlashInfer's token for
+    the same seed (`compact_sort_kernel`).
+- `cute-flashinfer`: the `max_error` helpers of `decode`, `prefill`, `attention`, `mla`,
+  `rope`, `sparse` and `xqa` return NaN when an output is NaN. They dropped it, so a NaN
+  output passed the tests that used them; that hid the prefill fault above.
 
 ### Added
 
 - `flashinfer-check/`: a check of the `cute-flashinfer` ports against FlashInfer itself.
   FlashInfer's Python package and the ports are given the same inputs on one GPU and their
   outputs compared under a rule per output (the same bytes, one representable value apart,
-  or a tolerance for sums). On an RTX 2000 Ada, 1,075 of 1,080 outputs over 18 modules agree;
-  the other 5 are two faults in the ports (single decode with a sliding window gives NaN; the
-  large-vocabulary top-k then top-p sampler draws a different token from FlashInfer's).
+  or a tolerance for sums). On an RTX 2000 Ada, all 1,092 outputs over 18 modules agree,
+  after the three `cute-flashinfer` fixes listed above, which it led to.
 - On-device tests for the Blackwell custom-epilogue, `cute_ext` persistent and
   task-scheduling GEMMs (`tests/gpu_blackwell_more.rs`; they need an sm_100 GPU).
 - Tests of `make_tiled_copy_c_atom` with one- and two-value atoms.

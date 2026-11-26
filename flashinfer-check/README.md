@@ -43,14 +43,14 @@ cases whose name contains `norm_`; `compare.py cases --only norm_` compares only
 ## Results
 
 FlashInfer 0.7.5.post1 (PyTorch 2.8.0) against `cute-flashinfer`, on an RTX 2000 Ada (SM89),
-26 November 2026: 625 cases, 1,080 outputs.
+26 November 2026: 631 cases, 1,092 outputs, all within their rule.
 
 | Module | Cases | Outputs | Within the rule | Bit-identical | Differ |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | `activation` | 30 | 30 | 30 | 20 | 0 |
 | `attention` | 10 | 20 | 20 | 1 | 0 |
 | `cascade` | 36 | 72 | 72 | 72 | 0 |
-| `decode` | 36 | 72 | 71 | 9 | 1 |
+| `decode` | 36 | 72 | 72 | 9 | 0 |
 | `gdn` | 51 | 109 | 109 | 13 | 0 |
 | `gemm` | 24 | 24 | 24 | 24 | 0 |
 | `kda` | 28 | 56 | 56 | 11 | 0 |
@@ -59,33 +59,38 @@ FlashInfer 0.7.5.post1 (PyTorch 2.8.0) against `cute-flashinfer`, on an RTX 2000
 | `moe` | 20 | 28 | 28 | 23 | 0 |
 | `norm` | 58 | 82 | 82 | 64 | 0 |
 | `pod` | 7 | 14 | 14 | 2 | 0 |
-| `prefill` | 61 | 122 | 122 | 44 | 0 |
+| `prefill` | 67 | 134 | 134 | 46 | 0 |
 | `quantization` | 62 | 108 | 108 | 108 | 0 |
 | `rope` | 46 | 86 | 86 | 84 | 0 |
-| `sampling` | 65 | 74 | 70 | 61 | 4 |
+| `sampling` | 65 | 74 | 74 | 65 | 0 |
 | `sparse` | 17 | 34 | 34 | 15 | 0 |
 | `xqa` | 14 | 14 | 14 | 0 | 0 |
-| Total | 625 | 1,080 | 1,075 | 578 | 5 |
+| Total | 631 | 1,092 | 1,092 | 584 | 0 |
 
 The attention families are rarely bit-identical because the two libraries add the same terms
 in a different order. Their largest differences are a few steps of the output type: 0.004 in
 a Float16 output and 0.016 in a BFloat16 one, on values above 1.
 
-### The two differences found
+### Faults it found
 
-Both are faults in the ports, and their cases fail until the ports are fixed.
+The first run had five outputs outside their rule, from two faults in the ports; a third
+turned up while those were being fixed. All three are fixed, and their cases now pass.
 
-* **Single decode with a sliding window gives NaN** (`decode_single_f16_hd128_window_n4000`):
-  every output is NaN when the cache is longer than the window. `Problem::single_plan` splits
-  the whole cache into chunks, but the kernel reads only the window, so the chunks outside it
-  are empty and divide zero by zero. Batch decode with a window is right (its plan counts the
-  visible pages only), as is single decode without a window.
-* **Top-k then top-p sampling on a large vocabulary draws another token** (the four
+* **Single decode with a sliding window gave NaN** when the cache was longer than the window
+  (`decode_single_f16_hd128_window_n4000`). The plan split the whole cache into chunks, but
+  the kernel reads only the window, so the chunks outside it were empty and divided zero by
+  zero. The plan now covers the window only, as the batch plan did.
+* **A causal prefill split into chunks gave NaN** for the queries that see nothing of one of
+  their chunks: after a cached prefix, the early queries cannot see the last chunk (the six
+  `prefill_*_c_prefix*` cases, added for it). An unseen chunk's share was zero divided by
+  zero, and the merge kept the NaN; it is now zero. The port's own tests ran such plans, but
+  their error measure dropped NaN, so they passed.
+* **Top-k then top-p sampling on a large vocabulary drew another token** (the four
   `sampling_kp_*_top_k_first_*x128256_*` cases; vocabulary of 65,536 or more and k of 256 or
-  less). The token is always one of the top k and the distribution is right, but it is not
-  the token FlashInfer draws from the same seed: FlashInfer sorts the k kept values before it
-  draws, and the port's compact path keeps them in the order its selection left them. The
-  other samplers return FlashInfer's token on every row.
+  less). The token was always one of the top k and the distribution was right, but it was
+  not the token FlashInfer draws from the same seed: FlashInfer sorts the k kept values
+  before it draws, and the port kept them in the order its selection left them. It now sorts
+  them too.
 
 ### Where the rule is not the obvious one
 

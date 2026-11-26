@@ -76,6 +76,23 @@ fn single_decode_matches_reference() {
     }
 }
 
+/// Single decode with a sliding window over a cache longer than the window: the plan covers
+/// the window only (whole when it fits one chunk, split when it does not), and no output is
+/// NaN.
+#[test]
+fn single_decode_with_window_matches_reference() {
+    for (kv_len, window_left, ctas) in [(600usize, 99, 1usize), (700, 599, 3)] {
+        let p = Problem::new_ragged(&[kv_len], 1, 3).with_window(window_left);
+        let plan = p.single_plan(1000);
+        assert_eq!(plan.num_ctas(), ctas, "kv_len {kv_len}, window {window_left}");
+        let (o, lse) = execute(&p, &plan);
+        assert!(o.iter().chain(&lse).all(|x| x.is_finite()), "kv_len {kv_len}, window {window_left}");
+        let (want_o, want_lse) = p.reference();
+        let (eo, el) = (max_error(&o, &want_o), max_error(&lse, &want_lse));
+        assert!(eo < 2e-3 && el < 1e-3, "kv_len {kv_len}, window {window_left}: |o| {eo:.2e}, |lse| {el:.2e}");
+    }
+}
+
 /// FlashInfer's single-decode chunk rule.
 #[test]
 fn single_plan_follows_flashinfer() {

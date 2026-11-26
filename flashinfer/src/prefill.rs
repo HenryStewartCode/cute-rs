@@ -1149,9 +1149,14 @@ pub(crate) fn body_dt<KV: KvElem>(
             sync_threads();
         }
 
-        // ---- Normalise and write.
-        let inv_d: Vec<Float32> =
-            d_v.iter().map(|d| if fp8 { v_scale / *d } else { Float32::from(1.0f32) / *d }).collect();
+        // ---- Normalise and write. A row that saw no token (in a split plan, a chunk wholly
+        // past what a causal query sees) has `d = 0`: its output is 0 and its `lse` -inf, so
+        // the merge gives it no weight. `1 / 0` would make the output NaN, and the merge's
+        // `0 * NaN` would keep it.
+        let inv_d: Vec<Float32> = d_v
+            .iter()
+            .map(|d| select(d.gt(zero), if fp8 { v_scale / *d } else { Float32::from(1.0f32) / *d }, zero))
+            .collect();
         for mq in 0..nq {
             for md in 0..num_mma_d {
                 for reg in 0..8 {

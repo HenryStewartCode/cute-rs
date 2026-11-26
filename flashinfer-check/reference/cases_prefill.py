@@ -2,7 +2,8 @@
 """`flashinfer` batch prefill (paged and ragged KV) and `single_prefill_with_kv_cache`, `fa2` backend.
 
 Float16 and BFloat16, head dim 64/128/256, grouped queries, causal or not, ragged lengths (one-token
-requests, lengths off the tile and page), long requests that make the planner split the KV and merge,
+requests, lengths off the tile and page), long requests that make the planner split the KV and merge
+(also causal ones after a cached prefix, where a query cannot see every chunk),
 soft-cap, sliding window, custom mask, ALiBi and an FP8 KV cache. Attention outputs add up many terms:
 `close` rules, on the output and on the base-2 log-sum-exp.
 """
@@ -184,3 +185,12 @@ def cases():
     yield single("bf16", 128, 130, 400, True, "s")
     yield single("bf16", 64, 33, 1000, False, "s")
     yield single("f16", 128, 8, 4000, True, "split")
+    # Causal queries after a cached prefix, few enough tiles that the planner splits the KV: the
+    # early queries see nothing of the last chunks, which must then count for nothing in the merge.
+    # (Appended last, so the cases above keep their random inputs.)
+    yield paged("f16", 128, [100], [400], True, "prefix", hq=8, hkv=8)
+    yield paged("f16", 128, [150, 70], [160, 75], True, "prefix2", hq=4, hkv=1)
+    yield paged("bf16", 64, [300], [900], True, "prefix", hq=4, hkv=2)
+    yield paged("f16", 128, [100], [400], True, "prefix", hq=8, hkv=8, kv_tag="e4m3")
+    yield ragged("f16", 128, [200, 60], [500, 130], True, "prefix", hq=4, hkv=2)
+    yield single("f16", 128, 700, 3000, True, "prefix")

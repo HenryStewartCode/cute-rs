@@ -675,6 +675,12 @@ pub fn merge_kernel(head_dim: usize) -> Kernel {
     )
 }
 
+/// The larger of two differences; NaN if either is (`f32::max` would drop a NaN, and an output
+/// of NaN would then count as no error).
+fn nan_max(a: f32, b: f32) -> f32 {
+    if a.is_nan() || b.is_nan() { f32::NAN } else { a.max(b) }
+}
+
 /// The largest error of `a` against `b`, with equal infinities agreeing and NaN an
 /// infinite error.
 pub fn max_error(a: &[f32], b: &[f32]) -> f32 {
@@ -690,7 +696,7 @@ pub fn max_error(a: &[f32], b: &[f32]) -> f32 {
                 (x - y).abs()
             }
         })
-        .fold(0.0, f32::max)
+        .fold(0.0, nan_max)
 }
 
 /// The merge's arguments, from the kernel's.

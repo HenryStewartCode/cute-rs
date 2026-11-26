@@ -1069,10 +1069,12 @@ impl Problem {
         self.plan_with_min_chunk(max_grid, (128 / self.page_tokens()).max(1))
     }
 
-    /// [`Plan::single`] for a one-request ragged problem.
+    /// [`Plan::single`] for a one-request ragged problem, over its visible tokens (with a
+    /// window, only the window's: the kernel starts at the window's first token, so chunks
+    /// planned past the window would be empty).
     pub fn single_plan(&self, max_grid: usize) -> Plan {
         assert!(self.is_ragged() && self.kv_lens.len() == 1, "a single-request plan needs one ragged request");
-        Plan::single(self.kv_lens[0], self.num_kv_heads, max_grid)
+        Plan::single(self.visible(0).1, self.num_kv_heads, max_grid)
     }
 
     /// The decode kernel for this problem's layout.
@@ -1192,8 +1194,14 @@ impl Problem {
     }
 }
 
+/// The larger of two differences; NaN if either is (`f32::max` would drop a NaN, and an output
+/// of NaN would then count as no error).
+fn nan_max(a: f32, b: f32) -> f32 {
+    if a.is_nan() || b.is_nan() { f32::NAN } else { a.max(b) }
+}
+
 pub fn max_error(a: &[f32], b: &[f32]) -> f32 {
-    a.iter().zip(b).map(|(x, y)| (x - y).abs()).fold(0.0, f32::max)
+    a.iter().zip(b).map(|(x, y)| (x - y).abs()).fold(0.0, nan_max)
 }
 
 /// Simulate `p` under a plan for `max_grid` concurrent CTAs (the decode kernel, then the

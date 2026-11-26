@@ -630,6 +630,44 @@ fn compact_kernels() {
     assert_eq!(args[3].to_vec::<i32>(), vec![103, 110, 0]);
 }
 
+/// The compact path's sort: each row largest first with its token indices, equal values by
+/// token index, for a row shorter than a block and one longer (negative values, both zeros).
+#[test]
+fn compact_sort() {
+    for k in [10usize, 150] {
+        let batch = 3;
+        let vals: Vec<f32> = (0..batch * k)
+            .map(|i| match i % 11 {
+                0 => 0.0,
+                1 => -0.0,
+                r => ((i * 7) % 13) as f32 * 0.25 - 1.5 + if r == 5 { 0.0 } else { i as f32 * 1e-3 },
+            })
+            .collect();
+        // Token indices in another order than the slots, so ties are told apart by index.
+        let idx: Vec<i32> = (0..batch * k).map(|i| ((i % k) * 7 % k) as i32 + 1000 * (i / k) as i32).collect();
+        let mut args = vec![
+            KernelArg::buffer(&vals),
+            KernelArg::buffer(&idx),
+            KernelArg::buffer(&vec![f32::NAN; batch * k]),
+            KernelArg::buffer(&vec![-1i32; batch * k]),
+            KernelArg::ScalarI32(k as i32),
+        ];
+        let launch = LaunchConfig::new([batch as u32, 1, 1], [COMPACT_THREADS as u32, 1, 1]);
+        compact_sort_kernel().simulate(launch, &mut args).unwrap();
+        let (got_v, got_i) = (args[2].to_vec::<f32>(), args[3].to_vec::<i32>());
+        for b in 0..batch {
+            let mut want: Vec<(f32, i32)> = (b * k..(b + 1) * k).map(|i| (vals[i], idx[i])).collect();
+            want.sort_by(|x, y| y.0.total_cmp(&x.0).then(x.1.cmp(&y.1)));
+            let got: Vec<(f32, i32)> = (b * k..(b + 1) * k).map(|i| (got_v[i], got_i[i])).collect();
+            assert_eq!(
+                got.iter().map(|x| (x.0.to_bits(), x.1)).collect::<Vec<_>>(),
+                want.iter().map(|x| (x.0.to_bits(), x.1)).collect::<Vec<_>>(),
+                "k {k} row {b}"
+            );
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------------------
 // Top-k with an index transform.
 

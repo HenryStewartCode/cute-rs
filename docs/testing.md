@@ -380,9 +380,10 @@ the device gave then, which is how a correction to the simulator is checked with
 [`flashinfer-check/`](../flashinfer-check) gives FlashInfer itself and the `cute-flashinfer`
 ports the same inputs on the same GPU and compares what they return, so the expected output
 is FlashInfer's and not a reference written beside the port. On an RTX 2000 Ada (SM89) with
-FlashInfer 0.7.5, 1,075 of 1,080 outputs over 18 modules agree (578 of them bit for bit); the
-other 5 are two faults it found in the ports, single decode with a sliding window and the
-large-vocabulary top-k sampling path.
+FlashInfer 0.7.5, all 1,092 outputs over 18 modules agree (584 of them bit for bit). It found
+three faults in the ports, since fixed: NaN from single decode with a sliding window, NaN
+from a causal prefill split into chunks, and the large-vocabulary top-k sampling path drawing
+another token than FlashInfer's.
 [Its README](../flashinfer-check/README.md#results) has the table, the rules and what is not
 compared.
 

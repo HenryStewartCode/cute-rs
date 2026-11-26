@@ -689,9 +689,15 @@ impl Problem {
     }
 }
 
+/// The larger of two differences; NaN if either is (`f32::max` would drop a NaN, and an output
+/// of NaN would then count as no error).
+fn nan_max(a: f32, b: f32) -> f32 {
+    if a.is_nan() || b.is_nan() { f32::NAN } else { a.max(b) }
+}
+
 /// Largest `|a - b|`, counting equal values (and infinities) as equal.
 pub fn max_error(a: &[f32], b: &[f32]) -> f32 {
-    a.iter().zip(b).map(|(x, y)| if x == y { 0.0 } else { (x - y).abs() }).fold(0.0, f32::max)
+    a.iter().zip(b).map(|(x, y)| if x == y { 0.0 } else { (x - y).abs() }).fold(0.0, nan_max)
 }
 
 /// Run `p` under `plan` on the simulator; returns `o` (as f32) and `lse`.
