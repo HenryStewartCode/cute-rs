@@ -484,6 +484,7 @@ impl From<ScaledBasis> for StrideLeaf {
 /// `E<Ns...>`): `E(0)` is `1@0`, `E([1, 0])` is `1@0@1`, and the empty path
 /// `E([])` is the integer 1. Scale it with `*`: `2 * E(0)` is `2@0`, and a
 /// runtime [`Int32`](crate::Int32) works too.
+// Named `E` as in CuTe.
 #[allow(non_snake_case)]
 pub fn E(mode: impl BasisMode) -> StrideLeaf {
     let mode = mode.into_mode();

@@ -72,6 +72,7 @@ impl From<&Tiler> for ShapeTiler {
 
 macro_rules! shape_tiler_from_tuple {
     ($(($($name:ident),+)),+) => {$(
+        // The tuple's fields are bound by their generic parameter names (`A`, `B`, ...).
         #[allow(non_snake_case)]
         impl<$($name: Into<Shape>),+> From<($($name,)+)> for ShapeTiler {
             fn from(($($name,)+): ($($name,)+)) -> Self {

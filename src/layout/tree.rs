@@ -437,6 +437,7 @@ int_tuple_from_int!(usize, u8, u16, u32, u64, i32, i64);
 
 macro_rules! tree_from_tuple {
     ($target:ty; $(($($name:ident),+)),+) => {$(
+        // The tuple's fields are bound by their generic parameter names (`A`, `B`, ...).
         #[allow(non_snake_case)]
         impl<$($name: Into<$target>),+> From<($($name,)+)> for $target {
             fn from(($($name,)+): ($($name,)+)) -> Self {

@@ -871,8 +871,47 @@ impl Layout {
     /// [`compose`](Layout::compose), where `self` is the mode `at` names.
     #[track_caller]
     fn compose_in(&self, rhs: &Layout, at: &ModePath) -> Layout {
-        let lhs = self.coalesce().flat_modes_expr();
-        compose_impl(&lhs, &rhs.shape, &rhs.stride, self, rhs, at)
+        let lhs = self.coalesce_x_modes();
+        let mut inexact = None;
+        let c = compose_impl(&lhs, &rhs.shape, &rhs.stride, self, rhs, at, &mut inexact);
+        if let Some(why) = inexact {
+            // A step took a stride smaller than a mode that it does not
+            // divide (see `compose_static`): keep the answer only where it is
+            // the composition, which needs every value to check.
+            let exact = self.is_static()
+                && rhs.is_static()
+                && !self.has_scaled_basis()
+                && !rhs.has_scaled_basis()
+                && c.is_static()
+                && (0..rhs.size()).all(|i| c.call(i) == self.call(rhs.call(i)));
+            assert!(exact, "{why}");
+        }
+        c
+    }
+
+    /// The flat modes of C++ CuTe's `detail::coalesce_x(layout)`, which
+    /// composition takes of its left-hand side: [`coalesce`](Layout::coalesce),
+    /// except that a last mode of a static extent 1 is kept, with the extent
+    /// 2, so that its stride still says where the layout goes on past its
+    /// domain. `(2,1):(2,1)` gives `(2,2):(2,1)`, not `2:2`; `(4,1):(1,0)`
+    /// gives `(4,2):(1,0)`. Composition reads only the strides of the last
+    /// mode, never its extent.
+    fn coalesce_x_modes(&self) -> Vec<(IndexExpr, StrideLeaf)> {
+        let flat = self.flat_modes_expr();
+        let Some(((ls, ld), rest)) = flat.split_last() else { return self.coalesce().flat_modes_expr() };
+        let mut out: Vec<(IndexExpr, StrideLeaf)> = vec![(if is_one(ls) { st(2) } else { ls.clone() }, ld.clone())];
+        for (s, d) in rest.iter().rev() {
+            if is_one(s) {
+                continue;
+            }
+            // Merge as `coalesce` does (static values merge exactly as in C++).
+            if d.try_scale(s).is_some_and(|next| next.same_value(&out[0].1)) {
+                out[0] = (s.clone() * out[0].0.clone(), d.clone());
+                continue;
+            }
+            out.insert(0, (s.clone(), d.clone()));
+        }
+        out
     }
 
     /// Composition with a tiler: by mode for tuples, whole for a layout.
@@ -943,11 +982,13 @@ impl Layout {
             return self.complement_basis(cotarget);
         }
         let Some((mut result, current)) = self.complement_prefix() else {
-            let extent = match cotarget.as_static() {
-                Some(c) => st(c.max(1)),
-                None => cotarget,
+            // C++ CuTe's `make_layout(coalesce(cotarget))`, compact, so a
+            // static cotarget of 1 gives `1:0`.
+            return match cotarget.as_static() {
+                Some(c) if c <= 1 => Layout::new(1, 0),
+                Some(c) => Layout::new(c, 1),
+                None => Layout { shape: Tree::Leaf(cotarget), stride: Tree::Leaf(StrideLeaf::Int(st(1))) },
             };
-            return Layout { shape: Tree::Leaf(extent), stride: Tree::Leaf(StrideLeaf::Int(st(1))) };
         };
         result.push((IndexExpr::ceil_div(cotarget, current.clone()), current));
         Layout::from_flat_expr(&result).coalesce()
@@ -1181,14 +1222,22 @@ impl Layout {
                 modes.len()
             );
         }
+        // A stable sort: equal strides keep their order, as C++ CuTe's
+        // `find` of the minimum takes the first.
         modes.sort_by_key(|(_, d)| d.as_static());
         let mut result = Vec::new();
         let mut current = st(1);
         for (s, d) in modes {
+            // C++ CuTe divides with floor, so strides need not divide each
+            // other: `complement((3,2):(2,16), 21)` is `(2,2):(1,6)`. It
+            // refuses only a gap of extent 0, a stride smaller than where the
+            // modes before it end ("Non-injective Layout detected in
+            // complement").
             if let (Some(dv), Some(cv)) = (d.as_static(), current.as_static()) {
                 assert!(
-                    dv >= cv && dv % cv == 0,
-                    "complement: layout {self} is not injective or its strides do not divide each other"
+                    dv >= cv,
+                    "complement: layout {self} is not injective: the stride {dv} is below {cv}, where the modes of \
+                     smaller strides end"
                 );
             }
             result.push((d.clone() / current.clone(), current));
@@ -1207,16 +1256,23 @@ impl Layout {
     /// span, and the strides after it are written as the products of the
     /// cotarget's extents that they equal under that assumption: dividing
     /// all of `(m,n)` by `32:1` leaves `(ceil_div(m,32),n):(32,m)`, where C++
-    /// CuTe's strides are `(32,32*ceil_div(m,32))`. A static cotarget, or a
-    /// tile whose span is a runtime value, takes the plain complement of the
-    /// cotarget's size, as [`complement`](Layout::complement) does.
+    /// CuTe's strides are `(32,32*ceil_div(m,32))`. A static cotarget takes
+    /// C++ CuTe's fold exactly, so `complement(2:1, (3,5))` is `(2,5):(2,4)`
+    /// coalesced to `10:2`, not `complement(2:1, 15) = 8:2`. A tile whose
+    /// span is a runtime value takes the plain complement of the cotarget's
+    /// size, as [`complement`](Layout::complement) does.
     #[track_caller]
     fn complement_to_shape(&self, cotarget: &Shape) -> Layout {
         let extents = cotarget.flat_leaves();
-        if cotarget.is_static() || extents.iter().any(is_zero) {
+        if extents.iter().any(is_zero) {
             return self.complement(cotarget.product());
         }
-        let (mut result, current) = self.complement_prefix().unwrap_or_else(|| (Vec::new(), st(1)));
+        let prefix = self.complement_prefix();
+        if prefix.is_none() && cotarget.is_static() {
+            // C++ CuTe's `make_layout(coalesce(cotarget))`.
+            return self.complement(cotarget.product());
+        }
+        let (mut result, current) = prefix.unwrap_or_else(|| (Vec::new(), st(1)));
         let Some(mut span) = current.as_static() else {
             result.push((IndexExpr::ceil_div(cotarget.product(), current.clone()), current));
             return Layout::from_flat_expr(&result).coalesce();
@@ -1309,7 +1365,45 @@ impl Layout {
                 "left_inverse: layout {self} has the runtime stride {d:?} at mode {path:?}; a left inverse needs static strides"
             );
         }
-        Layout::from_modes([self.clone(), self.complement(cosize_of(&self.shape, &self.stride))]).right_inverse()
+        // C++ CuTe's `left_inverse`, as CuTe DSL computes it: the coalesced
+        // modes in increasing stride order, each stride `d` giving a mode of
+        // extent `d / size(so far)` whose stride is the prefix product of the
+        // extents before its mode, starting from stride 0, and the extent of
+        // the mode of the largest stride last. Offsets in the gaps go to 0, so
+        // `left_inverse(4:3)` is `(3,4):(0,1)`.
+        let modes = self.coalesce().flat_int_modes();
+        let mut prefix = Vec::with_capacity(modes.len());
+        let mut running = st(1);
+        for (s, _) in &modes {
+            prefix.push(running.clone());
+            running = running * s;
+        }
+        let mut order: Vec<usize> = (0..modes.len()).collect();
+        order.sort_by_key(|&i| modes[i].1.as_static());
+        let (mut shapes, mut strides, mut size) = (Vec::new(), vec![st(0)], 1usize);
+        for &i in &order {
+            let d = modes[i].1.as_static().expect("checked static");
+            if d == 0 {
+                continue;
+            }
+            assert!(
+                d.is_multiple_of(size),
+                "left_inverse: layout {self} has the stride {d}, which is not a multiple of {size}, the size of the \
+                 inverse of the modes of smaller strides (CuTe's left inverse divisibility condition)"
+            );
+            shapes.push(st(d / size));
+            strides.push(prefix[i].clone());
+            size = d;
+        }
+        if shapes.is_empty() {
+            // No stride but 0: CuTe DSL gives `1:0`, where C++ CuTe keeps the
+            // extent of the last mode, `left_inverse(8:0) = 8:0`.
+            return Layout::new(1, 0);
+        }
+        let last = order.last().map_or(st(1), |&i| modes[i].0.clone());
+        shapes.push(last);
+        let flat: Vec<(IndexExpr, IndexExpr)> = shapes.into_iter().zip(strides).collect();
+        Layout::from_flat_expr(&flat).coalesce()
     }
 
     /// The same function on the domain `shape`: `self ∘ make_layout(shape)`
@@ -1426,13 +1520,10 @@ impl Layout {
                         modes.len()
                     );
                 }
-                // C++ CuTe takes the complement in `shape(coalesce(layout))`;
-                // for a static shape that is the same as in its size.
-                let rest = if self.shape.is_static() {
-                    b.complement(self.shape.product())
-                } else {
-                    b.complement_to_shape(self.coalesce().shape())
-                };
+                // C++ CuTe takes the complement in `shape(coalesce(layout))`,
+                // folding `ceil_div` across its modes; for a static shape that
+                // the tile's span divides this is the same as in its size.
+                let rest = b.complement_to_shape(self.coalesce().shape());
                 self.compose_in(&Layout::from_modes([b.clone(), rest]), at)
             }
             Tree::Branch(ts) => self.by_mode(ts, ByMode::Divide, at),
@@ -1883,6 +1974,7 @@ fn compose_impl(
     a: &Layout,
     b: &Layout,
     at: &ModePath,
+    inexact: &mut Option<String>,
 ) -> Layout {
     match (shape, stride) {
         (Tree::Branch(ss), Tree::Branch(ds)) => {
@@ -1890,11 +1982,11 @@ fn compose_impl(
             // caller's location.
             let mut modes = Vec::with_capacity(ss.len());
             for (s, d) in ss.iter().zip(ds) {
-                modes.push(compose_impl(lhs, s, d, a, b, at));
+                modes.push(compose_impl(lhs, s, d, a, b, at, inexact));
             }
             Layout::from_modes(modes)
         }
-        (Tree::Leaf(s), Tree::Leaf(StrideLeaf::Int(d))) => compose_mode(lhs, s, d, a, b, at),
+        (Tree::Leaf(s), Tree::Leaf(StrideLeaf::Int(d))) => compose_mode(lhs, s, d, a, b, at, inexact),
         (Tree::Leaf(s), Tree::Leaf(StrideLeaf::Basis(e))) => {
             // A basis stride `v@m` on the right-hand side picks mode `m` of
             // the left-hand side and composes it with `s:v` (C++ CuTe's and
@@ -2025,8 +2117,17 @@ fn compose_mode(
     a: &Layout,
     b: &Layout,
     at: &ModePath,
+    inexact: &mut Option<String>,
 ) -> Layout {
-    if is_zero(d) || is_one(s) {
+    if is_zero(d) {
+        return Layout { shape: Tree::Leaf(s.clone()), stride: Tree::Leaf(StrideLeaf::Int(st(0))) };
+    }
+    if let (Some(sv), Some(dv)) = (s.as_static(), d.as_static_signed())
+        && lhs[..lhs.len().saturating_sub(1)].iter().all(|(si, _)| si.is_static())
+    {
+        return compose_static(lhs, sv, dv, a, b, at, inexact);
+    }
+    if is_one(s) {
         return Layout { shape: Tree::Leaf(s.clone()), stride: Tree::Leaf(StrideLeaf::Int(st(0))) };
     }
     let scale = |di: &StrideLeaf, r: &IndexExpr| di.scale(r, "composition");
@@ -2106,6 +2207,93 @@ fn compose_mode(
         }
     }
     let result: Vec<_> = result.into_iter().filter(|(s, _)| !is_one(s)).collect();
+    Layout::from_flat_expr(&result)
+}
+
+/// [`compose_mode`] for a static right-hand mode `s:d` (`d` not 0) and a
+/// left-hand side `lhs` (from [`Layout::coalesce_x_modes`]) whose extents are
+/// static, except perhaps the last, which is never read: C++ CuTe's
+/// `composition_impl` for an integral right-hand side, step for step, so
+/// the result prints as CuTe DSL's does. A mode of extent 1 gets the stride
+/// the walk reaches (`(8,2):(2,16) ∘ (6,1,1):(1,6,6)` is
+/// `(6,1,1):(2,12,12)`), and the last mode of the left-hand side goes on
+/// past its extent.
+///
+/// The conditions are C++ CuTe's: at each mode `si` the stride walked so far
+/// must be a multiple of `si` or smaller than it (the "Stride Divisibility
+/// Condition"), and the extent still to place a multiple of the extent the
+/// mode gives it (the "Shape Divisibility Condition"). The first condition
+/// admits a stride smaller than `si` that does not divide it, and C++ CuTe
+/// then goes on into the next mode as if it had divided `si`, which is not
+/// always the composition: `(6,8):(8,1) ∘ 12:4` gives `(2,6):(32,1)`, whose
+/// element 2 is 1 where `(6,8):(8,1)` sends 8 to 17. Such a step is noted in
+/// `inexact` (the refusal to give), and [`Layout::compose`] keeps the
+/// answer only if it checks, value by value, that it is the composition, as
+/// `(8,2):(2,1) ∘ (2,3):(3,1) = (2,3):(6,2)` is. CuTe DSL returns C++ CuTe's
+/// layout in both cases; cute-rs refuses the inexact ones.
+#[track_caller]
+fn compose_static(
+    lhs: &[(IndexExpr, StrideLeaf)],
+    s: usize,
+    d: i64,
+    a: &Layout,
+    b: &Layout,
+    at: &ModePath,
+    inexact: &mut Option<String>,
+) -> Layout {
+    let scale = |di: &StrideLeaf, r: i64| di.scale(&IndexExpr::from_signed(r), "composition");
+    let Some(((_, last), init)) = lhs.split_last() else { unreachable!("coalesce_x gives at least one mode") };
+    if init.is_empty() {
+        return Layout::from_flat_expr(&[(st(s), scale(last, d))]);
+    }
+    let (mut rest_shape, mut rest_stride) = (s, d);
+    let mut result: Vec<(IndexExpr, StrideLeaf)> = Vec::new();
+    for (si, di) in init {
+        let cs = si.as_static().expect("checked static");
+        let r = rest_stride;
+        let ra = r.unsigned_abs() as usize;
+        let stride_refusal = || {
+            let stride = with_rest("stride", &IndexExpr::from_signed(d), &IndexExpr::from_signed(r));
+            format!(
+                "composition {a} ∘ {b}{} is not defined: {stride} is not compatible with mode size {si}",
+                at.suffix()
+            )
+        };
+        let refuse_stride = || -> ! { panic!("{}", stride_refusal()) };
+        // C++ CuTe's condition, on the signed stride.
+        if !(cs == 0 || r % cs as i64 == 0 || r < cs as i64) {
+            refuse_stride();
+        }
+        let next_shape = if ra == 0 { 1 } else { cs.div_ceil(ra) };
+        let next_stride = (ra.div_ceil(cs.max(1)) as i64) * r.signum();
+        if next_shape == 1 || rest_shape == 1 {
+            if rest_shape != 1 && !ra.is_multiple_of(cs.max(1)) {
+                // A negative stride larger than `si` and not a multiple of it.
+                refuse_stride();
+            }
+            rest_stride = next_stride;
+            continue;
+        }
+        if !cs.is_multiple_of(ra) && inexact.is_none() {
+            *inexact = Some(stride_refusal());
+        }
+        let new_shape = next_shape.min(rest_shape);
+        if !rest_shape.is_multiple_of(new_shape) {
+            let shape = with_rest("shape", &st(s), &st(rest_shape));
+            let held = if ra == 1 {
+                format!("mode size {si}")
+            } else {
+                format!("mode size {si} at stride {r}, which has {next_shape} elements")
+            };
+            panic!("composition {a} ∘ {b}{} is not defined: {shape} is not compatible with {held}", at.suffix())
+        }
+        result.push((st(new_shape), scale(di, r)));
+        rest_shape /= new_shape;
+        rest_stride = next_stride;
+    }
+    if result.is_empty() || rest_shape != 1 {
+        result.push((st(rest_shape), scale(last, rest_stride)));
+    }
     Layout::from_flat_expr(&result)
 }
 
@@ -2343,6 +2531,12 @@ fn product_block(block: &Layout, what: &str) {
 
 #[track_caller]
 fn logical_product_impl(a: &Layout, b: &Layout) -> Layout {
+    // CuTe DSL's `(a, composition(complement(a, size(a) * cosize(b)), b))`,
+    // the formula of the CuTe documentation. C++ CuTe 4.8.1 takes the
+    // complement with no cotarget, ending in a mode of extent 1 that
+    // composition extends, which gives a size-1 mode of the tiler a
+    // different stride: `logical_product(5:1, 1:1)` is `(5,1):(1,0)` in
+    // CuTe DSL and `(5,1):(1,5)` in C++ CuTe. cute-rs follows CuTe DSL.
     let rest = a.complement(st(a.size()) * cosize_of(&b.shape, &b.stride)).compose(b);
     Layout::from_modes([a.clone(), rest])
 }
@@ -2415,6 +2609,13 @@ pub fn blocked_product<X: Tileable>(block: &X, tiler: &Layout) -> X {
 fn blocked_product_impl(block: &Layout, tiler: &Layout) -> Layout {
     product_block(block, "blocked_product");
     let r = block.rank().max(tiler.rank());
+    if r == 1 && block.shape.is_leaf() {
+        // A block that is a single integer mode is paired with the whole
+        // rest, as CuTe DSL zips them, so a tiler `(4):(1)` keeps its tuple:
+        // `blocked_product(8:1, (4):(1))` is `((8,(4))):((1,(8)))`.
+        let p = logical_product_impl(block, tiler);
+        return Layout::from_modes([Layout::from_modes([p.mode(0), p.mode(1)])]);
+    }
     let p = logical_product_impl(&block.pad_to_rank(r), &tiler.pad_to_rank(r));
     zip_modes(&p.mode(0), &p.mode(1))
 }
@@ -2432,7 +2633,13 @@ fn raked_product_impl(block: &Layout, tiler: &Layout) -> Layout {
     product_block(block, "raked_product");
     let r = block.rank().max(tiler.rank());
     let p = logical_product_impl(&block.pad_to_rank(r), &tiler.pad_to_rank(r));
-    zip_modes(&p.mode(1), &p.mode(0))
+    // Each mode coalesced, as CuTe DSL 4.8.1 does (and C++ CuTe did up to
+    // CUTLASS 3.x: `coalesce(zip(...), tuple_repeat<R>(_1{}))`); C++ CuTe
+    // 4.8.1 returns the zip as it is. So `raked_product((4,6):(6,1), 4:2)`
+    // is `((4,4),6):((48,6),1)`, not `((4,4),(1,6)):((48,6),(0,1))`.
+    // `blocked_product` keeps its modes in both.
+    let z = zip_modes(&p.mode(1), &p.mode(0));
+    Layout::from_modes((0..r).map(|i| z.mode(i).coalesce()))
 }
 
 /// Build a thread-value layout from a thread layout and a per-thread value
@@ -2446,7 +2653,11 @@ pub fn make_layout_tv(thr_layout: &Layout, val_layout: &Layout) -> (IntTuple, La
     thr_layout.require_static("make_layout_tv: the thread layout", why);
     val_layout.require_static("make_layout_tv: the value layout", why);
     let layout_mn = raked_product(thr_layout, val_layout);
-    let tv = Layout::col_major((thr_layout.size(), val_layout.size()));
+    // Compact, with stride 0 for an extent of 1, as CuTe DSL's
+    // `make_layout((size(thr), size(val)))` is: `make_layout_tv(2:1, 1:1)`
+    // gives the thread-value layout `(2,1):(1,0)`.
+    let (nt, nv) = (thr_layout.size(), val_layout.size());
+    let tv = Layout::new((nt, nv), (if nt == 1 { 0 } else { 1 }, if nv == 1 { 0 } else { nt }));
     let layout_tv = layout_mn.right_inverse().compose(&tv);
     (layout_mn.static_shape().product_each(), layout_tv)
 }
@@ -2513,8 +2724,10 @@ pub fn zipped_product<X: Tileable>(block: &X, tiler: &Layout) -> X {
 #[track_caller]
 fn zipped_product_impl(block: &Layout, tiler: &Layout) -> Layout {
     product_block(block, "zipped_product");
-    let r = block.rank().max(tiler.rank());
-    logical_product_impl(&block.pad_to_rank(r), &tiler.pad_to_rank(r))
+    // The whole tiler, unpadded (C++ CuTe's `tile_unzip(logical_product(block,
+    // tiler), tiler)` with a layout as the tiler): `zipped_product((4,2):(2,8),
+    // 2:1)` is `((4,2),2):((2,8),1)`.
+    logical_product_impl(block, tiler)
 }
 
 /// `((block...), tiler0, tiler1, ...)`.
@@ -2527,7 +2740,7 @@ pub fn tiled_product<X: Tileable>(block: &X, tiler: &Layout) -> X {
 fn tiled_product_impl(block: &Layout, tiler: &Layout) -> Layout {
     let z = zipped_product(block, tiler);
     let mut modes = vec![z.mode(0)];
-    modes.extend(z.mode(1).modes());
+    modes.extend(z.mode(1).as_tuple_modes());
     Layout::from_modes(modes)
 }
 
@@ -2540,8 +2753,8 @@ pub fn flat_product<X: Tileable>(block: &X, tiler: &Layout) -> X {
 #[track_caller]
 fn flat_product_impl(block: &Layout, tiler: &Layout) -> Layout {
     let z = zipped_product(block, tiler);
-    let mut modes = z.mode(0).modes();
-    modes.extend(z.mode(1).modes());
+    let mut modes = z.mode(0).as_tuple_modes();
+    modes.extend(z.mode(1).as_tuple_modes());
     Layout::from_modes(modes)
 }
 
@@ -2561,8 +2774,10 @@ pub fn max_common_layout(a: &(impl LayoutSource + ?Sized), b: &(impl LayoutSourc
     let inverse = b.right_inverse();
     let common = a.compose(&inverse).coalesce();
     match static_unit_run(&common) {
-        Some(n) => inverse.compose(&Layout::new(n, 1)),
-        None => Layout::new(1, 0),
+        // A run of one element (a runtime extent with no known static
+        // factor) is C++ CuTe's `Layout<_1,_0>{}`.
+        Some(n) if n > 1 => inverse.compose(&Layout::new(n, 1)),
+        _ => Layout::new(1, 0),
     }
 }
 
@@ -2600,6 +2815,7 @@ pub fn dice(layout: &Layout, mask: &[bool]) -> Layout {
 
 /// A compact layout of `shape` whose modes are filled in the order given by
 /// `order`: smaller values get smaller strides (CuTe's `make_ordered_layout`).
+/// A static extent of 1 gets stride 0, as in CuTe.
 /// A dynamic extent makes the strides of the modes after it dynamic:
 /// `make_ordered_layout((4,3,?,2), [2,1,3,4])` is `(4,3,?,2):(3,1,12,?)`.
 #[track_caller]
@@ -2612,7 +2828,10 @@ pub fn make_ordered_layout(shape: impl Into<Shape>, order: &[usize]) -> Layout {
     let mut stride = vec![st(0); order.len()];
     let mut running = st(1);
     for i in by_order {
-        stride[i] = running.clone();
+        // A static extent of 1 gets stride 0, as `compact_order` gives it in
+        // C++ CuTe and CuTe DSL: `make_ordered_layout((2,1,3), [0,1,2])` is
+        // `(2,1,3):(1,0,2)`.
+        stride[i] = if is_one(&sizes[i]) { st(0) } else { running.clone() };
         running = running * &sizes[i];
     }
     Layout::from_modes(sizes.iter().zip(&stride).map(|(s, d)| Layout::new(s.clone(), d.clone())))

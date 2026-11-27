@@ -1300,8 +1300,8 @@ fn compile_option_misuse() {
         ("--gpu-arch sm_88", "sm_88 is in the PTX ISA but not in CuTe DSL 4.8.1's Arch"),
         ("dump-ptx-path=maybe", "takes 1, true, yes or on"),
         ("remarks{ptxas}", "`ptxas` is not a diagnostic category"),
-        ("--link-libraries libdevice.bc", "linking device libraries is not available yet"),
-        ("iket", "IKET in-kernel event tracing is not available yet"),
+        ("--link-libraries libdevice.bc", "linking device libraries is not supported as a compile option string"),
+        ("iket", "IKET in-kernel event tracing is not supported as a compile option string"),
         ("--frobnicate", "unknown option `--frobnicate`"),
         ("--keep", "ambiguous option `--keep`"),
         ("--h x", "ambiguous option `--h`: it could be --help, --host-target"),
@@ -2500,7 +2500,7 @@ fn layout_algebra_limits_with_runtime_leaves() {
     });
     assert!(
         msg.contains(
-            "composition (6,8):(8,1) ∘ (4,12):(1,4) (mode [1] of layout (8,(6,8)):(?,(8,1))) is not defined: "
+            "composition (6,8):(8,1) ∘ (4,16):(1,4) (mode [1] of layout (8,(6,8)):(?,(8,1))) is not defined: "
         ) && msg.contains("stride 4 is not compatible with mode size 6"),
         "{msg}"
     );
@@ -2845,12 +2845,16 @@ fn tensors_take_runtime_extents() {
 #[test]
 fn composition_refusals_name_the_right_hand_values() {
     let a = Layout::new((2, 3, 5), (1, 100, 1000));
+    // A stride smaller than the mode it lands in that does not divide it is
+    // C++ CuTe's weak divisibility condition; the answer is kept where it is
+    // the composition, as here (offsets 0 and 4 of `a` are 0 and 200).
+    assert_eq!(composition(&a, &Layout::new(2, 4)), Layout::new(2, 200));
     let msg = build_panic(|| {
-        let _ = composition(&a, &Layout::new(2, 4));
+        let _ = composition(&a, &Layout::new(4, 4));
     });
     assert!(
         msg.contains(
-            "composition (2,3,5):(1,100,1000) ∘ 2:4 is not defined: stride 4 (2 after the modes before it) is not \
+            "composition (2,3,5):(1,100,1000) ∘ 4:4 is not defined: stride 4 (2 after the modes before it) is not \
              compatible with mode size 3"
         ),
         "{msg}"
@@ -2874,7 +2878,7 @@ fn composition_refusals_name_the_right_hand_values() {
         let _ = logical_divide(&Layout::row_major((6, 8)), Layout::new(2, 4));
     });
     assert!(
-        msg.contains("composition (6,8):(8,1) ∘ (2,(4,6)):(4,(1,8)) is not defined: stride 4 is not compatible"),
+        msg.contains("composition (6,8):(8,1) ∘ (2,(4,4)):(4,(1,8)) is not defined: stride 8 is not compatible"),
         "{msg}"
     );
 }
@@ -7155,7 +7159,7 @@ fn struct_misuse() {
     assert!(e.contains("allocating Ranges: an alignment of 4096 bytes is more than shared memory's 1024"), "{e}");
 }
 
-// ---- m6-diagnostics: located errors, code frames, compiler diagnostics,
+// ---- Located errors, code frames, compiler diagnostics,
 // ---- device assertions.
 
 /// `{:#}` (and `render`) add a code frame of the failing line; plain
@@ -7426,7 +7430,7 @@ fn runtime_assertions_on_the_simulator() {
     assert!(off.kernel_arg().is_none() && off.verify(&k).is_ok());
 }
 
-// ---- m9: pipeline primitives and shared-memory partitions ----
+// ---- Pipeline primitives and shared-memory partitions ----
 
 mod pipeline_misuse {
     use super::{build_panic, simulate_err};
@@ -7590,7 +7594,7 @@ mod pipeline_misuse {
     }
 }
 
-// ---- m9: PipelineAsync and the static persistent tile schedulers ----
+// ---- PipelineAsync and the static persistent tile schedulers ----
 
 mod pipeline_async_misuse {
     use super::{build_panic, simulate_err};
@@ -8221,7 +8225,7 @@ mod tensormap_misuse {
     }
 }
 
-// ---- m9-pipeline-tma: PipelineTmaAsync and PipelineTmaStore ----
+// ---- PipelineTmaAsync and PipelineTmaStore ----
 
 mod tma_pipeline_misuse {
     use super::build_panic;

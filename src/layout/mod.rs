@@ -6,6 +6,7 @@ mod bytes;
 mod fn_composed;
 pub(crate) mod image_mask;
 mod index;
+// `layout::layout` holds `Layout`, as CuTe's `layout.py` does.
 #[allow(clippy::module_inception)]
 mod layout;
 mod parse;

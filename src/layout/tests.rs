@@ -1828,7 +1828,12 @@ fn property_products_with_dynamic_tilers_match_the_static_ones() {
         ];
         for (name, op) in ops {
             let (dynamic, want) = (op(&block, &tiler), op(&block, &template));
-            let got = eval_layout(&dynamic, &env);
+            let mut got = eval_layout(&dynamic, &env);
+            if name == "raked_product" {
+                // raked_product coalesces each mode, which a runtime extent
+                // that is 1 at these values does not let it do when it is built.
+                got = Layout::from_modes(got.modes().iter().map(Layout::coalesce));
+            }
             assert_eq!(unit_modes_zeroed(&got), unit_modes_zeroed(&want), "{name}({block}, {tiler:?}) = {dynamic:?}");
         }
     }
@@ -2056,13 +2061,36 @@ fn whole_layout_divides_with_dynamic_extents() {
 /// stand for small values, multiples of nothing in particular: wherever the
 /// static composition is defined, the dynamic one agrees with it. It is
 /// refused only where a static stride does not fit the static extents it
-/// steps over, which the static composition does not check for a mode of
-/// extent 1 (C++ CuTe refuses it whatever the extent). (A left-hand side
+/// steps over, which the static composition lets through for a mode of
+/// extent 1 when the stride is smaller than the extent, or where the static
+/// composition takes a stride smaller than a mode that it does not divide,
+/// which it keeps only after checking every value. (A left-hand side
 /// with runtime strides is another matter: they can keep its modes from
 /// merging, and the divisibility conditions then apply to the unmerged
 /// modes.)
 #[test]
 fn property_composition_with_runtime_right_hand_sides() {
+    /// Whether C++ CuTe's walk of `a ∘ b` takes a stride smaller than a mode
+    /// of `a` that it does not divide: the static composition is then kept
+    /// only after checking every value, which a runtime extent or stride
+    /// prevents.
+    fn takes_indivisible_stride(a: &Layout, b: &Layout) -> bool {
+        let lhs: Vec<usize> = a.coalesce().flat_modes().into_iter().map(|(s, _)| s).collect();
+        b.flat_modes().into_iter().filter(|&(_, d)| d != 0).any(|(s, d)| {
+            let (mut rest_shape, mut rest_stride) = (s, d);
+            for &cs in &lhs[..lhs.len() - 1] {
+                let next_shape = cs.div_ceil(rest_stride);
+                if next_shape > 1 && rest_shape > 1 {
+                    if !cs.is_multiple_of(rest_stride) {
+                        return true;
+                    }
+                    rest_shape /= next_shape.min(rest_shape).max(1);
+                }
+                rest_stride = rest_stride.div_ceil(cs);
+            }
+            false
+        })
+    }
     let mut rng = Rng(0x2b5);
     let (mut checked, mut refused, mut at_run_time) = (0, 0, 0);
     for _ in 0..4000 {
@@ -2086,7 +2114,10 @@ fn property_composition_with_runtime_right_hand_sides() {
         });
         let rb = Layout::new(shape, stride);
         let Ok(got) = std::panic::catch_unwind(|| composition(&a, &rb)) else {
-            assert!(runtime_extents.contains(&1), "({a}) o ({rb:?}) was refused, but ({a}) o ({b}) = {want}");
+            assert!(
+                runtime_extents.contains(&1) || takes_indivisible_stride(&a, &b),
+                "({a}) o ({rb:?}) was refused, but ({a}) o ({b}) = {want}"
+            );
             refused += 1;
             continue;
         };
@@ -2838,7 +2869,7 @@ fn recast_layout_properties() {
     }
 }
 
-// m4 layout-like helpers. "cutegen" marks the vectors of cg_layout_test.cpp,
+// Layout-like helpers. "cutegen" marks the vectors of cg_layout_test.cpp,
 // cg_composed_layout_test.cpp and cg_swizzle_test.cpp; "layout.hpp" the
 // example in the comment above C++ make_layout_like.
 
@@ -3163,4 +3194,85 @@ fn composed_layout_algebra_brute_force() {
         assert_eq!(crd2idx((3, 5), &c), c.offset_of(&(3, 5).into()));
         assert_eq!(c.group_modes(0, 2).rank(), 1);
     }
+}
+
+/// Calls recorded from CuTe DSL 4.8.1 (gpu-results/cutedsl-check-20261126/
+/// layouts.tsv) that cute-rs used to answer differently or refuse: the
+/// strides of extent-1 modes in composition and the operations built on it,
+/// C++ CuTe's `coalesce_x` of the left-hand side, its weak stride condition
+/// where the result is exact, the floor division of `complement`, the
+/// complement in the divided layout's shape, `left_inverse`,
+/// `make_ordered_layout`, the products' padding and raked_product's
+/// coalescing, and `make_layout_tv`'s thread-value layout. `ERR` marks a
+/// call cute-rs refuses: CuTe DSL refuses the first, and the others are
+/// ill-posed (a non-injective complement, a composition C++ CuTe gets
+/// wrong).
+#[test]
+fn cutedsl_recorded_vectors() {
+    let p = |s: &str| -> Layout { s.parse().unwrap_or_else(|e| panic!("{s}: {e}")) };
+    let tilers = |s: &str| -> Tiler { Tree::Branch(s.split(';').map(|t| Tree::Leaf(Some(p(t)))).collect()) };
+    let cases: &[(&str, &[&str], &str)] = &[
+        ("composition", &["(8,2):(2,16)", "(6,1,1):(1,6,6)"], "(6,1,1):(2,12,12)"),
+        ("composition", &["(3,6,2):(1,6,3)", "(2,1):(1,1)"], "(2,1):(1,3)"),
+        ("composition", &["(2,1):(2,1)", "(2,(2,5)):(4,(12,2))"], "(2,(2,5)):(2,(6,1))"),
+        ("composition", &["1:2", "(3,(3,1),5,4):(320,(960,2),32,4)"], "(3,(3,1),5,4):(640,(1920,4),64,8)"),
+        ("composition", &["(8,2):(2,1)", "(2,3):(3,1)"], "(2,3):(6,2)"),
+        ("composition", &["(3,6,3):(12,12,3)", "1:4"], "ERR"),
+        ("composition", &["((3,8),4):((8,1),24)", "((2,2),3):((2,2),0)"], "ERR"),
+        ("complement", &["(3,2):(2,16)", "21"], "(2,2):(1,6)"),
+        ("complement", &["1:2", "1"], "1:0"),
+        ("complement", &["(2,2,3,3):(6,4,1,2)", "24"], "ERR"),
+        ("logical_divide", &["(2,4,1):(8,8,0)", "8:4"], "((2,4),(2,2)):((16,0),(8,8))"),
+        ("logical_divide", &["(3,5,2):(4,16,160)", "2:1"], "ERR"),
+        ("logical_divide", &["3:3", "((1,2),2):((2,8),2)"], "(((1,2),2),(2,2)):(((6,24),6),(3,12))"),
+        ("zipped_divide", &["(4,2,(2,1)):(1,8,(4,32))", "2:1;2:1;2:2"], "((2,2,2),(2,1,2)):((1,8,32),(2,0,4))"),
+        ("tiled_divide", &["((2,1),2,2,5):((20,2),10,1,2)", "2:2"], "((2),2,2,2,5):((2),20,10,1,2)"),
+        ("left_inverse", &["4:3"], "(3,4):(0,1)"),
+        ("left_inverse", &["(3,2,6):(12,48,1)"], "(12,4,2):(6,1,3)"),
+        ("left_inverse", &["(2,3,2):(4,1,3)"], "(4,2):(2,1)"),
+        ("left_inverse", &["8:0"], "1:0"),
+        ("logical_product", &["5:1", "1:1"], "(5,1):(1,0)"),
+        ("logical_product", &["(4,6):(28,4)", "(4):(2)"], "((4,6),((2,2))):((28,4),((2,112)))"),
+        ("blocked_product", &["(6,1):(2,12)", "(1,4):(4,1)"], "((6,1),(1,(2,2))):((2,24),(12,(1,12)))"),
+        ("blocked_product", &["1:6", "(4):(1)"], "((1,(4))):((6,(1)))"),
+        ("raked_product", &["(4,6):(6,1)", "(4):(2)"], "((4,4),6):((48,6),1)"),
+        (
+            "raked_product",
+            &["(5,4,3):(1,15,5)", "((4,2),3):((12,60),2)"],
+            "((4,2,5),(3,4),3):((720,3600,1),(120,15),5)",
+        ),
+        ("zipped_product", &["(2):(1)", "(8,3,3):(27,9,3)"], "((2),(8,3,3)):((1),(54,18,6))"),
+        ("tiled_product", &["1:4", "(2,3,3):(9,3,1)"], "(1,2,3,3):(4,9,3,1)"),
+        ("flat_product", &["(4,2):(2,8)", "2:1"], "(4,2,2):(2,8,1)"),
+        ("flat_product", &["(2,3):(4,1)", "3:2"], "(2,3,3):(4,1,16)"),
+        ("make_layout_tv", &["(2):(1)", "1:1"], "((2),(2,1):(1,0))"),
+    ];
+    for &(op, a, want) in cases {
+        let call = || match op {
+            "composition" => p(a[0]).compose(&p(a[1])).to_string(),
+            "complement" => p(a[0]).complement(a[1].parse::<usize>().unwrap()).to_string(),
+            "logical_divide" => p(a[0]).logical_divide(&Tree::Leaf(Some(p(a[1])))).to_string(),
+            "zipped_divide" => p(a[0]).zipped_divide(&tilers(a[1])).to_string(),
+            "tiled_divide" => p(a[0]).tiled_divide(&tilers(a[1])).to_string(),
+            "left_inverse" => p(a[0]).left_inverse().to_string(),
+            "logical_product" => logical_product(&p(a[0]), p(a[1])).to_string(),
+            "blocked_product" => blocked_product(&p(a[0]), &p(a[1])).to_string(),
+            "raked_product" => raked_product(&p(a[0]), &p(a[1])).to_string(),
+            "zipped_product" => zipped_product(&p(a[0]), &p(a[1])).to_string(),
+            "tiled_product" => tiled_product(&p(a[0]), &p(a[1])).to_string(),
+            "flat_product" => flat_product(&p(a[0]), &p(a[1])).to_string(),
+            "make_layout_tv" => {
+                let (tiler, tv) = make_layout_tv(&p(a[0]), &p(a[1]));
+                format!("({tiler},{tv})")
+            }
+            _ => unreachable!(),
+        };
+        let got = std::panic::catch_unwind(call).map(|s| s.replace(' ', "")).unwrap_or_else(|_| "ERR".to_string());
+        assert_eq!(got, want, "{op}({})", a.join(", "));
+    }
+    // make_ordered_layout gives an extent of 1 stride 0.
+    assert_eq!(
+        make_ordered_layout(vec![1usize, 8, 4, 5, 4], &[1, 3, 4, 2, 0]).to_string().replace(' ', ""),
+        "(1,8,4,5,4):(0,20,160,4,1)"
+    );
 }

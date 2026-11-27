@@ -20,3 +20,10 @@ dependencies = [
 [[package]]
 name = "cute-rs"
 version = "0.1.0"
+
+[[package]]
+name = "cute-rs-cutedsl-check"
+version = "0.1.0"
+dependencies = [
+ "cute-rs",
+]

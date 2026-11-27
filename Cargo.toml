@@ -19,7 +19,12 @@ features = ["cuda"]
 # FlashInfer's kernels, ported to cute-rs (Apache-2.0, FlashInfer's licence): `flashinfer/`;
 # `flashinfer-check/` runs them on inputs saved from FlashInfer itself.
 [workspace]
-members = ["flashinfer", "flashinfer-check"]
+members = ["flashinfer", "flashinfer-check", "cutedsl-check"]
+
+[lints.clippy]
+# Kernel entry points and launch helpers take one argument per tensor and size, as CuTe's do.
+too_many_arguments = "allow"
+type_complexity = "allow"
 
 [features]
 # Launch compiled kernels on an NVIDIA GPU through the CUDA driver API
