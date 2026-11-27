@@ -67,9 +67,17 @@ src/
   smem_struct.rs  cute.struct and cute.union: shared-storage structs
                (StructLayout, cute_struct!, cute_union!, MemRange views)
   builder.rs   Kernel construction (thread-local builder, CSE, DCE)
-  ir.rs        the IR
+  ir.rs        the IR (the module root: ValueId, BufferId, Loc; re-exports the
+               ir/ files: types, scalar, memory, mma, numeric, asm, op,
+               tcgen05, kernel, externs)
   validate.rs  IR verification
-  sim/         the CPU simulator, and SimStream with its PDL model
+  sim/         the CPU simulator, and SimStream with its PDL model;
+               exec.rs and exec/: the interpreter (exec.rs holds the
+               machine's state and construction; exec/ the scheduler,
+               barriers, blocked-thread reports, memory model, instruction
+               interpreter and asynchronous copies, and one file each for
+               tensormaps, tmem, umma, tmem_cp, wgmma, blockscale, clc and
+               distributed)
   backend/     MLIR emission, compile options, the lowering pipeline and
                PTX compilation; cache.rs: the in-memory and on-disk
                compile caches and KernelCache
@@ -80,5 +88,8 @@ src/
                callbacks
   aot.rs       ahead-of-time export to C and the export manifest
 examples/      the kernels above
-tests/         integration tests
+tests/         integration tests; diagnostics/ is one test binary split by
+               topic (main.rs and topic modules), and feature_kernels/ holds
+               the kernels several binaries share (mod.rs re-exports its
+               topic files)
 ```
