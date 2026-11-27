@@ -12,15 +12,15 @@
 //! cargo test --release --features cuda --test gpu_blackwell_more
 //! ```
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/custom_epilogue_dense_gemm.rs"]
 mod custom;
 
-#[allow(dead_code)]
 #[path = "../examples/cute_ext_dense_gemm_persistent.rs"]
 mod persistent;
 
-#[allow(dead_code)]
 #[path = "../examples/ts_gemm_simple.rs"]
 mod ts_gemm_simple;
 

@@ -190,7 +190,6 @@ fn zero_sum(mode: RoundingMode, f: Format) -> u64 {
 
 /// `a + b` for finite nonzero operands with significands of at most 106
 /// bits.
-#[allow(clippy::too_many_arguments)]
 fn add_finite(na: bool, sa: u128, ea: i32, nb: bool, sb: u128, eb: i32, mode: RoundingMode, f: Format) -> u64 {
     let (ma, mb) = (ea + bit_length(sa) - 1, eb + bit_length(sb) - 1);
     let ((nx, sx, ex), (ny, sy, ey)) =

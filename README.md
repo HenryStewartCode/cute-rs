@@ -4,6 +4,13 @@
 
 A CuTe-style GPU kernel DSL for Rust.
 
+> **Experimental, and mostly machine-written.** Nearly all of cute-rs was written by an AI
+> model (Anthropic's Claude, through Claude Code), directed by one person. At about 285,000
+> lines it is more than anyone has read line by line, so judge it by what it has been checked
+> against, not by its size. [What has been checked](#what-has-been-checked) lists the
+> comparisons with NVIDIA's CuTe DSL, with FlashInfer and with real GPUs, and what has not
+> been checked. Reviews and bug reports are welcome.
+
 You write GPU kernels as ordinary Rust, using the same building blocks as NVIDIA's
 [CuTe](https://github.com/NVIDIA/cutlass/tree/main/include/cute) and CuTe DSL: hierarchical
 layouts and their algebra, tensors over global, shared and register memory, and copy and
@@ -60,33 +67,54 @@ To use it from another crate (the library is called `cute`):
 cute-rs = { git = "https://github.com/HenryStewartCode/cute-rs" }
 ```
 
-## Status
+## What has been checked
 
-cute-rs covers the features of CuTe DSL 4.8.1, apart from three left out by design: the
-`frontend-next` tracing frontend, and `cute-ext`'s compiler pipeline and entry points
-(cute-rs builds kernels from Rust closures instead). Every feature is tested on the
-simulator, and the generated PTX is assembled by `ptxas` for each architecture it targets
-(except SM107, which no released CUDA toolkit assembles yet).
+cute-rs has a counterpart for each feature of CuTe DSL 4.8.1 except three left out by design:
+the `frontend-next` tracing frontend, and `cute-ext`'s compiler pipeline and entry points
+(cute-rs builds kernels from Rust closures instead).
+[docs/cutedsl-mapping.md](docs/cutedsl-mapping.md) lists them one by one. Having a counterpart
+is not the same as being right, and how well each part has been checked varies. This section
+says how.
 
-What has run on real GPUs, and what has not:
+### Against things written independently of cute-rs
+
+| What | Compared with | Result |
+| --- | --- | --- |
+| The layout algebra | NVIDIA's CuTe DSL 4.8.1, given the same 20,500 seeded random calls ([`cutedsl-check/`](cutedsl-check)) | Two seeds, 41,000 calls. cute-rs gives CuTe DSL's answer character for character on 36,945 and both refuse 3,121. cute-rs answers 88 that CuTe DSL refuses, and refuses 846 that are ill-posed, where CuTe DSL returns a layout that is not what the operation defines (the complement of an overlapping layout, say). No call gets a different answer. The first run found 771 calls that cute-rs wrongly refused and 143 it answered differently; those are fixed, and the second seed was recorded after the fixes ([docs/testing.md](docs/testing.md#checking-the-layout-algebra-against-cute-dsl)). |
+| The FlashInfer ports ([`flashinfer/`](flashinfer)) | FlashInfer itself, on the same inputs, on an SM89 GPU ([`flashinfer-check/`](flashinfer-check)) | All 1,092 outputs agree within the rule stated for each, 584 of them bit for bit. The first run found three faults in the ports, which are fixed. |
+| The simulator | Real GPUs: each kernel the simulator's tests run is also run on the device, and the buffers compared ([docs/testing.md](docs/testing.md#checking-the-simulator-against-a-gpu)) | On a B200, 15,140 of 15,522 kernel runs give the simulator's bytes exactly; on an H100, 18,998 of 20,237. The rest differ in approximate instructions, last-digit rounding in the tensor cores, addresses, thread order and ties. The B200 run also found places where the simulator was wrong; they are corrected, except one that is refused instead ([docs/limitations.md](docs/limitations.md)). |
+| The generated PTX | NVIDIA's assembler, `ptxas` | It assembles for every target architecture except SM107, which no released CUDA toolkit assembles yet. |
+
+### On real GPUs
 
 | Architecture | Hardware tested | Status |
 | --- | --- | --- |
 | SM80 / SM89 (Ampere, Ada) | an SM89 GPU | The full GPU suite passes |
 | SM120 (consumer Blackwell) | RTX 5090 | The full GPU suite passes, including TMA, the SM120 MMAs and the block-scaled warp MMAs |
-| SM90 (Hopper) | H100 | The Hopper device tests pass (the WGMMA GEMMs with clusters, every major mode, Float16, BFloat16, FP8 and 8-bit integers, the persistent GEMM and the FMHA forward); the simulator's test suite was compared with the device kernel by kernel ([docs/testing.md](docs/testing.md#results-on-an-h100)) |
-| SM100 (datacenter Blackwell) | B200 | The Blackwell device tests pass (tcgen05 GEMMs with and without CTA pairs, mixed-input, NVFP4, custom epilogues, task scheduling), as does a 200-launch stress test of each; the simulator's test suite was compared with the device kernel by kernel ([docs/testing.md](docs/testing.md#results-on-a-b200)) |
-| SM103 / SM107 (Blackwell Ultra, Rubin) | none yet | Checked by the simulator and `ptxas` only (SM107 by the simulator only) |
+| SM90 (Hopper) | H100 | The Hopper device tests pass (the WGMMA GEMMs with clusters, every major mode, Float16, BFloat16, FP8 and 8-bit integers, the persistent GEMM and the FMHA forward) ([docs/testing.md](docs/testing.md#results-on-an-h100)) |
+| SM100 (datacenter Blackwell) | B200 | The Blackwell device tests pass (tcgen05 GEMMs with and without CTA pairs, mixed-input, NVFP4, custom epilogues, task scheduling), as does a 200-launch stress test of each ([docs/testing.md](docs/testing.md#results-on-a-b200)) |
+| SM103 / SM107 (Blackwell Ultra, Rubin) | none | Never run. Checked by the simulator and `ptxas` only (SM107 by the simulator only) |
 
-`tests/gpu_hopper.rs` and `tests/gpu_blackwell.rs` run the Hopper and datacenter-Blackwell
-examples on those GPUs against CPU references, and time them (the `#[ignore]`d `bench_*`
-tests). With `CUTE_RS_CROSSCHECK_GPU` set, every kernel the simulator tests run is also run
-on the GPU and compared. `scripts/gpu-validate.sh` does a whole validation pass on a GPU machine in one go:
-it installs Rust and `mlir-opt`, runs the architecture's suite, then the full suite, then the
-timings (with cuBLAS alongside when PyTorch is installed), and packs the results.
-`scripts/pod-run.sh` drives it on a rented machine over SSH (`start`, `status`, `fetch`).
+The device tests compare each kernel's output with a CPU reference. `scripts/gpu-validate.sh`
+does a whole validation pass on a GPU machine in one go (it installs Rust and `mlir-opt`, runs
+the architecture's suite, then the full suite, then the timings, and packs the results), and
+`scripts/pod-run.sh` drives it on a rented machine over SSH.
 
-Known gaps besides the architectures not yet run:
+### By its own tests only
+
+The other tests, about 1,850 of them, were written together with the code they test. They
+compare kernels with CPU references and `cute::math` with a double-double reference, and they
+catch regressions, but they are weaker evidence than the comparisons above: the three faults
+in the FlashInfer ports had passed them. In particular:
+
+* Apart from the layout algebra, whether a feature behaves as CuTe DSL's does has been judged
+  from CuTe DSL's documentation and examples, not by running the two side by side.
+* The JAX (`xla_ffi`) and TVM-FFI bindings are tested against hand-built call frames, not
+  under JAX or `libtvm_ffi` themselves.
+* Multicast memory (`MulticastGroup`) has never run: it needs two or more NVLink-connected
+  GPUs, and the machines used so far had one.
+
+### Known gaps
 
 * Speed: on a B200 at 8192 x 8192 x 8192 in Float16, the tutorial tcgen05 GEMMs run at about
   1,600 TFLOP/s, level with cuBLAS, but CuTe DSL's own builds of the same kernels are 15 to 30%
@@ -94,20 +122,35 @@ Known gaps besides the architectures not yet run:
   ([docs/testing.md](docs/testing.md#results-on-a-b200)). On an H100 the Hopper GEMMs reach about
   500 TFLOP/s where cuBLAS reaches 750, and the FMHA 199 TFLOP/s where PyTorch's attention
   reaches 262 ([docs/testing.md](docs/testing.md#results-on-an-h100)).
-* On the B200 the simulator disagreed with the device in a few places. They are corrected
-  against the device's saved outputs, except a CTA pair's block-scaled MMA with M = 128:
-  where it wants B's scale factors is not known, so the simulator refuses it.
-  [docs/limitations.md](docs/limitations.md) has the details.
-* The JAX (`xla_ffi`) and TVM-FFI bindings are tested against hand-built call frames, not
-  under JAX or `libtvm_ffi` themselves.
-* A CTA pair's B scale factors (the 2x2 data path of `make_tmem_layout_sfb`) are not laid
+* A CTA pair's block-scaled MMA with M = 128: where it wants B's scale factors is not known,
+  so the simulator refuses it, and the 2x2 data path of `make_tmem_layout_sfb` is not laid
   out yet.
-* Multicast memory (`MulticastGroup`) has not run: it needs two or more NVLink-connected GPUs,
-  and the machines used so far had one (the driver makes no team of one, on an H100 or a B200).
 * The JIT disk cache refuses a directory other users can write to, which includes network
   volumes that report mode 777; point `CUTE_RS_CACHE_DIR` at local disk there.
 
 [docs/limitations.md](docs/limitations.md) lists each feature's smaller gaps.
+
+## Size, and where to start reading
+
+| Part | Lines |
+| --- | --- |
+| The library, `src/` | 143,000 |
+| Its tests, `tests/` | 88,000 |
+| The examples, `examples/` | 22,000 |
+| The FlashInfer ports and their check, `flashinfer/` and `flashinfer-check/` | 38,000 |
+
+The public history starts with one large commit because the project was developed in a
+private repository and first published, as a snapshot, on 24 November 2026.
+
+Good places to start reading are [`src/layout/layout.rs`](src/layout/layout.rs) (the layout
+algebra, the part most directly comparable with CuTe), [`examples/tensorop_gemm.rs`](examples/tensorop_gemm.rs)
+(a complete tensor-core kernel), [`src/sim/`](src/sim) (the simulator) and
+[`src/backend/mlir.rs`](src/backend/mlir.rs) (code generation).
+[docs/crate-layout.md](docs/crate-layout.md) maps the rest.
+
+If you know CuTe, CUTLASS or CUDA and something here looks wrong, please open an issue. A
+kernel that the simulator accepts and a GPU does not, or a call that CuTe DSL answers
+differently, is exactly the kind of report that is wanted.
 
 ## Examples
 
@@ -151,7 +194,7 @@ the way C++ CuTe works them out at compile time. From that one representation:
 | [Examples](docs/examples.md) | What each example shows |
 | [Compile options](docs/compile-options.md) | Optimization levels, line information, option strings and environment variables |
 | [Runtime and interop](docs/runtime.md) | Streams, graphs, export to C, TVM-FFI, JAX, external functions and host tensors |
-| [Testing](docs/testing.md) | What the test suites cover and how to run them on a GPU |
+| [Testing](docs/testing.md) | What the test suites cover, the comparisons with CuTe DSL, FlashInfer and real GPUs, and how to run them |
 | [Hopper](docs/hopper.md) | TMA, warpgroup MMAs, distributed shared memory and the pipelines |
 | [Blackwell and Rubin](docs/blackwell.md) | tcgen05 MMAs, tensor memory, CTA pairs, cluster launch control and block scaling |
 | [The primitives layer](docs/primitives.md) | Typed descriptors and the instruction-level API |

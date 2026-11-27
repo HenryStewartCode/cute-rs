@@ -1,4 +1,4 @@
-//! Kernels of roadmap parts m9-pipeline-async and m9-persistent-schedulers
+//! Kernels of the async pipelines and the persistent schedulers
 //! whose results depend on timing or that take arguments of their own, so
 //! that they are not feature kernels: shared by `tests/pipeline_async.rs`,
 //! `tests/tile_schedulers.rs` and `tests/gpu_async_sched.rs`.

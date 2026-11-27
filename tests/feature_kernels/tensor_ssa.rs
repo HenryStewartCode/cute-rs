@@ -104,7 +104,6 @@ macro_rules! ssa_int_case {
                     let (x, y, v) = (xs[i], ys[i], ys[i / 4 * 4]);
                     let d = (y & 7) + 1;
                     let p = x.wrapping_mul(y);
-                    #[allow(unused_comparisons)]
                     let abs = if p < (0 as $t) { (0 as $t).wrapping_sub(p) } else { p };
                     let want: [$t; INT_OPS] = [
                         x.wrapping_add(y),

@@ -221,7 +221,6 @@ pub fn is_shuffle_a(
 /// `(m, n)` (and of the scale tensor, `(m, k / scale_granularity_k)` contiguous along M,
 /// counted in B's type) hold whole 16-byte runs; and with an M granularity, each CTA's scale
 /// rows (`cta_m / cluster_n / scale_granularity_m` of `scale_dtype`) take at least 128 bytes.
-#[allow(clippy::too_many_arguments)]
 pub fn is_valid_tensor_alignment(
     (m, n, k): (usize, usize, usize),
     a_dtype: DType,
@@ -556,7 +555,6 @@ pub struct EpilogGmemPartition<C> {
 /// `tiled_copy_t2r`, those of the global tensor `g_c_mnl_simt` partitioned for thread `tidx`,
 /// and a universal copy atom of C's type.
 #[track_caller]
-#[allow(clippy::too_many_arguments)]
 pub fn epilog_gmem_copy_and_partition<C: Numeric, Acc: Numeric>(
     tidx: Int32,
     tma_atom_c: Option<&CopyAtom<C>>,

@@ -71,8 +71,8 @@ No version has been tagged yet; 0.1.0 will be the first.
 - Floating-point multiply-adds contract into `fma` by default
   (`CompileOptions::fp_contract`); bit-for-bit comparisons with the simulator turn it off.
 - The README is a short introduction; the reference material moved to `docs/`.
-- The errors of compile options that are not available yet no longer name internal work
-  items.
+- The errors of compile options that cannot be set by option string no longer name internal
+  work items.
 - `scripts/gpu-validate.sh` takes `LLVM_VERSION` to choose the LLVM it installs.
 - The task-scheduling copy examples (`ts_copy_tma`, `ts_merge_copy`) set the tutorials'
   per-task register counts and prefetch the TMA descriptor.

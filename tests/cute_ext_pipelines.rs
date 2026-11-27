@@ -14,7 +14,7 @@
 //! SM100_LAUNCH_CONTROL -> LD_SHARED, the circular-buffer accounting on thread kinds with
 //! (count_per_stage, count_per_iteration) = (4, 1), (2, 2) and (1, 2) and a premature refill
 //! the race detector catches, and a warp-specialised GEMM through TMAToUMMAPipeline (plain and
-//! circular), AsyncToUMMAPipeline and UMMAtoAsyncPipeline; arrival counts against the m9/m10
+//! circular), AsyncToUMMAPipeline and UMMAtoAsyncPipeline; arrival counts against the
 //! classes' own; the kernels compiled for sm_90a / sm_100a and assembled when `ptxas` is
 //! installed; diagnostics last.
 
@@ -603,7 +603,6 @@ fn thread_producer(ab: &AsyncToUMMAPipeline, a: &Tensor<F16>, b: &Tensor<F16>, s
 }
 
 /// One k-block's MMA from stage `stage`, unit `kb`.
-#[allow(clippy::too_many_arguments)]
 fn mma_unit(
     mma: &TiledMma,
     m: &mut TiledMma,

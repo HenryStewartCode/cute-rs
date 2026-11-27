@@ -8,39 +8,31 @@
 //! PATH=/usr/local/cuda/bin:$PATH cargo test --test ptxas
 //! ```
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/block_reduce.rs"]
 mod block_reduce;
-#[allow(dead_code)]
 #[path = "../examples/cp_async_mbarrier_arrive.rs"]
 mod cp_async_mbarrier_arrive;
 mod feature_kernels;
-#[allow(dead_code)]
 #[path = "../examples/fp4_x2_tensor.rs"]
 mod fp4_x2_tensor;
-#[allow(dead_code)]
 #[path = "../examples/pipeline_software_fill.rs"]
 mod pipeline_software_fill;
-#[allow(dead_code)]
 #[path = "../examples/redux_sync.rs"]
 mod redux_sync;
-#[allow(dead_code)]
 #[path = "../examples/runtime_gemm.rs"]
 mod runtime_gemm;
-#[allow(dead_code)]
 #[path = "../examples/single_warp_pipeline.rs"]
 mod single_warp_pipeline;
-#[allow(dead_code)]
 #[path = "../examples/tensorop_gemm.rs"]
 mod tensorop_gemm;
-#[allow(dead_code)]
 #[path = "../examples/warp_named_barrier.rs"]
 mod warp_named_barrier;
 // The TMA tutorials.
-#[allow(dead_code)]
 #[path = "../examples/tma_copy.rs"]
 mod tma_copy;
-#[allow(dead_code)]
 #[path = "../examples/tma_transpose.rs"]
 mod tma_transpose;
 
@@ -183,7 +175,7 @@ fn registered() -> Vec<(Case, &'static [Arch])> {
     kernels.push((example(block_reduce::build::<BF16>(4, 4, block_reduce::ReduceOp::Add)), &HOPPER_AND_NEWER[..]));
     kernels.push((example(redux_sync::float_reductions()), &SM100A[..]));
     kernels.push((example(redux_sync::redux_vs_shuffle(true)), &SM100A[..]));
-    // The m3 examples: the FP8 GEMM (FP8 mma.sync) and kernel 4 of redux_sync.py with the shuffle
+    // The conversion examples: the FP8 GEMM (FP8 mma.sync) and kernel 4 of redux_sync.py with the shuffle
     // tree (the FP8 cvt) from sm_89 on, kernel 4 with redux.sync on sm_100a, and the FP4 recast
     // decoded with integer operations everywhere and with cvt.rn.f16x2.e2m1x2 on sm_100a and
     // sm_120a.

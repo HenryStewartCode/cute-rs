@@ -14,10 +14,9 @@
 //! buffer as a [`KernelArg`] with the matching [`Layout`], and the logical
 //! values as f32 for the reference.
 //!
-//! Note for the block-scaled port (m10): the scale-factor index map here is
+//! Note: the scale-factor index map here is
 //! written from the explicit formula, not from the `BlockScaledBasicChunk`
-//! layout; cross-check them against `blockscaled-sf-gmem-layout` when that
-//! lands.
+//! layout.
 
 /// CuTe DSL's `cutlass.utils.gemm.sm100`: the packaged Blackwell epilogues.
 pub mod sm100 {

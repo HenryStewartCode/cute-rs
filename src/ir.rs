@@ -1244,7 +1244,7 @@ pub enum BulkDirection {
     S2S,
 }
 
-// ---- m7-tma-im2col and m7-tma-sm100-modes ----
+// ---- TMA im2col and SM100 modes ----
 
 /// The tensor access mode of a TMA instruction (the PTX ISA's `.load_mode`).
 #[derive(Clone, Debug, PartialEq, Default)]
@@ -1758,7 +1758,7 @@ impl BarrierRedKind {
     }
 }
 
-/// The mbarrier operations of roadmap part m11-prims-nvvm-layer
+/// The extra mbarrier operations of `cute::prims`
 /// ([`Op::MbarrierExt`]).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum MbarrierExtKind {
@@ -1816,7 +1816,7 @@ impl MbarrierExtKind {
     }
 }
 
-/// The per-thread markers and hints of roadmap part m11-prims-nvvm-layer
+/// The per-thread markers and hints of `cute::prims`
 /// ([`Op::PrimMarker`]), which the simulator counts and otherwise skips.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum PrimMarker {
@@ -2073,7 +2073,6 @@ impl BlockScaledMmaKind {
     }
 }
 
-// m11-prims-mma-forms.
 /// A warp-level sparse block-scaled `mma.sp::ordered_metadata` (sm_120a,
 /// PTX ISA 8.7; CuTe C++'s `SM120_SPARSE_16x8x64_TN_VS` and
 /// `SM120_SPARSE_16x8x128_TN_VS`): A 2:4 sparse (FP4: pairs, 4:8), stored
@@ -3649,7 +3648,7 @@ pub enum Op {
         index: ValueId,
         parity: ValueId,
         kind: MbarrierWaitKind,
-        /// m11-prims-nvvm-layer: `parity` is an i64 state token from an
+        /// `parity` is an i64 state token from an
         /// arrival (`mbarrier.{try,test}_wait`, no `.parity`).
         state: bool,
         /// The `suspendTimeHint` (i32, nanoseconds) of
@@ -3699,8 +3698,7 @@ pub enum Op {
         cache_policy: Option<ValueId>,
         mcast_mask: Option<ValueId>,
         peer: Option<ValueId>,
-        /// `.cp_mask` with this i16 mask (S2G only; roadmap part
-        /// m7-tma-sm100-modes, sm_100): bit `i` enables byte `i` of each
+        /// `.cp_mask` with this i16 mask (S2G only, sm_100): bit `i` enables byte `i` of each
         /// 16-byte chunk.
         byte_mask: Option<ValueId>,
     },
@@ -3749,7 +3747,7 @@ pub enum Op {
         /// `Sm100MmaPeerBitMask`).
         two_cta: bool,
     },
-    // ---- m7-tma-store and m7-cluster-copies ----
+    // ---- TMA stores and cluster copies ----
     /// A TMA tile store:
     /// `cp.async.bulk.tensor.{N}d.global.shared::cta.tile.bulk_group[.L2::cache_hint]`
     /// of the box at element `src_index` of `src` (its unswizzled start;
@@ -4645,7 +4643,6 @@ pub enum UmmaDataKind {
     /// `.kind::f16`: Float16 or BFloat16 operands, Float16 or Float32
     /// accumulators.
     F16,
-    // m10-umma-dense-kinds.
     /// `.kind::tf32`: TFloat32 operands (32-bit in shared memory, of which
     /// the tensor core uses the top 19 bits), a Float32 accumulator, K = 8.
     Tf32,
@@ -4656,7 +4653,6 @@ pub enum UmmaDataKind {
     /// operands are read from the padded shared-memory image (16 values in
     /// each 16-byte slot, PTX's `.b6x16_p32` and `.b4x16_p64`).
     F8F6F4,
-    // m10-umma-blockscaled.
     /// `.kind::mxf8f6f4.block_scale`: the operands of `F8F6F4` (FP6 and FP4
     /// from the padded image), UE8M0 scale factors, one per 32 K elements,
     /// a Float32 accumulator, K = 32.
@@ -4750,7 +4746,7 @@ pub struct UmmaKind {
     pub a_tmem: bool,
     /// The scale factors of a block-scaled kind.
     pub scale: Option<UmmaScale>,
-    /// m10-sparse-umma: `tcgen05.mma.sp`, A 2:4 structured sparse (stored
+    /// `tcgen05.mma.sp`, A 2:4 structured sparse (stored
     /// compressed, half of K), with metadata in tensor memory.
     pub sparse: bool,
     /// The Rubin (sm_107) forms: the doubled K and the
@@ -4792,7 +4788,6 @@ pub struct UmmaPrims {
 /// reads it from the collector and keeps it there; `LASTUSE` reads it from
 /// the collector and releases it; `DISCARD` (the default, no qualifier)
 /// reads shared memory and leaves nothing behind.
-#[allow(clippy::upper_case_acronyms)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
 pub enum CollectorOp {
     #[default]
@@ -5080,7 +5075,7 @@ impl UmmaKind {
         };
         // The collector qualifiers (DISCARD, the default, is not written).
         let mut collect = String::new();
-        // m11-prims-mma-forms: .ashift, then the collector usage (verified against LLVM 23's
+        // .ashift, then the collector usage (verified against LLVM 23's
         // NVPTX printer: `.kind::tf32.ashift.collector::a::lastuse`, `.collector::b2::use`).
         if self.prims.ashift {
             collect.push_str(".ashift");
@@ -5906,7 +5901,6 @@ pub struct KernelIr {
     /// Where the kernel was built (the `Kernel::build` call): the kernel
     /// function's own source location.
     pub loc: Loc,
-    // m11-extern-distributed.
     /// External device functions the kernel calls ([`Op::Call`]), one per symbol.
     pub externs: Vec<ExternDecl>,
     /// LLVM bitcode files linked into the module (CuTe DSL's `BitCode` sources and

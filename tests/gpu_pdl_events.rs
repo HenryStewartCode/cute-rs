@@ -8,7 +8,9 @@
 //! What the SM89 test GPU (driver 595) does with the SM90 features is printed and asserted:
 //! see each test.
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/cooperative_launch.rs"]
 mod cooperative_launch;
 

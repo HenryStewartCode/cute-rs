@@ -9,6 +9,7 @@
 //! `100`, `103`): a test of that family then fails instead of skipping, so a misconfigured run
 //! cannot pass by testing nothing.
 
+// Shared by several test binaries; each uses part of it.
 #![allow(dead_code)]
 
 use cute::cuda::{CudaContext, CudaFunction, HardwareInfo};

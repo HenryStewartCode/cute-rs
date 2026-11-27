@@ -8,6 +8,7 @@
 //! Copyright (c) 2025 - 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //! BSD-3-Clause; see THIRD-PARTY-NOTICES.md.
 
+// Shared by several test binaries; each uses part of it.
 #![allow(dead_code)]
 
 use cute::prelude::*;

@@ -15,7 +15,9 @@
 //! the static answers. And `runtime_gemm` with runtime extents computes the
 //! static-bound kernel's bits on the simulator.
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/runtime_gemm.rs"]
 mod runtime_gemm;
 

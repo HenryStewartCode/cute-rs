@@ -19,31 +19,27 @@
 //!     --ignored --nocapture --test-threads=1
 //! ```
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/blackwell_fp16_gemm.rs"]
 mod blackwell_fp16_gemm;
 
-#[allow(dead_code)]
 #[path = "../examples/blackwell_dense_gemm.rs"]
 mod blackwell_dense_gemm;
 
-#[allow(dead_code)]
 #[path = "../examples/blackwell_nvfp4_gemm.rs"]
 mod blackwell_nvfp4_gemm;
 
-#[allow(dead_code)]
 #[path = "../examples/blackwell_mixed_input_gemm.rs"]
 mod blackwell_mixed_input_gemm;
 
-#[allow(dead_code)]
 #[path = "../examples/custom_epilogue_dense_gemm.rs"]
 mod custom;
 
-#[allow(dead_code)]
 #[path = "../examples/cute_ext_dense_gemm_persistent.rs"]
 mod persistent;
 
-#[allow(dead_code)]
 #[path = "../examples/ts_gemm_simple.rs"]
 mod ts_gemm_simple;
 
@@ -131,7 +127,6 @@ impl Soak {
 
     /// Launch `kernel` with `args` `n` times, resetting each `(index, buffer)` of `resets`
     /// before each launch and running `check` on the arguments after it. One summary line.
-    #[allow(clippy::too_many_arguments)]
     fn case(
         &mut self,
         kernel: &str,

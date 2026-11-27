@@ -103,7 +103,6 @@ fn staged(mn: usize) -> ComposedLayout {
 /// The MMA warp's side: for each output tile, acquire an accumulator stage, wait for each
 /// k-tile, issue its four k-blocks and release the stage with a commit, then commit the
 /// accumulator.
-#[allow(clippy::too_many_arguments)]
 fn mma_warp<P>(
     ab: &P,
     acc_pipe: &PipelineUmmaAsync,
@@ -479,6 +478,7 @@ fn column_math_pool_and_copy_properties() {
             ),
             32
         );
+        // Tests the deprecated names, which still have to work.
         #[allow(deprecated)]
         let old = cute::utils::get_num_tmem_alloc_cols(&[&t1, &t2], true);
         assert_eq!(old, 128);

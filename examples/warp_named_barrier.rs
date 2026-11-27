@@ -169,7 +169,6 @@ pub fn run(stages: usize, num_tiles: usize, arch: Arch) -> SimReport {
     report
 }
 
-#[allow(dead_code)]
 fn main() {
     for stages in [2, 4] {
         for num_tiles in [DEFAULT_NUM_TILES, 2 * DEFAULT_NUM_TILES] {

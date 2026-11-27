@@ -57,7 +57,6 @@ fn dot(coord: &[usize], stride: &[usize]) -> usize {
 /// and the index it should give: `atom(t % 128, v)` (an index into the atom's `(MN, K)`
 /// or `(M, N)` tile) moved to warpgroup `t / 128`'s place in the tile (stacked along M
 /// for A and C; B is shared).
-#[allow(clippy::too_many_arguments)]
 fn check_tv(
     tv: &Layout,
     threads: usize,
@@ -385,8 +384,7 @@ fn find_ptxas() -> Option<std::path::PathBuf> {
 }
 
 /// Accumulators a loop carries before any MMA has written them (a main loop with no
-/// MMAs issued ahead of it, `k_pipe_mmas = 0`) start as zeros instead of being refused
-/// (an m8-wgmma-core follow-up).
+/// MMAs issued ahead of it, `k_pipe_mmas = 0`) start as zeros instead of being refused.
 #[test]
 fn unwritten_accumulators_can_be_carried() {
     let case = feature_kernels::wgmma_pipelined(2, 0);
@@ -396,8 +394,7 @@ fn unwritten_accumulators_can_be_carried() {
 }
 
 /// A block whose last warpgroup is partial may issue warpgroup MMAs from its whole
-/// warpgroups (the PTX ISA needs the issuing warpgroup complete; an m8-wgmma-core
-/// follow-up); one issued by the partial warpgroup is reported.
+/// warpgroups (the PTX ISA needs the issuing warpgroup complete); one issued by the partial warpgroup is reported.
 #[test]
 fn partial_last_warpgroup() {
     let kernel = |issue_all: bool| {

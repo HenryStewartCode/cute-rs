@@ -213,7 +213,6 @@ pub fn run(rows: usize, cols: usize, leader: bool) -> Vec<F16> {
     out
 }
 
-#[allow(dead_code)]
 fn main() {
     run(ROWS, COLS, false);
     run(ROWS, COLS, true);

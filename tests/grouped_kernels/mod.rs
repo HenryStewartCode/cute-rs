@@ -1,9 +1,10 @@
-//! Kernels of roadmap part m9-grouped-gemm-schedulers that take arguments
+//! Kernels of the grouped GEMM schedulers that take arguments
 //! of their own: the grouped scheduler's enumeration of every group's
 //! tiles and the contiguous search's tile records, with their plain-Rust
 //! models. Shared by `tests/grouped_schedulers.rs` and
 //! `tests/gpu_cpasync_grouped.rs`.
 
+// Tests the deprecated `GroupedGemmTileSchedulerHelper`, which still has to work.
 #![allow(deprecated)]
 
 use cute::prelude::*;

@@ -125,7 +125,6 @@ pub fn run(m: usize, n: usize, k: usize) -> SimReport {
     report
 }
 
-#[allow(dead_code)]
 fn main() {
     let (m, n, k) = (256, 256, 64);
     let report = run(m, n, k);

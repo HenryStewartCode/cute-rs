@@ -7,7 +7,9 @@
 //! schedules with the race detector on; the kernel's instructions; and the
 //! sm_90a PTX with `ptxas` where installed.
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/hopper_fmha.rs"]
 mod hopper_fmha;
 

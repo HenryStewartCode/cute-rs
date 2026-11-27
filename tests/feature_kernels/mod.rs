@@ -12,6 +12,7 @@
 //! check written in plain Rust; `tests/features.rs` holds the simulator to
 //! it, and `tests/gpu.rs` holds the GPU to the simulator.
 
+// Shared by several test binaries; each uses part of it.
 #![allow(dead_code)]
 
 mod async_sched;
@@ -36,15 +37,15 @@ mod structs;
 mod subbyte;
 mod tensor_ssa;
 mod tensormap;
-// m7-tma-im2col and m7-tma-sm100-modes.
+// The TMA im2col and SM100-mode kernels.
 mod tma_im2col;
 mod tma_load;
 mod tma_pipelines;
 mod tma_sm100;
 mod tma_store;
-// m10-tmem-core.
+// The TMEM kernels.
 mod tmem;
-// m10-tmem-ld-st.
+// The TMEM load and store kernels.
 mod tmem_ldst;
 mod types;
 mod vector;
@@ -3098,7 +3099,7 @@ pub fn sm90() -> Vec<Case> {
     .chain(cluster_copy_cases_sm90())
     // Distributed shared memory.
     .chain(dsmem_cases_sm90())
-    // m9-gemm-host-helpers.
+    // The GEMM host helper cases.
     .chain(gemm_helper_cases_sm90())
     // The TMA pipelines.
     .chain(tma_pipeline_cases_sm90())
@@ -7864,7 +7865,7 @@ pub fn pack_unpack() -> Case {
     Case { name: "pack_unpack", kernel, cfg: launch(1), small_only: false, check }
 }
 
-/// The kernels of this part that run on every target (in [`all`]): Pack
+/// The kernels that run on every target (in [`all`]): Pack
 /// and Unpack, Float16 and BFloat16 (fma) arithmetic, the Float32 and int8
 /// conversions and the int4 sign extension.
 pub fn packed_half_and_conversions() -> Vec<Case> {

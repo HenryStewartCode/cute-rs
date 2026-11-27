@@ -7,7 +7,9 @@
 //! cargo test --release --features cuda --test gpu_external
 //! ```
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/call_bypass_dlpack.rs"]
 mod call_bypass_dlpack;
 #[path = "support/dlpack_alloc.rs"]

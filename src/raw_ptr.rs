@@ -75,8 +75,7 @@ fn widen(b: &mut builder::BuilderState, x: ValueId, loc: crate::ir::Loc) -> Valu
 /// shared-memory window), [`AddressSpace::Rmem`] (an offset in the
 /// thread's local window) and [`AddressSpace::Tmem`] (a tensor-memory
 /// address, which tcgen05 operations take: loads and stores through it are
-/// refused). Constant and distributed shared memory wait for the parts of
-/// the roadmap that use them.
+/// refused). Constant and distributed shared memory are not supported.
 ///
 /// The pointer works with every load, store, atomic and copy that takes a
 /// pointer or a tensor ([`make_tensor`](crate::make_tensor) over it);
@@ -130,8 +129,8 @@ fn raw_ptr<T: Numeric>(value: ValueId, space: AddressSpace, align: usize, what: 
     match space {
         AddressSpace::Generic | AddressSpace::Gmem | AddressSpace::Smem | AddressSpace::Rmem | AddressSpace::Tmem => {}
         other => panic!(
-            "{what}: pointers into {other} memory are not supported yet (constant memory and distributed shared \
-             memory come with the cluster and TMA parts of the roadmap)"
+            "{what}: pointers into {other} memory are not supported (a pointer cannot be made into constant \
+             or distributed shared memory)"
         ),
     }
     assert!(

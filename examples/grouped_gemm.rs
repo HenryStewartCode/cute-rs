@@ -370,7 +370,6 @@ pub fn run() {
     }
 }
 
-#[allow(dead_code)]
 fn main() {
     run();
     println!("grouped_gemm and moe_contiguous: PASS");

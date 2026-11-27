@@ -516,7 +516,7 @@ pub struct TmemLayout {
 /// requirements ([`Resource::get_tmem_requirements`]), lays them out on the
 /// host (one after another; alias groups share columns), and is handed to
 /// [`TaskManager::tmem_allocator`](super::TaskManager::tmem_allocator), which
-/// allocates the columns from warp 0 in the prologue over m10's
+/// allocates the columns from warp 0 in the prologue over
 /// [`TmemAllocator`](crate::memory::TmemAllocator), publishes the address
 /// slot in [`ResourceContext::tmem_ptr_i32`](super::ResourceContext), and
 /// relinquishes the permit and frees the columns after every task is done.

@@ -21,7 +21,9 @@
 //!   thread-value layout);
 //! * the sm_100a PTX, assembled by `ptxas` when it is on PATH.
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/blackwell_fp16_gemm.rs"]
 mod blackwell_fp16_gemm;
 

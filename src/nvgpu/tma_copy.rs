@@ -262,7 +262,6 @@ pub(crate) fn tma_copy<T: Numeric, S: CopyElem<T>, D: CopyElem<T>>(
         }
         CopyOp::TmaStore => tma_store(atom, src, dst, args, None, func),
         CopyOp::TmaReduce(kind) => tma_store(atom, src, dst, args, Some(kind), func),
-        // m7-tma-im2col.
         CopyOp::TmaLoadMode { mode: crate::cpasync::TmaOpMode::Im2col, multicast, cta_group } => {
             tma_load(atom, src, dst, args, multicast, cta_group == CtaGroup::TWO, func)
         }

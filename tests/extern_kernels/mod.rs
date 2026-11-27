@@ -1,5 +1,6 @@
 //! Kernels and device functions shared by `tests/extern_calls.rs` and `tests/gpu_extern.rs`.
 
+// Shared by several test binaries; each uses part of it.
 #![allow(dead_code)]
 
 use std::path::{Path, PathBuf};

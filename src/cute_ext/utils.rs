@@ -64,7 +64,6 @@ pub fn is_preferred_cluster(preferred_shape: [usize; 3]) -> Boolean {
 
 /// The MMA operand a CTA-V map is made for ([`get_cta_v_map_ab`]'s
 /// `input_operand`: `'A'`, `'B'`, `'SFA'` or `'SFB'`).
-#[allow(clippy::upper_case_acronyms)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum MmaOperand {
     A,
@@ -298,7 +297,6 @@ fn check_mainloop_pipeline<P: AsGenericPipeline, T>(
 /// Panics when a pipeline does not feed a UMMA operation of the tiled MMA's
 /// CTA group, when a buffer's stage count is not its pipeline's, and when
 /// the shared pipelines differ in stages.
-#[allow(clippy::too_many_arguments)]
 #[track_caller]
 pub fn mainloop_mma<P: AsGenericPipeline, A: Numeric, B: Numeric, C: Numeric>(
     tiled_mma: &TiledMma,
@@ -399,7 +397,6 @@ fn slice_last2<T>(t: &Tensor<T>, k: usize, stage: Int32) -> Tensor<T> {
 /// `acc_buffer`, which is zeroed first unless `accumulate_to_acc`. The
 /// caller waits for and releases the pipeline stage and loads the
 /// fragments (`ldmatrix`).
-#[allow(clippy::too_many_arguments)]
 #[track_caller]
 pub fn mainloop_mma_sm120<A: Numeric, SA: Numeric, B: Numeric, SB: Numeric>(
     tiled_mma: &TiledMma,
@@ -497,7 +494,6 @@ pub struct EpilogueTmaStoreOptions {
 /// Panics when the pipeline's barrier does not count the epilogue
 /// warpgroup's 128 threads or its TMA warp is not `tma_store_warp_id`, and
 /// when the accumulator is not the CTA tile.
-#[allow(clippy::too_many_arguments)]
 #[track_caller]
 pub fn epilogue_tma_store<Acc: Numeric, D: Numeric>(
     cta_tile_shape_mnk: (usize, usize, usize),
@@ -528,7 +524,6 @@ pub fn epilogue_tma_store<Acc: Numeric, D: Numeric>(
 /// subtiles, each warp reduces it (`redux.sync` max, NaN-propagating) and
 /// lane 0 takes it into `amax_out` atomically; the accumulator must be
 /// Float32.
-#[allow(clippy::too_many_arguments)]
 #[track_caller]
 pub fn epilogue_tma_store_with<Acc: Numeric, D: Numeric>(
     cta_tile_shape_mnk: (usize, usize, usize),
@@ -567,7 +562,6 @@ pub fn epilogue_tma_store_with<Acc: Numeric, D: Numeric>(
 /// ([`AccumulatorDrain::after_t2r`]), so this function owns the
 /// accumulator's one release. Returns the store pipeline and the
 /// accumulator pipeline, advanced.
-#[allow(clippy::too_many_arguments)]
 #[track_caller]
 pub fn epilogue_tma_store_drain<Acc: Numeric, D: Numeric, P: AsGenericPipeline>(
     cta_tile_shape_mnk: (usize, usize, usize),
@@ -627,7 +621,6 @@ fn acc_tile<T>(acc: &Tensor<T>, want: (usize, usize)) -> Result<Tensor<T>, Strin
     Ok(tile)
 }
 
-#[allow(clippy::too_many_arguments)]
 #[track_caller]
 fn epilogue_core<Acc: Numeric, D: Numeric, P: AsGenericPipeline>(
     loc: &'static std::panic::Location<'static>,

@@ -237,7 +237,6 @@ impl ExportedKernel {
 
     /// Read a manifest: the stamp, the signature and the image files it names (PTX, cubin).
     /// Fails on another format version, a malformed line or a malformed signature.
-    #[allow(clippy::type_complexity)]
     pub fn parse_manifest(
         text: &str,
     ) -> Result<(ExportStamp, KernelSignature, Option<String>, Option<String>), AotError> {
@@ -929,7 +928,6 @@ fn c_unload(names: &CModuleNames, reset: &str) -> String {
 }
 
 /// The launch function `launch_fn` of kernel `sig` (whose loaded function is `function`).
-#[allow(clippy::too_many_arguments)]
 fn c_launch(
     sig: &KernelSignature,
     fields: &[String],

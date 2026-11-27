@@ -16,64 +16,47 @@
 //! compared with the simulator bit for bit, contraction is off (`fp_contract(false)`): a
 //! fused multiply-add rounds once, and the simulator rounds every operation.
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/ampere_sgemm.rs"]
 mod ampere_sgemm;
-#[allow(dead_code)]
 #[path = "../examples/async_pipeline.rs"]
 mod async_pipeline;
-#[allow(dead_code)]
 #[path = "../examples/block_reduce.rs"]
 mod block_reduce;
-#[allow(dead_code)]
 #[path = "../examples/cooperative_launch.rs"]
 mod cooperative_launch;
-#[allow(dead_code)]
 #[path = "../examples/cp_async_mbarrier_arrive.rs"]
 mod cp_async_mbarrier_arrive;
-#[allow(dead_code)]
 #[path = "../examples/cta_norm.rs"]
 mod cta_norm;
-#[allow(dead_code)]
 #[path = "../examples/cute_ext_memcpy.rs"]
 mod cute_ext_memcpy;
-#[allow(dead_code)]
 #[path = "../examples/cute_ext_sgemm.rs"]
 mod cute_ext_sgemm;
-#[allow(dead_code)]
 #[path = "../examples/elementwise_add.rs"]
 mod elementwise_add;
-#[allow(dead_code)]
 #[path = "../examples/elementwise_apply.rs"]
 mod elementwise_apply;
-#[allow(dead_code)]
 #[path = "../examples/fp4_x2_tensor.rs"]
 mod fp4_x2_tensor;
-#[allow(dead_code)]
 #[path = "../examples/pipeline_software_fill.rs"]
 mod pipeline_software_fill;
-#[allow(dead_code)]
 #[path = "../examples/red.rs"]
 mod red;
-#[allow(dead_code)]
 #[path = "../examples/redux_sync.rs"]
 mod redux_sync;
-#[allow(dead_code)]
 #[path = "../examples/rmsnorm_cluster.rs"]
 mod rmsnorm_cluster;
-#[allow(dead_code)]
 #[path = "../examples/runtime_gemm.rs"]
 mod runtime_gemm;
-#[allow(dead_code)]
 #[path = "../examples/sgemm.rs"]
 mod sgemm;
-#[allow(dead_code)]
 #[path = "../examples/single_warp_pipeline.rs"]
 mod single_warp_pipeline;
-#[allow(dead_code)]
 #[path = "../examples/tensorop_gemm.rs"]
 mod tensorop_gemm;
-#[allow(dead_code)]
 #[path = "../examples/warp_named_barrier.rs"]
 mod warp_named_barrier;
 
@@ -321,13 +304,13 @@ fn gpu_only_kernels_match_rust() {
     }
 }
 
-/// The m5 ports on the GPU, one compiled kernel per layout for every size:
+/// The runtime-shape ports on the GPU, one compiled kernel per layout for every size:
 /// `elementwise_add.py`'s kernel and `sgemm.py`'s for each major mode and
 /// both copy widths, the same bits as the simulator (which the example
 /// tests hold to CPU references) at sizes that are not tile multiples, K
 /// below bK included, and a larger problem against the CPU reference.
 #[test]
-fn m5_example_ports_match_the_simulator() {
+fn runtime_shape_example_ports_match_the_simulator() {
     let Some((ctx, toolchain)) = device() else { return };
     let add = elementwise_add::dynamic();
     for (m, n) in [(300, 512), (17, 130), (3, 12)] {
@@ -2047,7 +2030,7 @@ fn async_pipeline_example_matches_the_simulator() {
     }
 }
 
-/// m7-tma-store: `CopyG2ROp` and `CopyR2GOp` atoms with an L2 cache policy
+/// `CopyG2ROp` and `CopyR2GOp` atoms with an L2 cache policy
 /// (`ld.global.L2::cache_hint`, `st.global.L2::cache_hint`; sm_80, PTX 7.4) give the
 /// simulator's bits on the GPU, which are the inputs.
 #[test]

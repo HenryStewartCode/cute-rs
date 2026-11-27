@@ -97,7 +97,6 @@ pub fn run(n: usize, threads: usize) -> (SimReport, SimReport) {
     (s32, f32)
 }
 
-#[allow(dead_code)]
 fn main() {
     run(DEFAULT_N, DEFAULT_THREADS);
     println!("red: correct for s32 (sum, max) and f32 (sum), n = {DEFAULT_N}");

@@ -7,16 +7,15 @@
 //! cargo test --release --features cuda --test cubin
 //! ```
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/elementwise_add.rs"]
 mod elementwise_add;
-#[allow(dead_code)]
 #[path = "../examples/sgemm.rs"]
 mod sgemm;
-#[allow(dead_code)]
 #[path = "../examples/single_warp_pipeline.rs"]
 mod single_warp_pipeline;
-#[allow(dead_code)]
 #[path = "../examples/tensorop_gemm.rs"]
 mod tensorop_gemm;
 

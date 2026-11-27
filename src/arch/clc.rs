@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 //! Cluster launch control (CuTe DSL's `cute.arch.issue_clc_query` and
-//! `cute.arch.clc_response`, roadmap part m10-clc-scheduling; the PTX ISA's
+//! `cute.arch.clc_response`; the PTX ISA's
 //! `clusterlaunchcontrol.try_cancel` and `clusterlaunchcontrol.query_cancel`,
 //! sm_100 and PTX 8.6).
 

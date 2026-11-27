@@ -11,9 +11,9 @@
 //! # Design
 //!
 //! CuTe DSL's Task Scheduling describes a warp-specialised kernel in three
-//! layers, which cute-rs builds over three roadmap parts:
+//! layers:
 //!
-//! 1. **Resources** (this part). A [`MemoryResource`] is named memory with
+//! 1. **Resources**. A [`MemoryResource`] is named memory with
 //!    *work methods*: producer work fills it, consumer work reads it and
 //!    returns values into task-local variables. CuTe DSL declares work with
 //!    decorators on methods of a dataclass; here a resource is a value
@@ -23,7 +23,7 @@
 //!    results ([`WorkResults`]). No attribute macros are needed, and a
 //!    closure captures whatever the work reads (tensors, descriptors,
 //!    constants) by move. A resource with a [`PipelineConfig`] is staged:
-//!    [`Resource::create`] materialises m9/m10's pipeline
+//!    [`Resource::create`] materialises the pipeline
 //!    ([`ResourcePipeline`]: `PipelineAsync`, `PipelineCpAsync`,
 //!    `PipelineTmaAsync`, `PipelineTmaUmma`, `PipelineUmmaAsync`,
 //!    `PipelineAsyncUmma`, `PipelineClcFetchAsync`), and the resource offers
@@ -32,20 +32,20 @@
 //!    [`PipelineState`](crate::pipeline::PipelineState)s, which are
 //!    [`Carry`](crate::Carry) and so thread through loops. A probe's result
 //!    is kept in the side's status flag and taken as the next wait's token.
-//!    [`WorkQueue`] is a resource over a persistent tile scheduler (m9's
-//!    static one, m10's cluster launch control one) whose work methods
+//!    [`WorkQueue`] is a resource over a persistent tile scheduler (the
+//!    static one or the cluster launch control one) whose work methods
 //!    seed, advance and fetch the current [`WorkTileInfo`](crate::utils::WorkTileInfo).
 //!    [`TaskLocalVariable`] is a typed handle (its type is the value it
 //!    holds); its storage is not part of it but allocated by whoever runs
-//!    the work: [`TaskLocals`] in a hand-written kernel, the TaskManager of
-//!    the next part. Storage is a [`Var`](crate::Var), so values cross
+//!    the work: [`TaskLocals`] in a hand-written kernel, [`TaskManager`] in a
+//!    kernel built from tasks. Storage is a [`Var`](crate::Var), so values cross
 //!    loop iterations and branches. [`StageInfo`] is a struct of values
 //!    implementing [`Carry`](crate::Carry). The resource trait
 //!    [`Resource`] exposes the name, pipeline configuration and the
 //!    memory-requirement hooks ([`SmemAllocation`], [`TmemAllocation`])
-//!    that the allocators of the third part consume.
+//!    that the allocators consume.
 //!
-//! 2. **Schedules** (this part). [`schedule`] runs a builder closure over
+//! 2. **Schedules**. [`schedule`] runs a builder closure over
 //!    [`ResourceHandle`]s and records, without emitting IR, an ordered tree
 //!    ([`Schedule`]): work calls with their routes (which earlier step's
 //!    variable feeds which input), pipeline operations, one

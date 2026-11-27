@@ -65,7 +65,6 @@ fn global_layout(kind: SmemLayoutAtomKind, mn: usize, k: usize) -> Layout {
 /// One `(M, N)` tile of `C = A B^T` (A `(M, K)`, B `(N, K)`, in global memory with the
 /// majorness of their shared-memory atoms; C row-major) by `warpgroups` warpgroups stacked along M, each `64 x N`, over
 /// `WG_K / 16` k-blocks: ACCUMULATE false for the first, true after.
-#[allow(clippy::too_many_arguments)]
 fn tile_kernel<T: Numeric, C: Numeric>(
     name: &'static str,
     n: usize,

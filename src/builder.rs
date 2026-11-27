@@ -215,7 +215,6 @@ pub(crate) struct BuilderState {
     /// each result, a constant whose value is set by [`BuilderState::finish`]
     /// once every buffer is known, with its partition and cumulative flag.
     partition_queries: Vec<(ValueId, crate::ir::SmemPartition, bool)>,
-    // m11-extern-distributed.
     pub(crate) externs: Vec<crate::ir::ExternDecl>,
     pub(crate) link_libraries: Vec<std::path::PathBuf>,
     pub(crate) multicast: Vec<BufferId>,
@@ -788,7 +787,6 @@ impl BuilderState {
 
     /// A floating-point instruction with explicit modifiers (validated with
     /// the kernel).
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn float_inst(
         &mut self,
         func: FloatFn,
@@ -1421,7 +1419,6 @@ impl BuilderState {
         })
     }
 
-    #[allow(dead_code)]
     pub(crate) fn buffer(&self, b: BufferId) -> &BufferDecl {
         &self.buffers[b.0 as usize]
     }

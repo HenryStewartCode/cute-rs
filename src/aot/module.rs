@@ -153,7 +153,6 @@ impl ExportedModule {
 
     /// Read a manifest of either format: the stamp, the module's name, the signatures and the
     /// image files it names.
-    #[allow(clippy::type_complexity)]
     pub fn parse_manifest(
         text: &str,
     ) -> Result<(ExportStamp, String, Vec<KernelSignature>, Option<String>, Option<String>), AotError> {

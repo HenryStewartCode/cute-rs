@@ -24,7 +24,7 @@
 //!
 //! The operations of the example's test: `add`, `sub`, `mul`, `truediv`,
 //! `floordiv` and `leaky_relu` on Float32, `add` and `mul` on Float16 and
-//! BFloat16. `M` and `N` are static (runtime shapes arrive with m5).
+//! BFloat16. `M` and `N` are static.
 //!
 //! Run with `cargo run --example elementwise_apply`.
 
@@ -224,7 +224,6 @@ pub fn run_bf16(op: ApplyOp) -> SimReport {
     run(&bf16_kernel(op), op, &inputs(op), BF16::from_f32, |v: BF16| v.0 as u64)
 }
 
-#[allow(dead_code)]
 fn main() {
     for op in ApplyOp::F32 {
         let report = run_f32(op);

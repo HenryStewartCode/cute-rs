@@ -485,7 +485,7 @@ fn illegal_operations_panic_when_built() {
     let e = panic_text(new(DType::F16, DType::F32, (128, 64), CtaGroup::TWO, OperandSource::TMEM, KM));
     assert!(e.contains("OperandSource.SMEM"), "{e}");
     let e = panic_text(new(DType::F16, DType::F32, (128, 64), CtaGroup::ONE, OperandSource::TMEM, MN));
-    // A from TMEM arrived with m10-umma-kinds; an MN-major A there is refused.
+    // An MN-major A from TMEM is refused.
     assert!(e.contains("always K-major"), "{e}");
 }
 

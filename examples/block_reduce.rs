@@ -410,7 +410,6 @@ pub fn run<T: ReduceDtype + std::fmt::Debug>(row_tiles: usize, items_per_lane: u
     report
 }
 
-#[allow(dead_code)]
 fn main() {
     for op in ReduceOp::ALL {
         run::<i32>(DEFAULT_ROW_TILES, DEFAULT_ITEMS_PER_LANE, op);

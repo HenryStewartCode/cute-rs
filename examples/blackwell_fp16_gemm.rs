@@ -295,7 +295,6 @@ impl Fp16GemmConfig {
 }
 
 /// The tutorial's `kernel`.
-#[allow(clippy::too_many_arguments)]
 pub fn kernel<C>(
     cfg: &Fp16GemmConfig,
     mut tiled_mma: TiledMma,
@@ -1539,7 +1538,6 @@ pub fn run(cfg: &Fp16GemmConfig, m: usize, n: usize, k: usize) -> SimReport {
     report
 }
 
-#[allow(dead_code)]
 fn main() {
     // fp16_gemm_0 on 2x2 CTAs, then fp16_gemm_1 on one CTA pair with 8 k-tiles, then the
     // warp-specialized steps.
@@ -1559,7 +1557,6 @@ fn main() {
 /// `fp16_gemm_2` to `fp16_gemm_4` on a 512x512x128 problem (four CTA pairs' tiles): the
 /// static scheduler with two persistent clusters, and `fp16_gemm_4` with one preferred
 /// cluster split into fallback clusters.
-#[allow(dead_code)]
 fn main_ws() {
     let (m, n, k) = (512, 512, 128);
     for cfg in [FP16_GEMM_2, FP16_GEMM_3, FP16_GEMM_3_1, FP16_GEMM_4] {

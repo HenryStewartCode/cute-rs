@@ -18,7 +18,7 @@ use crate::value::Int32;
 /// each side waiting for the other through one barrier per stage (CuTe
 /// DSL's `PipelineAsync` interface, which its specialised pipelines
 /// inherit). [`PipelineAsync`] implements it here, the `cp.async` and TMA
-/// pipelines and m10's tcgen05 pipelines will too, and [`PipelineEmpty`]
+/// pipelines and the tcgen05 pipelines do too, and [`PipelineEmpty`]
 /// implements it with no barriers at all.
 ///
 /// The methods take the position in the ring as any [`StageState`]

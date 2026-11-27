@@ -16,16 +16,15 @@
 
 // hopper_persistent_gemm loads its own copy of hopper_gemm; this one gives its reference.
 #![allow(clippy::duplicate_mod)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
 
-#[allow(dead_code)]
 #[path = "../examples/hopper_gemm.rs"]
 mod hopper_gemm;
 
-#[allow(dead_code)]
 #[path = "../examples/hopper_persistent_gemm.rs"]
 mod hopper_persistent_gemm;
 
-#[allow(dead_code)]
 #[path = "../examples/hopper_fmha.rs"]
 mod hopper_fmha;
 

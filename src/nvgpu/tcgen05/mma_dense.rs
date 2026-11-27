@@ -109,7 +109,6 @@ macro_rules! umma_accessors {
     };
 }
 
-#[allow(clippy::too_many_arguments)]
 #[track_caller]
 fn umma_kind(
     name: &str,
@@ -258,7 +257,6 @@ pub struct MmaF8F6F4Op {
 }
 
 impl MmaF8F6F4Op {
-    #[allow(clippy::too_many_arguments)]
     #[track_caller]
     pub fn new(
         a_dtype: DType,
@@ -283,7 +281,6 @@ impl MmaF8F6F4Op {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
     #[track_caller]
     fn checked(
         name: &str,

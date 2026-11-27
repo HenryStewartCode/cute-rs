@@ -1,5 +1,6 @@
 //! Kernels instrumented with IKET events, shared by `profiling.rs` (simulator) and
 //! `gpu_iket.rs` (GPU).
+// Shared by several test binaries; each uses part of it.
 #![allow(dead_code)]
 
 use cute::pipeline::{Agent, CooperativeGroup, Pipeline, PipelineAsync, PipelineAsyncOptions};

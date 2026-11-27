@@ -215,7 +215,6 @@ pub fn variants() -> [PersistentTileSchedulerOptions; 3] {
     ]
 }
 
-#[allow(dead_code)]
 fn main() {
     for options in variants() {
         let kernel = build(options);

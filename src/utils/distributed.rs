@@ -105,7 +105,6 @@ macro_rules! ld_reduce_variants {
             #[track_caller]
             pub fn $name<T: Numeric>(mc_ptr: &Ptr<T>) -> $ret {
                 let regs = ld_reduce(mc_ptr, MultimemType::$ty, $regs);
-                #[allow(clippy::redundant_closure_call)]
                 ($wrap)(regs)
             }
         )*

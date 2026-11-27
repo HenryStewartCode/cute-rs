@@ -1,5 +1,8 @@
 //! Profiling scopes, the kernel symbol registry and IKET event tracing on the simulator, and on the MLIR the scopes lower to.
 
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 mod iket_kernels;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -355,7 +358,6 @@ fn trace_reports_unmatched_events() {
 /// each K tile's wait and issue, and the epilogue.
 #[test]
 fn instrumented_gemm_records_each_phase_per_warp() {
-    #[allow(dead_code)]
     #[path = "../examples/tensorop_gemm.rs"]
     mod tensorop_gemm;
     let (m, n, k) = (128, 128, 96);

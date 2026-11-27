@@ -236,15 +236,15 @@ pub fn module_global<T: Numeric>(
 }
 
 /// CuTe DSL's `extern=True` module globals, declared here and defined in another module,
-/// need linking against other device code, which cute-rs does not do yet (the extern-ffi
-/// milestone). This always fails, naming that.
+/// need linking against other device code, which cute-rs does not support for globals. This
+/// always fails, naming that.
 #[track_caller]
 pub fn extern_global<T: Numeric>(name: &str, _len: usize, _space: AddressSpace) -> Tensor<T> {
     user_panic(
         Location::caller(),
         format!(
             "cute: extern module global `{name}`: extern globals are defined in another module and need device \
-             code linking (cute-rs's extern-ffi support), which is not available yet; declare it with \
+             code linking, which cute-rs does not support for globals; declare it with \
              module_global instead"
         ),
     )

@@ -23,7 +23,7 @@
 //! * [`tcgen05_mma`]: the dense `tcgen05.mma` with the modifiers the atoms
 //!   lack ([`Tcgen05MmaOptions`]: `.collector::a::*`, `.ashift`,
 //!   `scale-input-d` and the disable-output-lane mask; `.collector::b::*`
-//!   is the sm_107 form of m10-rubin-umma).
+//!   is the sm_107 form).
 //! * [`tcgen05_mma_ws`] and [`tcgen05_mma_ws_sp`]: weight-stationary
 //!   `tcgen05.mma.ws{.sp}.cta_group::1` with B's four collector buffers
 //!   ([`Tcgen05MmaWsOptions`]).
@@ -52,7 +52,6 @@ use crate::value::{IntoValue, Numeric, Value};
 pub use crate::ir::CollectorOp as Tcgen05MmaCollectorOp;
 
 /// CuTe DSL's `Tcgen05MMAKind`: the `.kind` of a `tcgen05.mma`.
-#[allow(clippy::upper_case_acronyms)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Tcgen05MmaKind {
     F16,
@@ -140,7 +139,7 @@ impl From<Value<i32>> for TmemOperand {
 }
 
 impl TmemOperand {
-    /// The Int32 address (m11-prims-nvvm-layer's `tcgen05_shift`).
+    /// The Int32 address (the `tcgen05_shift` operation's).
     pub(crate) fn value(self) -> Value<i32> {
         self.0
     }
@@ -298,7 +297,6 @@ fn kind_types(kind: UmmaDataKind) -> &'static [DType] {
 /// outside the bits `runtime` may set. Panics naming `what` when no
 /// instruction has that descriptor.
 #[track_caller]
-#[allow(clippy::too_many_arguments)]
 fn decode(
     what: &str,
     kind: UmmaDataKind,
@@ -404,7 +402,6 @@ fn decode(
 
 /// Push one prims `tcgen05.mma`.
 #[track_caller]
-#[allow(clippy::too_many_arguments)]
 fn issue(
     what: &str,
     kind: UmmaKind,
@@ -455,7 +452,6 @@ fn issue(
 /// address, `b` B's descriptor and `idesc` a [`Tcgen05InstrDesc`]. Issued
 /// by the executing thread (call it inside `elect_one`).
 #[track_caller]
-#[allow(clippy::too_many_arguments)]
 pub fn tcgen05_mma(
     mma_kind: Tcgen05MmaKind,
     cta_group: CtaGroup,
@@ -484,7 +480,7 @@ pub fn tcgen05_mma(
     if let Err(why) = super::descriptors::check_shape(kind.kind, kind.m, kind.n, cta_group) {
         panic!("cute::prims::tcgen05_mma: {why}");
     }
-    // m10-rubin-umma: .collector::b::* is the sm_107 form.
+    // .collector::b::* is the sm_107 form.
     if let Some(bop) = options.b_collector_op {
         kind.sm107 = Some(crate::ir::Sm107Umma {
             wide_k: false,
@@ -554,7 +550,6 @@ pub fn tcgen05_mma_ws(
 /// `sparse_metadata` (the selector in the descriptor's bits 0-1).
 /// `.kind::tf32` (1:2 sparsity) is not modelled.
 #[track_caller]
-#[allow(clippy::too_many_arguments)]
 pub fn tcgen05_mma_ws_sp(
     mma_kind: Tcgen05MmaKind,
     d: impl Into<TmemOperand>,
@@ -580,7 +575,6 @@ pub fn tcgen05_mma_ws_sp(
 }
 
 #[track_caller]
-#[allow(clippy::too_many_arguments)]
 fn ws_common(
     what: &str,
     mma_kind: Tcgen05MmaKind,
@@ -624,7 +618,6 @@ fn ws_common(
 /// `SM100_MMA_MXF4NVF4_SS_SPARSE`. `idesc` is a [`Tcgen05MxInstrDesc`] or
 /// [`Tcgen05MxOmmaInstrDesc`] with the sparse flag.
 #[track_caller]
-#[allow(clippy::too_many_arguments)]
 pub fn tcgen05_mma_sp_block_scale(
     mma_kind: Tcgen05MmaKind,
     cta_group: CtaGroup,
@@ -696,7 +689,6 @@ pub fn tcgen05_mma_sp_block_scale(
 }
 
 /// CuTe DSL's `MMABlockScaleKind` of the warp-level block-scaled MMAs.
-#[allow(clippy::upper_case_acronyms)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum MmaBlockScaleKind {
     MXF8F6F4,
@@ -765,7 +757,6 @@ pub fn sp_block_scale_error(k: SpBlockScaledMmaKind) -> Option<String> {
 /// scale-factor registers with their byte and thread ids. Returns D. The
 /// inline PTX is not convergent to LLVM: keep it out of divergent code.
 #[track_caller]
-#[allow(clippy::too_many_arguments)]
 pub fn mma_sp_block_scale(
     shape: (usize, usize, usize),
     scale_vec_size: Tcgen05MmaScaleVec,

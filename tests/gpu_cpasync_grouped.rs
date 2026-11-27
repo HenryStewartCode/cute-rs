@@ -9,11 +9,12 @@
 //! cargo test --release --features cuda --test gpu_cpasync_grouped
 //! ```
 
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 mod feature_kernels;
-#[allow(dead_code)]
 #[path = "../examples/grouped_gemm.rs"]
 mod grouped_gemm;
-#[allow(dead_code)]
 mod grouped_kernels;
 
 use cute::cuda::CudaContext;

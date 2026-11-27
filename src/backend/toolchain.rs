@@ -869,7 +869,6 @@ impl Toolchain {
     /// (with a warning) and writes its own default `.version`, below what the kernel's
     /// instructions need (PTX ISA 9.1, for the s2f6x2 conversions, needs LLVM 23); that is
     /// refused here, as [`CompileError::Unsupported`], rather than left to `ptxas`.
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn lower(
         &self,
         mlir: &str,

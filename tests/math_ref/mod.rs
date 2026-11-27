@@ -7,6 +7,7 @@
 //! the trigonometric functions reduce their arguments exactly, with the
 //! integer bits of 2/pi.
 
+// Shared by several test binaries; each uses part of it.
 #![allow(dead_code)]
 
 use std::cmp::Ordering;

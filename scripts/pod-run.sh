@@ -16,7 +16,9 @@
 # fetch   copies the results archive back into ./gpu-results/ here.
 #
 # SSH_KEY picks the key (default ~/.ssh/runpod_ed25519), POD_DIR the directory on the machine
-# (default ~/cute-rs-validate), POD_ENV extra environment for the run ("VAR=value ...").
+# (default ~/cute-rs-validate), POD_ENV extra environment for the run ("VAR=value ..."), and
+# POD_EXCLUDE an extended regular expression of paths that --worktree leaves behind (untracked
+# notes, say: POD_EXCLUDE='^notes/|^TODO\.md$').
 # The machine needs only an NVIDIA driver, curl and apt (Ubuntu or Debian): gpu-validate.sh installs Rust and mlir-opt.
 #
 # Typical rental:  start  ->  status every few minutes  ->  fetch  ->  stop the pod.
@@ -49,10 +51,12 @@ start)
     fi
     COMMIT=$(git rev-parse --short HEAD)
     echo "copying $([ $WORKTREE -eq 1 ] && echo "the working tree (HEAD $COMMIT plus local changes)" || echo "HEAD $COMMIT") to $HOST:$REMOTE"
+    SKIP='^(target/|gpu-results/)|(^|/)\.DS_Store$'
+    [ -n "${POD_EXCLUDE:-}" ] && SKIP="$SKIP|$POD_EXCLUDE"
     if [ $WORKTREE -eq 1 ]; then
-        # Tracked and untracked files, without build output and personal notes.
+        # Tracked and untracked files, without build output, results and what POD_EXCLUDE matches.
         git ls-files -z --cached --others --exclude-standard |
-            grep -zv -E '^(target/|exercise/|gpu-results/|del\.txt$|HANDOFF\.md$|SESSION-HANDOVER\.md$|FLASHINFER-PORT-PLAN\.md$|(.*/)?\.DS_Store$)' |
+            grep -zv -E "$SKIP" |
             while IFS= read -r -d '' f; do [ -e "$f" ] && printf '%s\0' "$f"; done |
             COPYFILE_DISABLE=1 tar --no-xattrs --no-mac-metadata --uid 0 --gid 0 --null -T - -czf - |
             "${SSH[@]}" "rm -rf $REMOTE && mkdir -p $REMOTE && tar --no-same-owner -xzf - -C $REMOTE && echo '$COMMIT+worktree' > $REMOTE/.cute-rs-commit"

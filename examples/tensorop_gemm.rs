@@ -455,7 +455,6 @@ pub fn small_integers(len: usize, seed: u64) -> Vec<f32> {
         .collect()
 }
 
-#[allow(dead_code)]
 fn main() {
     let cfg = GemmConfig::new(256, 256, 256);
     let report = run(cfg);

@@ -45,7 +45,6 @@ use crate::nvgpu::OperandMajorMode;
 use crate::nvgpu::warpgroup::InstructionShape;
 
 /// The checks of both sparse MMAs, and their instruction.
-#[allow(clippy::too_many_arguments)]
 #[track_caller]
 fn sparse_kind(
     name: &str,
@@ -180,7 +179,6 @@ pub struct MmaF16BF16SparseOp {
 }
 
 impl MmaF16BF16SparseOp {
-    #[allow(clippy::too_many_arguments)]
     #[track_caller]
     pub fn new(
         ab_dtype: DType,
@@ -235,7 +233,6 @@ pub struct MmaFP8SparseOp {
 }
 
 impl MmaFP8SparseOp {
-    #[allow(clippy::too_many_arguments)]
     #[track_caller]
     pub fn new(
         ab_dtype: DType,

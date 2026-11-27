@@ -136,7 +136,6 @@ pub fn make_smem_layout_epi(
 /// Panics for any other pair (CuTe DSL raises a `TypeError`), and for
 /// parameters the operation refuses.
 #[track_caller]
-#[allow(clippy::too_many_arguments)]
 pub fn make_trivial_tiled_mma(
     a_dtype: DType,
     b_dtype: DType,
@@ -174,7 +173,6 @@ pub fn make_trivial_tiled_mma(
 
 /// [`make_trivial_tiled_mma`] by its other CuTe DSL name.
 #[track_caller]
-#[allow(clippy::too_many_arguments)]
 pub fn sm90_make_trivial_tiled_mma(
     a_dtype: DType,
     b_dtype: DType,

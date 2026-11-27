@@ -78,7 +78,6 @@ impl AtomicAddable for BF16 {}
 /// Push an atomic (`result` of type `result_ty`) or, without one, a
 /// reduction.
 #[track_caller]
-#[allow(clippy::too_many_arguments)]
 fn push<T: Numeric>(
     kind: AtomicKind,
     ty: AtomicType,

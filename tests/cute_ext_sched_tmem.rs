@@ -161,7 +161,6 @@ fn codec_words_chunks_and_sizes() {
 // (2) The accumulator planner on the host
 // ---------------------------------------------------------------------------------------------
 
-#[allow(clippy::too_many_arguments)]
 fn plan_cols(
     c: usize,
     s: usize,

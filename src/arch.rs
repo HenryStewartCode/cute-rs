@@ -24,11 +24,11 @@
 mod atomic;
 mod cvt;
 mod half;
-// m10-ldred-packed-math.
+// Packed arithmetic.
 mod packed;
-// m10-umma-layouts.
+// Tensor memory.
 mod tmem;
-// m10-clc-scheduling.
+// Cluster launch control.
 mod clc;
 
 pub use atomic::*;

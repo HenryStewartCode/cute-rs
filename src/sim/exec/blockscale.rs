@@ -97,7 +97,6 @@ fn element(ty: DType, packed: bool, reg: u32, j: usize) -> f64 {
 }
 
 impl<'a> Machine<'a> {
-    #[allow(clippy::too_many_arguments)]
     pub(super) fn mma_block_scaled(
         &mut self,
         kind: BlockScaledMmaKind,
@@ -177,7 +176,6 @@ impl<'a> Machine<'a> {
 
 impl<'a> Machine<'a> {
     /// The warp-level sparse block-scaled `mma.sp`.
-    #[allow(clippy::too_many_arguments)]
     pub(super) fn mma_sp_block_scaled(
         &mut self,
         kind: SpBlockScaledMmaKind,

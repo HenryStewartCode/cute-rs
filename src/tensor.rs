@@ -95,9 +95,8 @@ pub struct Ident;
 /// memory ([`param_tensor`]), shared memory ([`make_smem_tensor`],
 /// [`alloc_smem`]) and register memory (fragments and
 /// [`make_rmem_tensor`]'s per-thread arrays, which CuTe keeps in one space);
-/// `Generic`, `Cmem`, `Tmem` and `Dsmem` exist for the roadmap's later
-/// parts (generic pointers, distributed shared memory, tensor memory), and
-/// nothing builds them yet.
+/// `Generic`, `Cmem`, `Tmem` and `Dsmem` are the spaces of generic pointers,
+/// constant memory, tensor memory and distributed shared memory.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(u32)]
 pub enum AddressSpace {
@@ -1777,7 +1776,7 @@ impl<T: Numeric> Ptr<T> {
     }
 
     /// The plain pointer to the element this pointer addresses, its swizzle
-    /// applied (roadmap part m11-prims-descriptors-swizzle's `apply_swizzle`).
+    /// applied (`apply_swizzle`).
     #[track_caller]
     pub(crate) fn physical_ptr(&self) -> Ptr<T> {
         Ptr { offset: self.physical_offset(), swizzle: None, ..self.clone() }
@@ -1987,6 +1986,7 @@ origin_engine!(usize, u32, i32, i64, IndexExpr, Int32);
 
 macro_rules! origin_engine_tuple {
     ($(($($name:ident),+)),+) => {$(
+        // The tuple's fields are bound by their generic parameter names (`A`, `B`, ...).
         #[allow(non_snake_case)]
         impl<$($name: Into<Coord>),+> TensorEngine for ($($name,)+) {
             type Elem = Ident;
@@ -2062,6 +2062,7 @@ layout_from_shape!(usize, u32, i32, i64, IndexExpr, Int32, IntTuple, &IntTuple, 
 
 macro_rules! layout_from_tuple {
     ($(($($name:ident),+)),+) => {$(
+        // The tuple's fields are bound by their generic parameter names (`A`, `B`, ...).
         #[allow(non_snake_case)]
         impl<$($name: Into<Shape>),+> From<($($name,)+)> for LayoutOrShape {
             fn from(($($name,)+): ($($name,)+)) -> Self {

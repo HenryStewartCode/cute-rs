@@ -98,7 +98,6 @@ impl<'a> Machine<'a> {
     }
 
     /// Execute a multimem instruction for the `active` threads, one after another.
-    #[allow(clippy::too_many_arguments)]
     pub(super) fn multimem(
         &mut self,
         active: &[usize],

@@ -58,10 +58,9 @@ pub(crate) fn convert_values<T: Numeric, U: Numeric>(xs: &[Value<T>], what: &str
                 _ => cvt_f32x2_to_f6x2::<F6E3M2FN>([a, b], false).map(retype),
             })
         }
-        DType::F8E5M3FNU => panic!(
-            "{what}: a conversion to FloatNV8E5M3FNU needs cvt_f32x4_to_fnv8e5m3x4 (milestone m10), which cute-rs \
-             does not have yet"
-        ),
+        DType::F8E5M3FNU => {
+            panic!("{what}: a conversion to FloatNV8E5M3FNU is not supported here; call cvt_f32x4_to_fnv8e5m3x4")
+        }
         DType::F8E4M3FN | DType::F8E5M2 if from == DType::F16 => xs
             .chunks(2)
             .flat_map(|p| {
@@ -109,8 +108,8 @@ impl<T: Numeric> TensorSsa<T> {
     ///   (`cvt.rn.satfinite.{e2m1x2,e2m3x2,e3m2x2}.f32`, sm_100a and sm_120a,
     ///   PTX 8.6), so the element count must be even.
     ///
-    /// FloatNV8E5M3FNU needs `cvt_f32x4_to_fnv8e5m3x4`, which cute-rs does
-    /// not have yet (milestone m10): the build panics, naming it.
+    /// FloatNV8E5M3FNU is not supported here (use `cvt_f32x4_to_fnv8e5m3x4`): the
+    /// build panics, naming it.
     #[track_caller]
     pub fn to<U: Numeric>(&self) -> TensorSsa<U> {
         TensorSsa::from_parts(self.shape.clone(), convert_values::<T, U>(&self.values, "TensorSsa::to"))

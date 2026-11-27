@@ -1,18 +1,17 @@
-//! The EFC epilogue-fusion GEMMs of roadmap part m10-port-efc (the three
+//! The EFC epilogue-fusion GEMMs (the three
 //! `*_custom_epilogue_dense_gemm` examples and their shared `examples/efc` module),
 //! simulated and checked against EFC's host evaluation, plus the analysis, the rules and
 //! the sm_100a PTX.
 
 // Each example includes `examples/efc` itself, so the test compiles it three times.
 #![allow(clippy::duplicate_mod)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
 
-#[allow(dead_code)]
 #[path = "../examples/activation_custom_epilogue_dense_gemm.rs"]
 mod activation;
-#[allow(dead_code)]
 #[path = "../examples/custom_epilogue_dense_gemm.rs"]
 mod custom;
-#[allow(dead_code)]
 #[path = "../examples/synthetic_custom_epilogue_dense_gemm.rs"]
 mod synthetic;
 

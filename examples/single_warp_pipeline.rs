@@ -253,7 +253,6 @@ pub fn run() -> SimReport {
     report
 }
 
-#[allow(dead_code)]
 fn main() {
     let report = run();
     println!("single_warp_pipeline (M={M}, N={N}, K={K}): correct\n{report}\n");

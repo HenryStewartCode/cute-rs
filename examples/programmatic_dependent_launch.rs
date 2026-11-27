@@ -163,7 +163,6 @@ pub fn run(m: usize, n: usize) -> Vec<f32> {
     y
 }
 
-#[allow(dead_code)]
 fn main() {
     run(M, N);
     println!("programmatic_dependent_launch: y = u + v + x on {M}x{N}, the second kernel launched with use_pdl");

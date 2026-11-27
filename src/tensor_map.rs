@@ -29,7 +29,8 @@ pub use crate::tma::{
 /// type's own encoding, raw bytes, the flush-to-zero `f32` and TF32 forms that tensor
 /// reductions use, and the FP4/FP6 forms of SM100:
 /// `B4X16` packed, `B4X16_P64` and `B6X16_P32` padded to 16-byte slots.
-#[allow(non_camel_case_types, clippy::upper_case_acronyms)]
+// The variants are named after the CUDA enumerators.
+#[allow(non_camel_case_types)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 pub enum TensorMapDataFormat {
     #[default]

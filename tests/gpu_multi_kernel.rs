@@ -10,9 +10,11 @@
 //! cargo test --features cuda --test gpu_multi_kernel
 //! ```
 
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 mod multi_kernel_kernels;
 
-#[allow(dead_code)]
 #[path = "../examples/split_kv_decode.rs"]
 mod split_kv_decode;
 

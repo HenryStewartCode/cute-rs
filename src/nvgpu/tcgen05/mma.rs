@@ -5,9 +5,9 @@
 //   and its issue), include/cute/atom/mma_traits_sm100.hpp (the
 //   MMA_Traits<SM100_MMA_F16BF16_SS> layouts and fragment kinds) and
 //   include/cute/atom/mma_traits_sm100_frag.hpp (UMMA::tmem_frg_1sm, the TMEM
-//   accumulator layout); m10-umma-kinds: the _TS forms' K-major A rule and
+//   accumulator layout); the _TS forms' K-major A rule and
 //   UMMA::tmem_frg_1sm<T, T, TmemAllocMode::NonInterleaved> (the TMEM A layout);
-//   m10-cta-pair: the SM100_MMA_*_2x1SM_SS shape checks and UMMA::tmem_frg_2sm
+//   the SM100_MMA_*_2x1SM_SS shape checks and UMMA::tmem_frg_2sm
 //   (the CTA-pair accumulator layouts),
 //     Copyright (c) 2023 - 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // Those portions are under the BSD-3-Clause licence, and the rest of the file
@@ -45,7 +45,6 @@ use crate::value::{Int16, Numeric, Value};
 /// Where the A operand of a tcgen05 MMA comes from (CuTe DSL's
 /// `tcgen05.OperandSource`): shared memory through a descriptor, or tensor
 /// memory (the `_TS` forms).
-#[allow(clippy::upper_case_acronyms)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum OperandSource {
     TMEM,

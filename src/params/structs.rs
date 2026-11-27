@@ -27,9 +27,9 @@ pub enum NativeMember {
 /// after another when packed; constant fields take no space. A nested
 /// native struct is one member at its own alignment (1 inside a packed
 /// struct), with its own padding, and its fields are listed with their
-/// offsets from the outer start. Recorded for the by-value `.param`
-/// structs that kernel-argument marshaling adds; a native struct is passed
-/// today as one scalar parameter per field.
+/// offsets from the outer start. [`param_struct`](crate::param_struct) passes it
+/// as a by-value `.param` struct; as a `kernel_params!` argument a native
+/// struct is passed as one scalar parameter per field.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NativeLayout {
     pub fields: Vec<NativeField>,

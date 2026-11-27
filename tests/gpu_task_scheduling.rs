@@ -15,13 +15,13 @@
 //! cargo test --release --features cuda --test gpu_task_scheduling
 //! ```
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/ts_copy_grid_stride.rs"]
 mod ts_copy_grid_stride;
-#[allow(dead_code)]
 #[path = "../examples/ts_copy_persistent_skip_tile.rs"]
 mod ts_copy_persistent_skip_tile;
-#[allow(dead_code)]
 mod ts_kernels;
 
 use cute::cuda::CudaContext;

@@ -488,6 +488,7 @@ fn panic_text(f: impl FnOnce() + std::panic::UnwindSafe) -> String {
 }
 
 #[test]
+// Tests the deprecated names, which still have to work.
 #[allow(deprecated)]
 fn illegal_block_scaled_operations_panic_when_built() {
     use OperandMajorMode::{K, MN};

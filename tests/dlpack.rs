@@ -2,6 +2,9 @@
 //! codes), external tensors on the simulator, and the cache keys of specs and pointers.
 //! The managed tensors are built here over host memory, with deleters that count calls.
 
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "support/dlpack_alloc.rs"]
 mod dlpack_alloc;
 
@@ -314,7 +317,6 @@ fn cache_keys() {
     assert_ne!(k1, from_dlpack(t, FromDlpack::default()).unwrap().cache_key());
 }
 
-#[allow(dead_code)]
 #[path = "../examples/call_bypass_dlpack.rs"]
 mod call_bypass_dlpack;
 

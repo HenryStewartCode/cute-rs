@@ -21,6 +21,9 @@
 //! compile-time work arguments and register budgets shared by tasks smaller
 //! than a warpgroup.
 
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/ts_gemm_simple.rs"]
 mod ts_gemm_simple;
 

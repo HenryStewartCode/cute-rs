@@ -75,7 +75,6 @@ fn check_block_scaled_shape(
 }
 
 /// A Rubin `UmmaKind`.
-#[allow(clippy::too_many_arguments)]
 fn rubin_kind(
     kind: UmmaDataKind,
     (m, n): (usize, usize),
@@ -195,7 +194,6 @@ pub struct SM107MmaFP8Op {
 }
 
 impl SM107MmaFP8Op {
-    #[allow(clippy::too_many_arguments)]
     #[track_caller]
     pub fn new(
         a_dtype: DType,
@@ -273,7 +271,6 @@ pub struct SM107BlockScaledMmaMXF8F6F4Op {
 }
 
 impl SM107BlockScaledMmaMXF8F6F4Op {
-    #[allow(clippy::too_many_arguments)]
     #[track_caller]
     pub fn new(
         a_dtype: DType,

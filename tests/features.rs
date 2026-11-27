@@ -2,6 +2,9 @@
 //! written in Rust, and every kernel must compile to PTX (when `mlir-opt` is
 //! available) so that each path of the MLIR emitter is exercised.
 
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 mod feature_kernels;
 
 use cute::prelude::*;
@@ -226,7 +229,6 @@ fn hopper_instructions_are_rejected_for_older_targets() {
 /// One compiled kernel, several problem sizes.
 #[test]
 fn runtime_shapes() {
-    #[allow(dead_code)]
     #[path = "../examples/runtime_gemm.rs"]
     mod runtime_gemm;
     let kernel = runtime_gemm::build();

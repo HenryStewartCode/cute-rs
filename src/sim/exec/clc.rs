@@ -19,7 +19,7 @@
 //!   decodes it and reports 16 bytes that are not a response.
 //! * **Delivery.** The response is an asynchronous write through the async
 //!   proxy that completes 16 bytes of tx on the mbarrier, as a bulk copy
-//!   does (m2's in-flight model): it lands when a waiter sees the phase's
+//!   does (the in-flight model): it lands when a waiter sees the phase's
 //!   arrivals in (or at random), and reading it earlier is reported. With
 //!   `.multicast::cluster::all` it lands at the same offsets in every CTA of
 //!   the cluster, counting down each CTA's mbarrier; PTX leaves that

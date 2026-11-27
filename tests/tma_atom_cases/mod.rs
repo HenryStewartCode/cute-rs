@@ -4,6 +4,7 @@
 //! the descriptor's box-and-swizzle model must place the global element that the CuTe
 //! layouts say belongs there.
 
+// Shared by several test binaries; each uses part of it.
 #![allow(dead_code)]
 
 use std::collections::BTreeMap;
@@ -49,6 +50,7 @@ pub fn in_kernel<R>(f: impl FnOnce() -> R) -> R {
 }
 
 /// The GMMA shared-memory layout atoms, by the bytes of their rows.
+// Named as CuTe's `SW128` and `INTER` atoms are.
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Atom {

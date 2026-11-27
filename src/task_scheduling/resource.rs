@@ -170,8 +170,7 @@ impl std::hash::Hash for VarRef {
 /// returns it and read by later work (CuTe DSL's `TaskLocalVariable(dtype,
 /// default, docs)`). The handle is typed by the value it holds (an
 /// [`Int16`](crate::Int16), a [`WorkTileInfo`], ...); the storage is not
-/// part of it: [`TaskLocals`] (and the TaskManager of the next roadmap
-/// part) allocates one [`Var`] per variable, starting at the default.
+/// part of it: [`TaskLocals`] (and the [`TaskManager`](super::TaskManager)) allocates one [`Var`] per variable, starting at the default.
 ///
 /// The default is a closure, so that a variable can be declared outside a
 /// kernel (its constants are only built when storage is made);
@@ -400,7 +399,7 @@ fn test_of<C: LocalValue>(storage: &dyn Any) -> Option<Boolean> {
 
 /// Storage for task-local variables in a hand-written kernel: one [`Var`]
 /// per declared variable, so that values written in one loop iteration or
-/// branch are read in the next. The TaskManager of the next roadmap part
+/// branch are read in the next. The [`TaskManager`](super::TaskManager)
 /// allocates the same storage for the variables its tasks use.
 #[derive(Default)]
 pub struct TaskLocals {
@@ -850,7 +849,7 @@ impl Work {
 }
 
 // ---------------------------------------------------------------------------
-// Memory requirements (for the allocators of m11-ts-memory-groups)
+// Memory requirements (for the allocators)
 // ---------------------------------------------------------------------------
 
 /// A block of shared memory a resource asks the shared-memory allocator
@@ -1201,7 +1200,7 @@ struct Runtime {
 /// work methods ([`Work`]), variables and memory requirements. Inside a
 /// kernel, [`Resource::create`] builds its pipeline and status flags; then
 /// a hand-written kernel calls [`run_work`](Self::run_work) and the
-/// pipeline methods directly, and the TaskManager of the next roadmap part
+/// pipeline methods directly, and the [`TaskManager`](super::TaskManager)
 /// calls them in the order a captured [`Schedule`](super::Schedule) gives.
 ///
 /// The pipeline methods follow the default advance policy: a commit

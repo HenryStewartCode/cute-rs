@@ -404,7 +404,6 @@ pub fn run(m: usize, n: usize, seeds: &[u64]) -> SimReport {
     report
 }
 
-#[allow(dead_code)]
 fn main() {
     for (m, n) in [(DEFAULT_M, DEFAULT_N), (256, 128), (144, 208)] {
         let report = run(m, n, &[]);

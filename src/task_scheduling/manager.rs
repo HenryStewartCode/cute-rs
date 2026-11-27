@@ -70,6 +70,7 @@ pub struct DependencyGraphControlEdge;
 
 impl DependencyGraphControlEdge {
     /// A control edge from `upstream`.
+    // Mirrors CuTe's `DependencyGraphControlEdge(upstream)`, which builds an edge value.
     #[allow(clippy::new_ret_no_self)]
     pub fn new(upstream: &(impl Resource + ?Sized)) -> DependencyGraphEdge {
         DependencyGraphEdge { upstream: upstream.name().to_string(), control: true }

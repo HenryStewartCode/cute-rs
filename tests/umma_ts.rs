@@ -220,7 +220,6 @@ fn simulate(kernel: &Kernel, args: &mut [KernelArg]) -> Result<u64, String> {
 
 /// The float reference: each `kb`-wide k-block `blk` added in Float32 with the signs
 /// `sign(blk)` (A's, B's), then rounded with `round`, row `r` left as `keep(r, blk)` says.
-#[allow(clippy::too_many_arguments)]
 fn reference(
     a: &[f32],
     b: &[f32],

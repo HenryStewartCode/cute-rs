@@ -142,6 +142,7 @@ pub mod xla_ffi;
 
 pub use abi::{MAX_CONSTANT_BYTES, StructParam, extern_global, module_global, param_bytes, param_struct, smem_overlay};
 pub use aot::{AotError, ExportOptions, ExportReport, ExportedKernel};
+// Re-exports a name that is deprecated in favour of the replacement exported beside it.
 #[allow(deprecated)]
 pub use arch::atomic_max_float32;
 pub use arch::{
@@ -190,6 +191,7 @@ pub use arch::{
     sub_packed_f16x2,
 };
 // Packed f32x2 arithmetic and the Rubin mixed-precision forms.
+// Re-exports a name that is deprecated in favour of the replacement exported beside it.
 #[allow(deprecated)]
 pub use arch::exp_packed_f32x2;
 pub use arch::{
@@ -323,6 +325,7 @@ pub use tma::{
 };
 
 // stmatrix atoms and warpgroup register reallocation.
+// Re-exports a name that is deprecated in favour of the replacement exported beside it.
 #[allow(deprecated)]
 pub use arch::{setmaxregister_decrease, setmaxregister_increase, warpgroup_reg_alloc, warpgroup_reg_dealloc};
 pub use ir::StMatrixForm;
@@ -363,6 +366,7 @@ pub use control::{Prefetch, for_range_pipelined};
 pub use sim::MulticastReplicas;
 
 // Blackwell layout atoms, UMMA descriptors and sizing helpers.
+// Re-exports a name that is deprecated in favour of the replacement exported beside it.
 #[allow(deprecated)]
 pub use arch::{SM100_TMEM_CAPACITY_COLUMNS, SM100_TMEM_MIN_ALLOC_COLUMNS};
 pub use arch::{get_max_tmem_alloc_cols, get_min_tmem_alloc_cols, is_tmem_allocation_exclusive};

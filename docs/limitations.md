@@ -123,7 +123,7 @@
   SM89 GPU test runs the FP8 MMAs through that inline PTX (the pod's LLVM is
   22); `tests/mlir.rs` assembles the `nvvm` form with LLVM 23. The sparse
   operand is a plain compressed fragment plus a Uint32 metadata fragment the
-  kernel fills: CuTe DSL's sparse element types (m10) are not implemented,
+  kernel fills: CuTe DSL's sparse element types are not implemented,
   and only the TID metadata format (sparsity selector 0) exists. The
   simulator reports metadata that is not one of the six ordered index
   pairs. The 8-bit `ldmatrix` shapes (`.m16n16`, `.m8n16`) agree with a
@@ -193,7 +193,7 @@
   (not `cp.async` or bulk-copy sources, atomics or other bulk stores), and
   models the async proxy's shared-memory reads, not its global ones
   (`fence.proxy.async.global` orders nothing in it). The `nvgpu` module
-  has `cpasync`, the operand major modes and `warpgroup` (m8); the `warp`
+  has `cpasync`, the operand major modes and `warpgroup`; the `warp`
   atoms are `CopyOp` variants.
 * `cp_async_mbarrier_arrive_noinc` and `cp_async_mbarrier_arrive` run on
   SM80 and newer (tested on SM89). The arrivals they owe are made, and the
@@ -213,7 +213,7 @@
   compiled with `mlir-opt` for sm_90/sm_90a and assembled with `ptxas`, but
   not run on an SM90 GPU. The cluster kernel writes each CTA's own tile
   where the example reads its peer's through distributed shared memory
-  (`mapa` loads came with m8-dsmem; the port keeps its own-tile form).
+  (`mapa` loads are supported; the port keeps its own-tile form).
 * The simulator reports an mbarrier that runs two phases ahead of a parity
   wait (phase aliasing) only under a schedule that lets it: when nothing
   orders a phase's completion after a waiter's wait for the phase before it
@@ -337,7 +337,7 @@
   end (within its gap) is out of bounds for that buffer. The addresses
   differ from the GPU's, so kernels should not write them to outputs.
   Boolean raw pointers are refused (point at `Uint8` flags), and so are
-  constant-memory and distributed-shared-memory ones (m8).
+  constant-memory and distributed-shared-memory ones.
 * The simulator marks the masked-off results of a masked load without
   `pass_thru` undefined and reports their first use by anything other than
   a pure operation or a select that picks another operand; a value an
@@ -383,11 +383,11 @@
   G2R and R2G atoms copy between global memory and registers (fragments,
   or `make_rmem_tensor`s, whose per-thread accesses stay plain), at most
   128 bits at a time; CuTe DSL's `CopyS2ROp` and `CopyR2SOp` are not
-  implemented. The tensormap form of `prefetch` (`tensormap=`,
-  `in_param_space=`) waits for milestone m7.
+  implemented. The tensormap form of `prefetch` (`tensormap=`) is
+  `PrefetchOptions::tensormap`; `in_param_space=` is not needed, as the address is generic.
 * The vector forms of the atomics and reductions (`.v2`, `.v4`, `.v8` of
-  f32, f16 and bf16, sm_90) wait for TensorSSA vectors (m4); the
-  `.L2::cache_hint`, `inc`, `dec` and 128-bit forms are not implemented.
+  f32, f16 and bf16, sm_90) are not implemented, nor are the
+  `.L2::cache_hint`, `inc`, `dec` and 128-bit forms.
   Shared-memory atomics are emitted as `.shared` (which is `.shared::cta`)
   so that sm_80's PTX 7.0 takes them; `.shared::cluster` atomics on another
   CTA's memory are not implemented. The simulator ignores atomics' scope.
@@ -415,8 +415,7 @@
   values), and accepts a thread mode that reaches beyond the data, whose
   threads its composition then wraps around onto other threads' elements.
 * The packed half-precision operations and the conversions take scalars,
-  arrays and words; CuTe DSL's take and return MLIR vectors, which come
-  with TensorSSA (m4), and its int4 helpers sub-byte tensors. `.oob`
+  arrays and words; CuTe DSL's take and return MLIR vectors, and its int4 helpers sub-byte tensors. `.oob`
   (fma's out-of-bounds modifier) gives `+0` where a multiplicand is the
   "OOB NaN" that TMA's NaN fill writes, a special NaN whose encoding
   neither the PTX ISA nor the CUDA documentation gives: the simulator takes
@@ -432,7 +431,7 @@
   as MLIR (and as PTX text with LLVM 23; LLVM 21 and 22 are refused, see
   Compiling above); `cvt_i8_bf16_intrinsic` uses them only when
   asked (`I8ToBf16Path::S2f6x2`), where CuTe DSL picks them for sm_100a-class
-  targets, since a kernel's target is chosen after it is built (m6).
+  targets, since a kernel's target is chosen after it is built.
   `exp2_packed_bf16x2` is held to nothing but the simulator's correctly
   rounded value, as no GPU here runs it (the PTX ISA's bound is 2^-7
   relative).
@@ -523,7 +522,7 @@
   orders a reader after the copies that landed before it.
 * The `cuda` launcher has only been run on one GPU, an RTX 2000 Ada (SM89).
   PTX for other architectures assembles with `ptxas` but has not been run.
-* What m6 could only check with the simulator and `ptxas`, since the test GPU is an SM89:
+* What can be checked only with the simulator and `ptxas`, since the test GPU is an SM89:
   the overlap of programmatic dependent launches (the driver accepts `use_pdl` on SM89 and
   runs the kernels in order; the `SimStream` model checks the accesses before
   `griddepcontrol_wait`), programmatic events triggered by `griddepcontrol_launch_dependents`
@@ -533,16 +532,15 @@
   simulated, not launched on a GPU), and the
   sm_100f, sm_103, sm_107, sm_110, sm_120f and sm_121 targets (compiled and, where the
   toolchain has them, assembled; sm_107 is emitted by no LLVM yet).
-* Pipelines (m9): CuTe DSL's pipelines need sm_90 (`mbarrier.try_wait`, `fence.mbarrier_init`).
+* Pipelines: CuTe DSL's pipelines need sm_90 (`mbarrier.try_wait`, `fence.mbarrier_init`).
   A kernel built for a target below sm_90 (`KernelOptions::target(Arch::Sm89)`, or
   `CUTE_RS_ARCH`) instead gets `MbarrierArray` waits that spin on `mbarrier.test_wait`
   (sm_80), `try_wait` probes with it, and `pipeline_init_arrive` leaves the init fence out (the
   CTA barrier of `pipeline_init_wait` publishes CTA-local mbarriers), so the mbarrier-only
   pipelines run on SM80 to SM89. Without a target, they emit what CuTe DSL emits, and compiling
-  for sm_89 fails at the line that waits. The `TCGen05Mma` arrival waits for m10's
-  `tcgen05.commit`; the cluster, peer-CTA and TMA forms are checked with the simulator and
+  for sm_89 fails at the line that waits. The `TCGen05Mma` arrival is `tcgen05.commit`, which has no SM89 form; the cluster, peer-CTA and TMA forms are checked with the simulator and
   `ptxas` only.
-* TMA (m7): every TMA operation (descriptors built on the host and hidden per atom, tile
+* TMA: every TMA operation (descriptors built on the host and hidden per atom, tile
   loads, multicast loads, stores and reduce stores, bulk copies, prefetches, in-kernel
   descriptor copies and `tensormap.replace` updates, the tensormap-proxy fences, and the
   ported tutorials) is verified only by the simulator (against plain Rust), by `mlir-opt`
@@ -559,8 +557,8 @@
   `.im2col_no_offs::w` and `.report_mechanism`. `tensormap.replace`
   needs an architecture-specific target (sm_90a, sm_100a, sm_110a, sm_120a or their
   families); its fields other than the address, extents and strides are not exposed.
-* SM90 (m8): WGMMA (`warpgroup`), `stmatrix`, `setmaxnreg`, distributed shared memory and,
-  with m7, TMA are verified only by the simulator (whose models come from the PTX ISA,
+* SM90: WGMMA (`warpgroup`), `stmatrix`, `setmaxnreg`, distributed shared memory and
+  TMA are verified only by the simulator (whose models come from the PTX ISA,
   independently of cute-rs's layout code, and are held to plain Rust) and by `ptxas` 12.8
   for sm_90/sm_90a, `examples/hopper_gemm.rs` among them: no SM90 GPU has run any of it
   (the SM89 GPU runs only the host-side descriptor encodings, `cp.async` paths and
@@ -584,7 +582,7 @@
   the allocation permit). An allocation that can never be served is reported as a deadlock.
   The sm_107 exclusive forms are inline PTX checked only as MLIR text and in the simulator
   (no installed LLVM or ptxas knows PTX 9.4); their qualifier order is unverified.
-* Blackwell (m10): every `tcgen05` instruction, TMEM operation, UMMA MMA, `tcgen05.cp`, CLC
+* Blackwell: every `tcgen05` instruction, TMEM operation, UMMA MMA, `tcgen05.cp`, CLC
   and CTA-pair form is verified by the simulator (whose models come from the PTX ISA and are held
   to plain Rust) and, for sm_100a and sm_120a, by `ptxas` 12.8; **none has run on a Blackwell
   GPU** (the only GPU here is SM89), so timing, throughput, the hardware's accumulation order and

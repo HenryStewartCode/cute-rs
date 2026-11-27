@@ -8,7 +8,7 @@
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the
 // licence text and lists what each part ports.
 
-//! CuTe DSL's `cute.nvgpu.cpasync`: asynchronous copies. So far the bulk
+//! CuTe DSL's `cute.nvgpu.cpasync`: asynchronous copies: the bulk
 //! copy from shared to global memory, [`CopyBulkS2GOp`], and
 //! [`group_bulk_copy_modes`], and the TMA tile operations
 //! ([`CopyBulkTensorTileG2SOp`], [`CopyBulkTensorTileG2SMulticastOp`],
@@ -75,7 +75,6 @@ pub use super::tma_atom::{
 /// How many CTAs one TMA instruction serves (CuTe DSL's `CtaGroup`, the
 /// `.cta_group` qualifier): `ONE`, the CTA that issues it, or `TWO`, the
 /// CTA pair of SM100's 2-CTA MMAs.
-#[allow(clippy::upper_case_acronyms)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
 pub enum CtaGroup {
     #[default]
@@ -85,7 +84,6 @@ pub enum CtaGroup {
 
 /// The reduction a TMA reduce store applies to global memory (CuTe DSL's
 /// `ReductionKind`, PTX's `.redOp` of `cp.reduce.async.bulk.tensor`).
-#[allow(clippy::upper_case_acronyms)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
 pub enum ReductionKind {
     #[default]
@@ -168,7 +166,7 @@ impl From<CopyReduceBulkTensorTileS2GOp> for CopyOp {
     }
 }
 
-// ---- m7-tma-store and m7-cluster-copies ----
+// ---- TMA stores and cluster copies ----
 
 pub use super::tma_copy::prefetch_descriptor;
 // In-kernel descriptor copies and updates.
@@ -262,7 +260,7 @@ impl From<CopyBulkS2SOp> for CopyOp {
     }
 }
 
-// ---- m7-tma-im2col and m7-tma-sm100-modes ----
+// ---- TMA im2col and SM100 modes ----
 
 pub use super::tma_im2col::{Im2colOptions, make_im2col_tma_atom};
 pub use super::tma_sm100::{prefetch_atom_aux, tma_partition_override};

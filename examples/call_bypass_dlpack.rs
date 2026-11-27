@@ -106,7 +106,6 @@ pub fn run(m: usize, n: usize, k: usize, l: usize) -> Vec<F16> {
     c
 }
 
-#[allow(dead_code)]
 fn main() {
     run(64, 32, 16, 2);
     println!("call_bypass_dlpack: C = A B on raw pointers, checked against the reference");

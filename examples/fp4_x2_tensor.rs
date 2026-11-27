@@ -19,8 +19,7 @@
 //! Here the first is a `Float4E2M1FNx2` buffer (CuTe DSL's packed view,
 //! one unit per byte) recast to Float4E2M1FN, and the second a Uint8 buffer
 //! recast through `Float4E2M1FNx2` to Float4E2M1FN. The example's TVM-FFI
-//! half (passing torch tensors straight to a compiled function) belongs to
-//! milestones m6 and m11.
+//! half (passing torch tensors straight to a compiled function) is not ported.
 //!
 //! The example only prints the tensors' layouts; this kernel also decodes
 //! every value to Float16, eight at a time (one 32-bit vector of FP4 per
@@ -147,7 +146,6 @@ pub fn run(decode: Decode, bytes: &[u8]) {
     }
 }
 
-#[allow(dead_code)]
 fn main() {
     let bytes = random_bytes(1);
     let all: Vec<u8> = (0..=255).cycle().take(ROWS * BYTES_PER_ROW).collect();

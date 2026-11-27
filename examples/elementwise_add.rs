@@ -225,7 +225,6 @@ pub fn run(kernel: &Kernel, grid: [u32; 3], block: [u32; 3]) -> SimReport {
 pub const NAIVE_GRID: [u32; 3] = [(M * N).div_ceil(256) as u32, 1, 1];
 pub const TILED_GRID: [u32; 3] = [M.div_ceil(16) as u32, N.div_ceil(128) as u32, 1];
 
-#[allow(dead_code)]
 fn main() {
     let naive = naive();
     let report = run(&naive, NAIVE_GRID, [256, 1, 1]);

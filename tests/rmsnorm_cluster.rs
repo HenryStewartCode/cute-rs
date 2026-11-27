@@ -5,7 +5,9 @@
 //! Float16, BFloat16 and Float32, the simulator's diagnostics of a broken
 //! cluster reduction, and the sm_90 PTX (with `ptxas` where installed).
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/rmsnorm_cluster.rs"]
 mod rmsnorm_cluster;
 

@@ -28,7 +28,7 @@ pub(super) type EncodeTiled = unsafe extern "C" fn(
 /// `cuTensorMapEncodeIm2col(tensorMap, dataType, rank, globalAddress, globalDim,
 /// globalStrides, pixelBoxLowerCorner, pixelBoxUpperCorner, channelsPerPixel,
 /// pixelsPerColumn, elementStrides, interleave, swizzle, l2Promotion, oobFill)`, resolved for
-/// roadmap part m7-tma-im2col.
+/// the im2col TMA atoms.
 pub(super) type EncodeIm2col = unsafe extern "C" fn(
     *mut c_void,
     c_uint,

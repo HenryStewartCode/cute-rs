@@ -1597,12 +1597,12 @@ impl<'a> CopyArgs<'a> {
 
     /// CuTe DSL's `tma_multicast=` keyword (`cluster_shape`, `multicast_dim`)
     /// belongs to the block API ([`block_copy`](crate::block::block_copy)),
-    /// whose multicast is not supported yet: this panics.
+    /// whose multicast is not supported: this panics.
     #[track_caller]
     pub fn tma_multicast(self, cluster_shape: (u32, u32), multicast_dim: char) -> Self {
         panic!(
             "cute: copy: tma_multicast=(cluster_shape={cluster_shape:?}, multicast_dim={multicast_dim:?}) is the \
-             block API's multicast (cute::block::block_copy), which is not supported yet; for a multicast TMA load \
+             block API's multicast (cute::block::block_copy), which is not supported; for a multicast TMA load \
              use a multicast atom and pass mcast_mask"
         )
     }
@@ -1702,7 +1702,6 @@ fn atom_field_rules(op: CopyOp) -> (&'static [&'static str], &'static [&'static 
             (&["tma_bar_ptr", "cache_policy", "tma_desc_ptr", "mcast_mask"], &["tma_bar_ptr", "mcast_mask"])
         }
         CopyOp::TmaStore | CopyOp::TmaReduce(_) => (&["cache_policy", "tma_desc_ptr"], &[]),
-        // m7-tma-im2col and m7-tma-sm100-modes.
         CopyOp::TmaLoadMode { multicast: false, .. } => {
             (&["tma_bar_ptr", "cache_policy", "tma_desc_ptr", "mcast_mask"], &["tma_bar_ptr"])
         }
@@ -1816,7 +1815,7 @@ impl From<&Tensor<Ident>> for AuxOperand {
 /// take the index tensor's partition (`(&[tAgA], [&tAgI])` as the source of
 /// a gather4 load, the destination of a scatter4 store), and the override
 /// atoms the residue's (with the global tile's partition, in memory, as the
-/// primary operand); roadmap part m7-tma-sm100-modes.
+/// primary operand).
 #[track_caller]
 pub fn copy_aux<'a, T: Numeric, S: CopyElem<T>, D: CopyElem<T>>(
     atom: &impl AsCopyAtom<T>,
@@ -2010,7 +2009,6 @@ fn copy_body<T: Numeric, S: CopyElem<T>, D: CopyElem<T>>(
         dsmem_store_copy(bits, &src, &dst, args, func);
         return;
     }
-    // m10-s2t-copies.
     if let CopyOp::TmemCp { shape, two_cta } = atom.op {
         s2t_copy(shape, two_cta, &src, &dst, args, func);
         return;
@@ -2723,7 +2721,6 @@ fn physical(t: &Tensor<impl Sized>, linear: IndexExpr) -> IndexExpr {
     t.physical_offset(linear)
 }
 
-#[allow(clippy::too_many_arguments)]
 #[track_caller]
 fn emit_chunk<T: Numeric>(
     atom: &CopyAtom<T>,
@@ -2995,7 +2992,6 @@ fn tmem_chunk_address<T: Numeric>(t: &Tensor<T>, atom: &Layout, offset: IndexExp
 
 /// One `tcgen05.ld` of a TMEM load atom: the chunk at `s_base` of the TMEM
 /// tensor `src` into the registers of `dst` (a register fragment).
-#[allow(clippy::too_many_arguments)]
 #[track_caller]
 fn tmem_load_chunk<T: Numeric>(
     atom: &CopyAtom<T>,
@@ -3202,7 +3198,6 @@ pub fn copy_atom_call_sp(
 
 /// One `tcgen05.st` of a TMEM store atom: the registers of `src` into the
 /// chunk at `d_base` of the TMEM tensor `dst`.
-#[allow(clippy::too_many_arguments)]
 #[track_caller]
 fn tmem_store_chunk<T: Numeric>(
     atom: &CopyAtom<T>,
@@ -3244,7 +3239,6 @@ fn tmem_store_chunk<T: Numeric>(
 /// An 8-bit `ldmatrix` (`.m16n16` or `.m8n16`) into `dst`: the 32-bit
 /// registers it yields, split into bytes; destination register `w` byte
 /// `q` is byte `permute(w, q).1` of result `permute(w, q).0`.
-#[allow(clippy::too_many_arguments)]
 fn ldmatrix_b8<T: Numeric>(
     src: &Tensor<T>,
     src_atom: &Layout,

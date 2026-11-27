@@ -3,13 +3,14 @@
 //! globals, the JIT cache key, and the AOT export of a module. The PTX tests need an
 //! `mlir-opt` (skipped with a note otherwise); the GPU side is tests/gpu_multi_kernel.rs.
 
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 mod multi_kernel_kernels;
 
-#[allow(dead_code)]
 #[path = "../examples/split_kv_decode.rs"]
 mod split_kv_decode;
 
-#[allow(dead_code)]
 #[path = "../examples/tvm_ffi_module.rs"]
 mod tvm_ffi_module;
 

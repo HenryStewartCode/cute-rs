@@ -937,7 +937,6 @@ fn select_state(cond: Boolean, a: &PipelineState, b: &PipelineState) -> Pipeline
 
 /// The epilogue (warps 0 to 3): TMEM -> registers -> shared memory -> global memory through
 /// [`epilogue_tma_store`], waiting for the accumulator and releasing it.
-#[allow(clippy::too_many_arguments)]
 pub fn epilogue_warps(
     ecfg: &EpilogueConfig,
     tidx: Int32,
@@ -1103,7 +1102,6 @@ pub fn run(cfg: &MixedInputGemm, mnk: (usize, usize, usize)) -> SimReport {
     run_with(cfg, mnk, &SimOptions::default(), &[])
 }
 
-#[allow(dead_code)]
 fn main() {
     for (cfg, mnk) in [
         (MIXED_K_MAJOR_CONVERT, (128, 64, 256)),

@@ -46,6 +46,7 @@ pub const MAX_ELEMENT_STRIDE: u32 = 8;
 macro_rules! tensor_map_enum {
     ($(#[$m:meta])* $name:ident { $($(#[$vm:meta])* $v:ident = $n:expr, $s:expr;)* }) => {
         $(#[$m])*
+        // The variants are named after the CUDA enumerators.
         #[allow(non_camel_case_types)]
         #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
         #[repr(u32)]
@@ -680,8 +681,8 @@ pub struct TensorMapCheck<'a> {
 /// Check a descriptor against what `cuTensorMapEncodeTiled` accepts (CUDA 12.8's
 /// documented requirements), for the fields that are known:
 ///
-/// - the swizzle is not an SM100 atom mode (they arrive with roadmap part
-///   m10-umma-layouts);
+/// - the swizzle is not one of the SM100 atom modes cute-rs does not support
+///   (`s128b_atom_32b_flip_8b` and `s128b_atom_64b`);
 /// - the sub-byte encodings have no interleave or NaN
 ///   fill and a box whose inner extent is a whole number of 16-value groups; the padded
 ///   ones (`f416u4_align16b`, `f416u6_align16b`) also an inner box of exactly 128 values
@@ -702,7 +703,7 @@ pub fn check_tensor_map(c: &TensorMapCheck<'_>) -> Result<(), String> {
     let t = c.data_type;
     if c.swizzle.is_unsupported_atom_mode() {
         return Err(format!(
-            "tensor map: the {} swizzle is not supported yet (of the SM100 atom modes, cute-rs takes \
+            "tensor map: the {} swizzle is not supported (of the SM100 atom modes, cute-rs takes \
              s128b_atom_32b)",
             c.swizzle
         ));
@@ -920,7 +921,7 @@ pub fn check_im2col(c: &TensorMapCheck<'_>, p: &Im2colParams) -> Result<(), Stri
         ));
     }
     if c.swizzle.is_atom_mode() {
-        return Err(format!("im2col tensor map: the {} swizzle is not supported yet", c.swizzle));
+        return Err(format!("im2col tensor map: the {} swizzle is not supported", c.swizzle));
     }
     // The driver: the bounding box has a non-zero area in every spatial dimension.
     for k in 0..c.rank - 2 {
@@ -1534,7 +1535,7 @@ mod tests {
         rejects(&d, "exactly 64 bytes");
         let mut d = ok.clone();
         d.swizzle = TensorMapSwizzle::s128b_atom_64b;
-        rejects(&d, "not supported yet");
+        rejects(&d, "not supported");
     }
 
     #[test]

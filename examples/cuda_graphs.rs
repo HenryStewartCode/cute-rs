@@ -4,7 +4,7 @@
 //! Copyright (c) 2025 - 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //! BSD-3-Clause; see THIRD-PARTY-NOTICES.md. The notebook's kernel prints "Hello world"; this one
 //! counts its runs with an atomic instead, so that the replays can be checked, and the times
-//! come from the host clock (stream events arrive with a later milestone) rather than from
+//! come from the host clock rather than from
 //! PyTorch's CUDA events.
 //!
 //! ```text

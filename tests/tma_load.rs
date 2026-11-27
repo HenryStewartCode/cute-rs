@@ -147,7 +147,7 @@ fn copy_args_are_checked_when_the_kernel_is_built() {
         || {
             let _ = CopyArgs::new().tma_multicast((2, 1), 'M');
         },
-        &["tma_multicast=", "not supported yet", "mcast_mask"],
+        &["tma_multicast=", "not supported", "mcast_mask"],
     );
     expect_build_panic(
         move || {
@@ -521,7 +521,7 @@ fn mma_fields_are_loop_carried() {
             let atom = make_mma_atom(MmaKind::M16N8K16F32F16).__admit_fields_for_tests(&[MmaField::SFA]);
             let _ = atom.get(MmaField::SFA);
         },
-        &["arrive with m10"],
+        &["are not supported"],
     );
 }
 

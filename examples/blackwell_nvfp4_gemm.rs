@@ -238,7 +238,6 @@ impl Nvfp4GemmConfig {
 }
 
 /// The tutorial's `kernel`.
-#[allow(clippy::too_many_arguments)]
 pub fn kernel<S: Numeric>(
     cfg: &Nvfp4GemmConfig,
     mut tiled_mma: TiledMma,
@@ -668,7 +667,6 @@ pub fn run(cfg: &Nvfp4GemmConfig, m: usize, n: usize, k: usize) -> SimReport {
     report
 }
 
-#[allow(dead_code)]
 fn main() {
     for cfg in [NVFP4_GEMM_0, NVFP4_GEMM_0_UE8M0] {
         let (m, n, k) = (256, 512, 512);

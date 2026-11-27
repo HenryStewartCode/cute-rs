@@ -274,7 +274,6 @@ pub(crate) fn check_pair_load_target() -> Result<(), String> {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn make_tma_atom_core<T: Numeric>(
     loc: &'static Location<'static>,
     what: &str,

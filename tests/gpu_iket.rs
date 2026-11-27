@@ -6,7 +6,9 @@
 //! cargo test --release --features cuda --test gpu_iket
 //! ```
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/tensorop_gemm.rs"]
 mod tensorop_gemm;
 

@@ -1,25 +1,22 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! CuTe DSL's `cute.nvgpu.tcgen05` (Blackwell, SM100 and its family): so
-//! far the build-time pieces of the UMMA
-//! operands: the shared-memory layout atoms ([`SmemLayoutAtomKind`],
+//! CuTe DSL's `cute.nvgpu.tcgen05` (Blackwell, SM100 and its family): the build-time pieces
+//! of the UMMA operands: the shared-memory layout atoms ([`SmemLayoutAtomKind`],
 //! [`make_smem_layout_atom`], [`make_sparse_smem_layout_atom`]),
 //! [`tile_to_mma_shape`], and the shared-memory descriptors
 //! ([`make_umma_smem_desc`], [`SmemDescriptor`], [`UmmaOperandMap`]).
-//! m10-tmem-ld-st adds the TMEM load and store copy atoms
-//! ([`Ld32x32bOp`] and its peers) and [`make_tmem_copy`]. m10-umma-f16
-//! adds the F16/BF16 MMA ([`MmaF16BF16Op`], with [`CtaGroup`],
-//! [`OperandSource`] and [`Field`]) and [`commit`]. m10-umma-dense-kinds
-//! adds [`MmaTF32Op`], [`MmaI8Op`], [`MmaF8F6F4Op`] and [`MmaFP8Op`].
-//! m10-umma-kinds adds A from tensor memory ([`OperandSource::TMEM`]) and
+//! The TMEM load and store copy atoms ([`Ld32x32bOp`] and its peers) and
+//! [`make_tmem_copy`]. The F16/BF16 MMA ([`MmaF16BF16Op`], with [`CtaGroup`],
+//! [`OperandSource`] and [`Field`]) and [`commit`]. [`MmaTF32Op`], [`MmaI8Op`],
+//! [`MmaF8F6F4Op`] and [`MmaFP8Op`]. A from tensor memory ([`OperandSource::TMEM`]) and
 //! the runtime fields `NEGATE_A`, `NEGATE_B` and `DISABLE_OUTPUT_LANE`.
-//! m10-s2t-copies adds the shared-memory-to-TMEM copies ([`Cp128x256bOp`]
+//! The shared-memory-to-TMEM copies ([`Cp128x256bOp`]
 //! and its peers, [`make_s2t_copy`], [`get_s2t_smem_desc_tensor`],
-//! [`append_s2t_broadcast_mode`]). m10-umma-blockscaled adds the
+//! [`append_s2t_broadcast_mode`]). The
 //! block-scaled MMAs ([`MmaMXF8F6F4Op`], [`MmaMXF4Op`], [`MmaMXF4NVF4Op`],
 //! [`SM103MmaMXF4Op`], [`SM103MmaMXF4NVF4Op`]) and [`tmem_sf_frg_layout`].
-//! m10-sparse-umma adds the 2:4 structured-sparse MMAs
-//! ([`MmaF16BF16SparseOp`], [`MmaFP8SparseOp`]). m10-rubin-umma adds the
+//! The 2:4 structured-sparse MMAs
+//! ([`MmaF16BF16SparseOp`], [`MmaFP8SparseOp`]). The
 //! Rubin (sm_107) MMAs ([`SM107MmaFP8Op`], [`SM107BlockScaledMmaMXF8F6F4Op`],
 //! [`SM107MmaMXF4NVF4Op`]) and their collector buffers ([`CollectorOp`]).
 
@@ -49,18 +46,18 @@ pub use copy::{LdRed16x32bx2Op, LdRed32x32bOp, TmemLoadRedOp};
 // TMEM loads with sparse compression.
 pub use copy::{LdRedSPCompress32x32bOp, LdSPCompress32x32bOp};
 
-// m10-umma-f16.
+// The F16 and BF16 MMAs and commit.
 pub use mma::{CtaGroup, Field, MmaF16BF16Op, OperandSource, commit};
-// m10-umma-dense-kinds.
+// The dense MMA kinds.
 pub use mma_dense::{MmaF8F6F4Op, MmaFP8Op, MmaI8Op, MmaTF32Op};
-// m10-umma-blockscaled.
+// The block-scaled MMAs.
 pub use mma_blockscaled::{
     MmaMXF4NVF4Op, MmaMXF4Op, MmaMXF8F6F4Op, MmaMXF8Op, SM103MmaMXF4NVF4Op, SM103MmaMXF4Op, tmem_sf_frg_layout,
 };
-// m10-sparse-umma.
+// The sparse MMAs.
 pub use crate::atom::mma::SparseMetadataFormat;
 pub use mma_sparse::{MmaF16BF16SparseOp, MmaFP8SparseOp};
-// m10-rubin-umma.
+// The SM107 MMAs.
 pub use crate::ir::CollectorOp;
 pub use mma_sm107::{SM107BlockScaledMmaMXF8F6F4Op, SM107MmaFP8Op, SM107MmaMXF4NVF4Op};
 // TMEM copy introspection.
@@ -77,7 +74,7 @@ pub use smem_desc::{
     smem_descriptor_to_int, umma_desc_fields,
 };
 
-// m10-s2t-copies.
+// The shared-memory-to-TMEM copies.
 pub use s2t::{
     Cp2x64x128b0123Op, Cp2x64x128b0213Op, Cp4x32x128bOp, Cp4x256bOp, Cp128x128bOp, Cp128x256bOp,
     append_s2t_broadcast_mode, get_s2t_smem_desc_tensor, make_s2t_copy,
@@ -87,6 +84,6 @@ pub use s2t::{
 pub mod helpers {
     pub use super::mma::commit;
     pub use super::smem_desc::{int_to_smem_descriptor, smem_descriptor_to_int};
-    // m10-s2t-copies.
+    // The shared-memory-to-TMEM copies.
     pub use super::s2t::{append_s2t_broadcast_mode, get_s2t_smem_desc_tensor, make_s2t_copy};
 }

@@ -3,10 +3,11 @@
 //! held to a plain-Rust model; the runtime scheduler stops at a runtime
 //! bound; the grid sizing and the swizzled layouts match CuTe DSL's rules.
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/persistent_gemm.rs"]
 mod persistent_gemm;
-#[allow(dead_code)]
 mod pipeline_kernels;
 
 use cute::prelude::*;

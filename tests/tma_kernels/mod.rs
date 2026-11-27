@@ -1,6 +1,7 @@
 //! Kernels with tensor-map and grid-constant parameters, shared by the simulator tests
 //! (`tests/tma_desc.rs`) and the GPU tests (`tests/gpu_tma.rs`).
 
+// Shared by several test binaries; each uses part of it.
 #![allow(dead_code)]
 
 use cute::prelude::*;

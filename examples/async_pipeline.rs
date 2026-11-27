@@ -223,7 +223,6 @@ pub fn run() {
     }
 }
 
-#[allow(dead_code)]
 fn main() {
     run();
     let mut args = args(Variant::Staged);

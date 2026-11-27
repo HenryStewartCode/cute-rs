@@ -8,7 +8,9 @@
 //! cargo run --release --features cuda --example run_on_gpu
 //! ```
 
-#[allow(dead_code)]
+// `tensorop_gemm` is included as a module: its `main` and the helpers this example does not call are unused here.
+#![allow(dead_code)]
+
 #[path = "tensorop_gemm.rs"]
 mod tensorop_gemm;
 

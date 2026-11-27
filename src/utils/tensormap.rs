@@ -31,7 +31,6 @@ use crate::value::Numeric;
 /// Where [`TensorMapManager::update_tensormap`] edits a descriptor (CuTe
 /// DSL's `TensorMapUpdateMode`): in place in global memory, or in a copy in
 /// shared memory that is then copied back.
-#[allow(clippy::upper_case_acronyms)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum TensorMapUpdateMode {
     GMEM,

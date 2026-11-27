@@ -92,7 +92,6 @@ impl Emitter<'_> {
     }
 
     /// A multimem instruction on the multimem address of element `index` of `buffer`.
-    #[allow(clippy::too_many_arguments)]
     pub(super) fn multimem(
         &mut self,
         indent: usize,

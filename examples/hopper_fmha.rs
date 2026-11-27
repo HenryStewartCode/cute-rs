@@ -520,7 +520,6 @@ impl HopperFusedMultiHeadAttentionForward {
     }
 
     /// The TMA atoms, then the kernel (`__call__`).
-    #[allow(clippy::too_many_arguments)]
     fn call<T: Numeric, O: Numeric>(
         &self,
         q: &Tensor<T>,
@@ -1091,7 +1090,8 @@ impl HopperFusedMultiHeadAttentionForward {
     /// of the scaled scores, the rescaling of the running sum and of
     /// `acc_pv`, and the row sums. `origin` is the global `(row, column)` of
     /// the tile's first element.
-    #[allow(clippy::too_many_arguments, clippy::needless_range_loop)]
+    // `i` indexes several arrays at once (the row of the tile).
+    #[allow(clippy::needless_range_loop)]
     fn softmax_step(
         &self,
         mask: &FusedMask,
@@ -1228,7 +1228,6 @@ impl HopperFusedMultiHeadAttentionForward {
     /// The epilogue of one warpgroup: registers → shared memory
     /// (`stmatrix`) → global memory (TMA store), one epilogue tile at a
     /// time, on the warpgroup's named barrier.
-    #[allow(clippy::too_many_arguments)]
     fn epilogue<O: Numeric>(
         &self,
         pv_tiled_mma: &TiledMma,
@@ -1625,7 +1624,6 @@ pub fn run(fmha: &HopperFusedMultiHeadAttentionForward, kernel: &Kernel, p: &Pro
 /// `HardwareInfo::get_device_multiprocessor_count`).
 pub const SIM_SMS: usize = 3;
 
-#[allow(dead_code)]
 fn main() {
     println!("Running Hopper FMHA forward (in the simulator) with:");
     let p = Problem::new(1, 128, 200, 2, 1, 64).causal();

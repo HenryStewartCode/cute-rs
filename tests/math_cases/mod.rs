@@ -3,6 +3,7 @@
 //! simulator to the references; `tests/gpu.rs` holds the GPU to the
 //! simulator (precise mode, bit for bit) and to the references (fast mode).
 
+// Shared by several test binaries; each uses part of it.
 #![allow(dead_code)]
 
 use cute::prelude::*;

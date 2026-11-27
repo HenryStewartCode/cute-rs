@@ -657,9 +657,9 @@ impl<T: Numeric, X: Into<IndexExpr>> AddAssign<X> for Ptr<T> {
     }
 }
 
-/// `ptr - n`: `n` elements back. Offsets are non-negative until signed
-/// index arithmetic (m5), so `n` must be static and at most the static
-/// part of the pointer's offset, or the build panics.
+/// `ptr - n`: `n` elements back. Offsets are non-negative, so `n` must be
+/// static and at most the static part of the pointer's offset, or the
+/// build panics.
 impl<T: Numeric, X: Into<IndexExpr>> Sub<X> for Ptr<T> {
     type Output = Ptr<T>;
     #[track_caller]
@@ -687,13 +687,13 @@ impl<T: Numeric, X: Into<IndexExpr>> SubAssign<X> for Ptr<T> {
 fn back<T: Numeric>(p: &Ptr<T>, n: IndexExpr) -> Ptr<T> {
     let (_, off) = p.parts_unswizzled();
     let Some(k) = n.as_static() else {
-        panic!("Ptr - n: n = {n:?} is a runtime value; a pointer moves back only by a static count (until m5)")
+        panic!("Ptr - n: n = {n:?} is a runtime value; a pointer moves back only by a static count")
     };
     let have = static_part(&off);
     assert!(
         k <= have,
         "Ptr - {k}: the pointer's offset {off:?} has a static part of only {have} elements, and offsets cannot go \
-         negative (until m5's signed index arithmetic)"
+         negative"
     );
     p.with_offset(IndexExpr::difference(off, IndexExpr::Static(k)))
 }

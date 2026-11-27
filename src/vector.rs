@@ -557,6 +557,7 @@ impl<A: VectorSliceItem> VectorSlice for A {
 
 macro_rules! slice_tuples {
     ($(($($n:ident),+)),+) => {$(
+        // The tuple's fields are bound by their generic parameter names (`A`, `B`, ...).
         #[allow(non_snake_case)]
         impl<$($n: VectorSliceItem),+> VectorSlice for ($($n,)+) {
             fn slice_items(self) -> Vec<SliceItem> {

@@ -7,7 +7,9 @@
 //! warpgroups) with the race detector on, and the mistake the diagnostics
 //! show.
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/hopper_persistent_gemm.rs"]
 mod hopper_persistent_gemm;
 

@@ -30,7 +30,7 @@ pub struct ClcDynamicPersistentTileSchedulerOptions {
     /// Whether the clusters go along M first (the default) or along N.
     pub raster_along_m: bool,
     /// The fallback cluster shape of a launch with preferred and fallback
-    /// clusters (m6's `LaunchConfig::with_fallback_cluster`): the params
+    /// clusters (`LaunchConfig::with_fallback_cluster`): the params
     /// keep a second schedule for it
     /// ([`fallback`](ClcDynamicPersistentTileSchedulerParams::fallback)),
     /// which [`ClcDynamicPersistentTileScheduler::create`] takes in the

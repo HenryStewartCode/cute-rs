@@ -61,7 +61,7 @@ use crate::value::{bf16_bits_to_f32, f16_bits_to_f32, f32_to_bf16_bits, f32_to_f
 type R<T = ()> = Result<T, SimError>;
 
 mod tensormap;
-// m10-tmem-core.
+// The tensor-memory model.
 mod tmem;
 // Tcgen05 MMAs and commits.
 mod umma;
@@ -675,9 +675,8 @@ enum Trigger {
 }
 
 /// One in-flight asynchronous-operation model for every kind of operation:
-/// `cp.async` (with `cp.async.mbarrier.arrive{.noinc}`) and `cp.async.bulk`
-/// today, and the hooks for TMA, bulk async-groups and proxy fences (m7),
-/// WGMMA groups (m8) and tcgen05 (m10).
+/// `cp.async` (with `cp.async.mbarrier.arrive{.noinc}`), `cp.async.bulk`, TMA,
+/// bulk async-groups and proxy fences, WGMMA groups and tcgen05.
 struct AsyncOp {
     /// The issuing thread.
     thread: usize,
@@ -2514,7 +2513,6 @@ impl<'a> Machine<'a> {
                 count(self);
                 self.barrier(inst, group, *kind, Some(*id), *threads, None)?;
             }
-            // m11-prims-nvvm-layer.
             Op::BarrierRed { result, kind, pred, id, threads } => {
                 count(self);
                 self.barrier(inst, group, BarrierKind::Sync, Some(*id), *threads, Some((*kind, *pred, *result)))?;
@@ -4203,7 +4201,6 @@ impl<'a> Machine<'a> {
 
     /// Bounds- and alignment-check `n` elements of `size` bytes at element
     /// `idx`, and return the byte offset.
-    #[allow(clippy::too_many_arguments)]
     fn checked_range(
         &self,
         b: BufferId,
@@ -4449,7 +4446,6 @@ impl<'a> Machine<'a> {
 
     /// [`Self::smem_claim_write`] of shared memory in `block` (another CTA of `t`'s
     /// cluster for a copy into a peer's shared memory).
-    #[allow(clippy::too_many_arguments)]
     fn smem_claim_write_in(
         &mut self,
         b: BufferId,
@@ -4644,7 +4640,6 @@ impl<'a> Machine<'a> {
     /// moves on to a new time. An acquire one (acquire or acq_rel) orders
     /// its warp after what it read was published, once every lane has
     /// read, as an acquire load does.
-    #[allow(clippy::too_many_arguments)]
     fn atomic(
         &mut self,
         active: &[usize],
@@ -4718,7 +4713,7 @@ impl<'a> Machine<'a> {
                 let at = byte + k * step;
                 let shift = 8 * k * step;
                 let x = mask(operand >> shift, step * 8);
-                // A compare-and-swap that fails only reads (m11: so a spin on one is a poll,
+                // A compare-and-swap that fails only reads (so a spin on one is a poll,
                 // not progress).
                 if kind == AtomicKind::CompareExchange {
                     let current = self.read_as(buffer, at, step, t, true)?;
@@ -6250,7 +6245,7 @@ impl<'a> Machine<'a> {
                         self.pdl_access(*dst, di..di + count, t, true)?;
                     }
                     let data = self.shared[self.home[src.0 as usize]][block].data[si..si + count].to_vec();
-                    // m7-tma-sm100-modes: `.cp_mask` writes the bytes of each 16-byte chunk
+                    // `.cp_mask` writes the bytes of each 16-byte chunk
                     // whose bit of the mask is set, as runs.
                     let global_writes = match byte_mask {
                         None => vec![(*dst, di, data)],
@@ -7080,7 +7075,7 @@ impl<'a> Machine<'a> {
     }
 
     /// Issue a test-only asynchronous operation by thread `t`, with the
-    /// effects m7 and m8 add: shared-memory writes, background reads and
+    /// effects of TMA and WGMMA: shared-memory writes, background reads and
     /// register results.
     #[cfg(test)]
     fn issue_test_op(
@@ -7386,7 +7381,6 @@ impl<'a> Machine<'a> {
     /// the async proxy's write is checked and claimed, and the copy is in flight until
     /// the mbarrier's phase lands it. `reads` are shared memory of `t`'s CTA it reads
     /// until then.
-    #[allow(clippy::too_many_arguments)]
     fn issue_to_mbarrier(
         &mut self,
         dst: BufferId,
@@ -7453,7 +7447,6 @@ impl<'a> Machine<'a> {
     /// one CTA of a pair waits for both CTAs' halves of a 2-CTA MMA's operands.
     ///
     /// [`TmaDesc::access_elements`]: crate::tma::TmaDesc::access_elements
-    #[allow(clippy::too_many_arguments)]
     fn tma_load(
         &mut self,
         dst: BufferId,
@@ -9005,7 +8998,6 @@ impl<'a> Machine<'a> {
         (self.threads_per_block - base % self.threads_per_block).min(32)
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn mma(
         &mut self,
         kind: MmaKind,
@@ -9520,7 +9512,7 @@ pub(super) struct PdlState {
     waited: HashSet<([u32; 3], usize)>,
 }
 
-// ---- m7-tma-im2col and m7-tma-sm100-modes ----
+// ---- TMA im2col and SM100 modes ----
 
 /// A TMA instruction's operands, for the simulator.
 struct TmaIssue<'a> {

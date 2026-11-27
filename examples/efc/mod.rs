@@ -42,6 +42,7 @@
 //!   parameter, at least one written tensor, and (by the GEMM) one majorness for every
 //!   tensor.
 
+// The activation functions are methods named as the Python's, among them `add` and `mul`.
 #![allow(clippy::should_implement_trait)]
 
 use std::cell::RefCell;

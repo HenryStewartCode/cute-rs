@@ -30,7 +30,7 @@
 //!   until it would be the only live allocation, and blocks the others
 //!   until it is freed.
 //!
-//! Roadmap part m10-tmem-ld-st adds `tcgen05.ld`, `tcgen05.st` and
+//! The TMEM loads and stores `tcgen05.ld`, `tcgen05.st` and
 //! `tcgen05.wait::{ld,st}` (PTX ISA 9.7.18.8):
 //!
 //! * **Issue.** Both are warp-collective: all 32 lanes of the warp, one
@@ -110,6 +110,7 @@ pub(super) struct BlockTmem {
     cells: Vec<Cell>,
 }
 
+// Called only by the tests.
 #[cfg_attr(not(test), allow(dead_code))]
 impl BlockTmem {
     fn cells(&mut self) -> &mut [Cell] {
@@ -162,6 +163,7 @@ struct PendingSt<'a> {
 /// The lane-quadrant rule of `tcgen05.ld` and `tcgen05.st` (PTX ISA
 /// 9.7.18.8.1): warp `w` of a warpgroup (`w = warp_id % 4`) may access only
 /// TMEM lanes `32 w` to `32 w + 31`. Returns why `lane` is out of reach.
+// Called only by the tests.
 #[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn lane_quadrant(warp_id: usize, lane: usize) -> Result<(), String> {
     let q = warp_id % 4;
@@ -211,7 +213,7 @@ pub(super) struct State<'a> {
     /// The tcgen05 MMAs in flight, in issue order.
     pub(super) mmas: Vec<super::umma::UmmaFlight>,
     /// The collector buffers, by CTA and slot (0: A, 5: the
-    /// sm_107 B; m11-prims-mma-forms: `1 + i` the `.ws` B buffer `b<i>`).
+    /// sm_107 B; `1 + i`: the `.ws` B buffer `b<i>`).
     pub(super) collectors: HashMap<(usize, u8), super::umma::Collector>,
 }
 
@@ -346,8 +348,7 @@ impl<'a> Machine<'a> {
 
     /// A `tcgen05` instruction `what` (at `loc`, by thread `t`) with
     /// `.cta_group::2` when `two_cta`: the first fixes the kernel's
-    /// `cta_group`, and every later one must use the same (m10-cta-pair
-    /// adds the MMAs and commits).
+    /// `cta_group`, and every later one must use the same.
     pub(super) fn tcgen05_group(&mut self, what: &str, two_cta: bool, loc: Loc, t: usize) -> R {
         match self.tmem.group {
             Some((g, first)) if g != two_cta => {
@@ -371,7 +372,6 @@ impl<'a> Machine<'a> {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn tmem_alloc(
         &mut self,
         inst: &'a Inst,

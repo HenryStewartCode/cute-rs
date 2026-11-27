@@ -53,6 +53,7 @@
 //! Out of scope: sharding (`shard_map`, `custom_partitioning`) is the Python side's job;
 //! typed handler state, futures and non-buffer arguments are not read.
 
+// The handler plumbing is used only when the `cuda` feature builds the runtime that calls it.
 #![cfg_attr(not(feature = "cuda"), allow(dead_code, unused_imports))]
 
 use std::cell::RefCell;

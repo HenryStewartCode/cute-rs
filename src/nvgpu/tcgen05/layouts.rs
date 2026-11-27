@@ -24,6 +24,7 @@ use crate::value::Numeric;
 /// ([`warpgroup::SmemLayoutAtomKind`]) and `MN_SW128_32B`, the MN-major
 /// 128-byte swizzle with 32-byte atomicity (`Swizzle<2,5,2>` on bytes),
 /// which only UMMA reads.
+// The variants are named as CuTe's layout atoms are (`K_SW128`, ...).
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum SmemLayoutAtomKind {

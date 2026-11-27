@@ -397,7 +397,6 @@ impl StaticPersistentGroupTileScheduler {
     ///
     /// Panics for 0 groups, for a tensor whose shape is not `(group_count,
     /// 4)`, and for a cluster tile with a 0 extent.
-    #[allow(clippy::too_many_arguments)]
     #[track_caller]
     pub fn create(
         params: &PersistentTileSchedulerParams,
@@ -632,6 +631,7 @@ pub struct GroupedGemmTileSchedulerHelper {
     search_state: GroupedGemmGroupSearchState,
 }
 
+// The deprecated helper's own implementation uses its deprecated fields.
 #[allow(deprecated)]
 impl GroupedGemmTileSchedulerHelper {
     /// The helper for `group_count` groups, a schedule made with
@@ -715,6 +715,7 @@ impl GroupedGemmTileSchedulerHelper {
     }
 }
 
+// The deprecated helper's own implementation uses its deprecated fields.
 #[allow(deprecated)]
 impl Carry for GroupedGemmTileSchedulerHelper {
     #[track_caller]

@@ -559,7 +559,6 @@ impl<'a> Machine<'a> {
     /// read. Each byte
     /// must be written, by a write ordered before the issue in every warp of
     /// `warps`, and no asynchronous copy may still be writing it.
-    #[allow(clippy::too_many_arguments)]
     fn wgmma_operand(
         &mut self,
         desc: u64,

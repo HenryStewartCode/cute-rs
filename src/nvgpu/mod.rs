@@ -2,25 +2,24 @@
 
 //! The operations of CuTe DSL's `cute.nvgpu`, by its submodules: the
 //! structs are named like CuTe DSL's classes and convert into the
-//! IR-facing [`CopyOp`](crate::CopyOp) the copy functions take. So far
+//! IR-facing [`CopyOp`](crate::CopyOp) the copy functions take. It holds
 //! [`cpasync`], the common major modes ([`OperandMajorMode`],
 //! [`OutputMajorMode`]) and [`warpgroup`]'s shared-memory layout atoms and
-//! F16/BF16 warpgroup MMA; the `warp` operations follow
-//! with the roadmap's later parts.
+//! warpgroup MMAs, with [`tcgen05`] and the `warp` operations.
 
 mod common;
 pub mod cpasync;
 pub mod tensormap;
 pub(crate) mod tma_atom;
 pub(crate) mod tma_copy;
-// m7-tma-im2col.
+// The im2col TMA atoms.
 pub(crate) mod tma_im2col;
-// m7-tma-sm100-modes.
+// The SM100 TMA modes.
 pub(crate) mod tma_sm100;
 // The MMA-aware TMA atoms.
 mod tma_sm100_mma;
 pub mod warpgroup;
-// m10-umma-layouts.
+// The tcgen05 atoms.
 pub mod tcgen05;
 // Cute.nvgpu.warp's block-scaled MMAs.
 pub mod warp;

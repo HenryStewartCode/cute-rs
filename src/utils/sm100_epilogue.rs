@@ -117,7 +117,6 @@ fn repetition(n: u32) -> Repetition {
 /// per warp, for an epilogue tile the TMEM warp layout does not divide, for
 /// D of 6 or 4 bits with 16 datapaths, and for a pair of widths no
 /// instruction serves.
-#[allow(clippy::too_many_arguments)]
 #[track_caller]
 pub fn select_tmem_load_op(
     cta_tile_shape: &[usize],
@@ -216,7 +215,6 @@ pub fn select_tmem_load_op(
 /// The repetition is the largest the columns' bits allow (`.x32` at most
 /// for `16x256b`, `.x64` for `16x128b`, `.x128` otherwise). Panics when
 /// nothing serves (see [`select_tmem_load_op`]).
-#[allow(clippy::too_many_arguments)]
 #[track_caller]
 pub fn get_tmem_load_op<Acc: Numeric>(
     cta_tile_shape: &[usize],
@@ -600,7 +598,6 @@ pub fn epilogue_smem_copy_and_partition<Acc: Numeric, C: Numeric>(
 /// explicit (`fence_view_async_tmem_load`), which this inserts; the
 /// consumer arrival of `acc_pipeline` is one per warp (elected), so the
 /// pipeline's consumer group counts the epilogue warps.
-#[allow(clippy::too_many_arguments)]
 #[track_caller]
 pub fn epilogue_tma_store<Acc: Numeric, C: Numeric, G: CopyElem<C>, P: Pipeline>(
     cfg: &EpilogueConfig,
@@ -723,7 +720,6 @@ pub fn epilogue_tma_store<Acc: Numeric, C: Numeric, G: CopyElem<C>, P: Pipeline>
 ///
 /// The stage is released by one thread of each warp, as in
 /// [`epilogue_tma_store`]. Returns the next accumulator state.
-#[allow(clippy::too_many_arguments)]
 #[track_caller]
 pub fn epilogue<Acc: Numeric, C: Numeric, P: Pipeline>(
     cfg: &EpilogueConfig,

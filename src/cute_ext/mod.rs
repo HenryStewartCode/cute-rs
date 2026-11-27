@@ -1,5 +1,5 @@
 //! CuTe DSL's experimental fragment-free layer, `cutlass.cute.experimental`
-//! ("cute_ext"), roadmap part m11-cute-ext-core and the parts after it.
+//! ("cute_ext").
 //!
 //! In cute_ext a kernel allocates whole buffers and calls copy, partition,
 //! dot and pipeline operations on whole tensors; a compiler pipeline behind
@@ -39,7 +39,7 @@
 //! DSMEM messages to the pair's peer CTA), [`accumulator_buffering`] (the
 //! TMEM accumulator planner), [`utils`] (the GEMM building blocks:
 //! CTA-V maps, TMEM layouts, `mainloop_mma` and `epilogue_tma_store`), and
-//! the scaffolding of later parts: [`iket`].
+//! the hooks of cute_ext's IKET tracing: [`iket`].
 //!
 //! The semantics follow CuTe DSL 4.8.1's documented behaviour and its BSD-3
 //! examples; the implementation is cute-rs's own.
@@ -92,6 +92,7 @@ pub use pipeline_ops::{
     pipeline_advance_iterator, pipeline_tail, producer_acquire, producer_acquire_with, producer_commit,
     producer_try_acquire,
 };
+// Re-exports a deprecated name, which CuTe's `cute_ext` also exposes.
 #[allow(deprecated)]
 pub use tma::tma_load_multicast;
 pub use tma::{

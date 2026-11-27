@@ -193,7 +193,6 @@ pub fn run(kernel: &Kernel, mnkl: (usize, usize, usize, usize), small: bool) -> 
     d.to_vec()
 }
 
-#[allow(dead_code)]
 fn main() {
     let args: Vec<usize> = std::env::args().skip(1).map(|a| a.parse().expect("M N K L")).collect();
     let mnkl = match args.as_slice() {

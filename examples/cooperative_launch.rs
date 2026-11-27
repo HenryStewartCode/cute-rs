@@ -178,7 +178,6 @@ pub fn run() -> SimReport {
     report
 }
 
-#[allow(dead_code)]
 fn main() {
     run();
     println!("cooperative_launch: all {BLOCKS} blocks crossed the grid barrier {ITERATIONS} times");

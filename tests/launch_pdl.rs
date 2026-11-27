@@ -3,7 +3,9 @@
 //! PDL model ([`SimStream`]), the port of `programmatic_dependent_launch.py`, and the
 //! cooperative and PDL fields of [`LaunchConfig`].
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/programmatic_dependent_launch.rs"]
 mod programmatic_dependent_launch;
 

@@ -81,7 +81,7 @@ pub use sync::SyncObject;
 pub use tma_pipeline::{
     PipelineTmaAsync, PipelineTmaAsyncOptions, PipelineTmaStore, TmaStoreFence, init_empty_barrier_arrive_signal,
 };
-// m10-umma-pipelines.
+// The UMMA pipelines.
 pub use umma_pipeline::{
     PipelineAsyncUmma, PipelineTmaUmma, PipelineTmaUmmaOptions, PipelineUmmaAsync, PipelineUmmaOptions,
 };

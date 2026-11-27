@@ -9,7 +9,9 @@
 //! accumulator plan with `amax_out`; `mainloop_mma_sm120` on one SM120 warp; the layouts;
 //! sm_100a and sm_120a PTX (assembled when `ptxas` is installed); diagnostics last.
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/cute_ext_dense_gemm_persistent.rs"]
 mod gemm;
 

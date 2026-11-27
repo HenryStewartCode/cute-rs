@@ -495,7 +495,6 @@ pub fn run_with(
     report
 }
 
-#[allow(dead_code)]
 fn main() {
     for (cfg, mnk, clusters) in [
         (ONE_SM, (256, 128, 128), 2),

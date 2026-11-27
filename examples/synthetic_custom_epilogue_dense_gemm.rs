@@ -22,7 +22,6 @@
 //!
 //! Run with `cargo run --release --example synthetic_custom_epilogue_dense_gemm`.
 
-#[allow(dead_code)]
 #[path = "efc/mod.rs"]
 pub mod efc;
 
@@ -60,7 +59,6 @@ pub fn meta_epilogue(read_tensors: usize, written_tensors: usize, t_dtype: DType
 
 /// Simulate `cfg` with the synthetic epilogue on an `m x n x k` problem: read tensors of
 /// small integers, written ones filled with -7.
-#[allow(clippy::too_many_arguments)]
 pub fn run(
     cfg: GemmConfig,
     (m, n, k): (usize, usize, usize),

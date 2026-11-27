@@ -16,23 +16,21 @@
 //! cargo test --release --features cuda --test gpu_blackwell -- --ignored --nocapture bench_
 //! ```
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/blackwell_fp16_gemm.rs"]
 mod blackwell_fp16_gemm;
 
-#[allow(dead_code)]
 #[path = "../examples/blackwell_dense_gemm.rs"]
 mod blackwell_dense_gemm;
 
-#[allow(dead_code)]
 #[path = "../examples/blackwell_nvfp4_gemm.rs"]
 mod blackwell_nvfp4_gemm;
 
-#[allow(dead_code)]
 #[path = "../examples/blackwell_mixed_input_gemm.rs"]
 mod blackwell_mixed_input_gemm;
 
-#[allow(dead_code)]
 #[path = "../examples/tma_copy.rs"]
 mod tma_copy;
 

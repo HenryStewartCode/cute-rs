@@ -355,7 +355,6 @@ pub fn run_float(vals: &[f32]) {
     }
 }
 
-#[allow(dead_code)]
 fn main() {
     run_integer(&int_inputs());
     println!("integer_reductions: correct ({:?})", integer_reference(&int_inputs()));

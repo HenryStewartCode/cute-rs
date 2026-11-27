@@ -700,7 +700,7 @@ impl MmaAtom {
             }
     }
 
-    /// Whether the atom is a sparse `mma.sp` (or, m10-sparse-umma,
+    /// Whether the atom is a sparse `mma.sp` (or
     /// `tcgen05.mma.sp`), whose A operand is the compressed `M x K/2` tile.
     pub fn is_sparse(&self) -> bool {
         matches!(self.op, MmaOp::Sm80(kind) if kind.is_sparse()) || matches!(self.op, MmaOp::Sm100(kind) if kind.sparse)
@@ -1285,7 +1285,6 @@ pub fn gemm<A: GemmOperand, B: GemmOperand, TC: Numeric>(mma: &TiledMma, d: &Ten
     if let MmaOp::Sm120(_) = mma.atom.op {
         return gemm_block_scaled(mma, d, &a, sfa, &b, sfb, c);
     }
-    // m10-umma-blockscaled.
     // A's companion is the metadata.
     if let MmaOp::Sm100(kind) = mma.atom.op
         && (kind.scale.is_some() || kind.sparse)

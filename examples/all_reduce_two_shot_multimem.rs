@@ -159,7 +159,6 @@ pub fn expected_output(p: Problem, local_rank: usize) -> Vec<f32> {
     out
 }
 
-#[allow(dead_code)]
 fn main() {
     let p = Problem { m: 32, n: 256, rows_per_thread: 2, world_size: 2 };
     for rank in 0..p.world_size {

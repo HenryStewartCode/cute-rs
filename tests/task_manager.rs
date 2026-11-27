@@ -5,18 +5,18 @@
 // 01_copy_persistent_skip_tile.py); see examples/ts_copy_*.rs,
 // tests/ts_kernels/mod.rs and THIRD-PARTY-NOTICES.md.
 
-//! Task Scheduling part 2: tasks, the
+//! Task Scheduling tasks and the manager: the
 //! TaskManager's static checks, kernel emission on the simulator (with seeded
 //! interleavings), PDL barrier resources, IKET ranges per step, and the
 //! diagnostics.
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/ts_copy_grid_stride.rs"]
 mod ts_copy_grid_stride;
-#[allow(dead_code)]
 #[path = "../examples/ts_copy_persistent_skip_tile.rs"]
 mod ts_copy_persistent_skip_tile;
-#[allow(dead_code)]
 mod ts_kernels;
 
 use std::path::PathBuf;

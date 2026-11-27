@@ -1,5 +1,4 @@
-//! The MLIR of the operations of roadmap part m11-prims-nvvm-layer
-//! (`cute::prims`): `barrier.cta.red`, the extra mbarrier operations, the
+//! The MLIR of the operations of `cute::prims`: `barrier.cta.red`, the extra mbarrier operations, the
 //! markers and hints, `exit`, `st.bulk` and `tcgen05.shift`.
 //!
 //! The per-thread instructions are inline PTX with side effects, which

@@ -9,7 +9,7 @@
 // licence, and the rest of the file is cute-rs's own, under MIT OR Apache-2.0.
 // THIRD-PARTY-NOTICES.md has the licence text.
 
-//! Task Scheduling part 3: the declarative SMEM and
+//! Task Scheduling memory and groups: the declarative SMEM and
 //! TMEM allocators on the host (offsets, alignment, reordering, barrier
 //! placement, alias groups), the manager's new checks (alias races, group
 //! arrival counts, TMEM capacity, barrier storage, group misuse), the ported
@@ -17,6 +17,9 @@
 //! MLIR and PTX, and a TMEM + `TSPipelineAsyncUmma` / `TSPipelineUmmaUmma`
 //! kernel on the simulator with its sm_100a PTX. With `CUTE_TS_PTX_DIR` set,
 //! the PTX is also written there (for `ptxas` elsewhere).
+
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
 
 #[path = "../examples/ts_copy_tma.rs"]
 mod ts_copy_tma;

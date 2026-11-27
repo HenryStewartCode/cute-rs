@@ -573,6 +573,7 @@ fn epilogue_tiles() {
 }
 
 #[test]
+// Tests the deprecated names, which still have to work.
 #[allow(deprecated)]
 fn tmem_capacity() {
     for (arch, max) in [

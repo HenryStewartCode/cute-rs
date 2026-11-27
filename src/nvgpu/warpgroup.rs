@@ -32,6 +32,7 @@ use crate::value::Numeric;
 /// contiguous along M (A) or N (B), `K_*` along K; `INTER` is unswizzled
 /// (16-byte interleaved), `SW32`, `SW64` and `SW128` are swizzled over rows
 /// of 32, 64 and 128 bytes.
+// The variants are named as CuTe's layout atoms are (`K_SW128`, ...).
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum SmemLayoutAtomKind {
@@ -164,7 +165,6 @@ use crate::tensor::{Engine, RegisterStorage, Tensor, TensorInner};
 /// [`TiledMma::make_fragment_a`](crate::TiledMma::make_fragment_a) makes
 /// and a kernel fills, by `ldmatrix` or from an earlier accumulator, before
 /// [`fence`]).
-#[allow(clippy::upper_case_acronyms)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum OperandSource {
     RMEM,

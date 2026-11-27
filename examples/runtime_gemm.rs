@@ -242,7 +242,6 @@ pub fn run_dynamic(kernel: &Kernel, m: usize, n: usize, k: usize) -> (SimReport,
     (report, args[2].as_f32().to_vec())
 }
 
-#[allow(dead_code)]
 fn main() {
     let (kernel, dynamic) = (build(), build_dynamic());
     for (m, n, k) in [(128, 128, 32), (256, 128, 96), (128, 256, 160), (256, 256, 256)] {

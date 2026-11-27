@@ -656,7 +656,7 @@ pub struct SimReport {
     /// out-of-bounds elements included, as their transaction bytes count;
     /// a multicast load's in every CTA it writes).
     pub tma_bytes: u64,
-    // ---- m7-tma-store and m7-cluster-copies ----
+    // ---- TMA stores and cluster copies ----
     /// TMA tile stores and reduce stores issued, one per issuing thread.
     pub tma_stores: u64,
     /// The bytes of those stores' boxes (clipped elements included).
@@ -670,14 +670,14 @@ pub struct SimReport {
     /// Asynchronous copies (multicast TMA and bulk loads, peer bulk copies, `st.async`)
     /// into another CTA's shared memory, one per destination CTA.
     pub cluster_copies: u64,
-    // ---- m10-umma-f16 ----
+    // ---- tcgen05 MMAs ----
     /// `tcgen05.mma` instructions issued (one per warp-level `gemm` MMA).
     pub tcgen05_mma_instructions: u64,
-    // ---- m10-clc-scheduling ----
+    // ---- Cluster launch control ----
     /// Clusters cancelled by `clusterlaunchcontrol.try_cancel` (which never
     /// started).
     pub clc_cancelled: u64,
-    // ---- m11-prims-nvvm-layer ----
+    // ---- cute::prims ----
     /// Warps that executed `exit` (`prims::exit`).
     pub exits: u64,
     /// `nanosleep`s executed, one per warp (each yields the warp).

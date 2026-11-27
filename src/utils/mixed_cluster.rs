@@ -5,7 +5,7 @@
 //! and the fallback params of its tile schedulers).
 //!
 //! Since CUDA 12.8 (Blackwell), a launch may name two cluster shapes
-//! (m6's [`LaunchConfig::with_fallback_cluster`](crate::LaunchConfig::with_fallback_cluster)):
+//! ([`LaunchConfig::with_fallback_cluster`](crate::LaunchConfig::with_fallback_cluster)):
 //! the hardware runs each cluster of the grid at the preferred shape when it
 //! fits, and otherwise as fallback-shaped clusters, so one launch mixes the
 //! two. Everything a kernel derives from the cluster shape (the cluster

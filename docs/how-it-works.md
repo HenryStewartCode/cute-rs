@@ -150,8 +150,8 @@ Rust kernel code ──► builder ──► IR ──► validate ──┬─�
   PTX ISA version; the target gets the version of the alternative it
   satisfies (the FP4 `cvt` is PTX 8.6 on sm_100a, 8.7 on sm_120a and 8.8
   on sm_103f), and a refusal lists them all. `validate::SM90A_ONLY` and
-  `validate::SETMAXNREG` are the exact-chip lists m8's WGMMA and
-  `setmaxnreg` will use.
+  `validate::SETMAXNREG` are the exact-chip lists that WGMMA and
+  `setmaxnreg` use.
   Kernels with more than 48 KB of shared memory are compiled to allocate it
   dynamically, and so are kernels with a dynamic region (`get_dyn_smem`),
   whose size the launch sets (`LaunchConfig::with_dynamic_smem`): one layout,

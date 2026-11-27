@@ -3,7 +3,9 @@
 //! reduced `mixed_input_gemm.py` port (`examples/blackwell_mixed_input_gemm.rs`) against a CPU
 //! reference, with its sm_100a PTX assembled by `ptxas` when it is on PATH.
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/blackwell_mixed_input_gemm.rs"]
 mod blackwell_mixed_input_gemm;
 

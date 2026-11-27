@@ -244,7 +244,6 @@ pub mod gpu {
     /// `compile_class` of the example returns): a panic when the kernel cannot be built
     /// (`copy_bits = 1`), `CantImplement` when the row length is not a whole number of
     /// vectors.
-    #[allow(clippy::type_complexity)]
     pub fn build<'a>(
         ctx: &'a CudaContext,
         tc: &Toolchain,
@@ -287,7 +286,6 @@ pub mod gpu {
     }
 }
 
-#[allow(dead_code)]
 fn main() {
     // Every candidate on the simulator: the buildable ones compute C = A + B, edges included.
     for (m, n) in [(3, 12), (37, 64), (64, 128)] {

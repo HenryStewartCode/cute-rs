@@ -49,8 +49,6 @@
 //! - the epilogue waits for each TMEM load explicitly (`fence_view_async_tmem_load`), which
 //!   the simulator requires, and the TMA-load warp's `try_acquire` peeks are left out.
 
-#![allow(clippy::too_many_arguments)]
-
 use std::collections::HashMap;
 
 use cute::cpasync;

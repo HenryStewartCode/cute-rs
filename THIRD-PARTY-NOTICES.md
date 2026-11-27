@@ -200,7 +200,7 @@ comment at each says where it comes from:
   `UniversalCopy` in `include/cute/atom/copy_traits.hpp`, the tables
   `src/atom/copy.rs` ports.
 
-### stmatrix atoms (m8-stmatrix-setmaxnreg)
+### stmatrix atoms
 
 | cute-rs file | NVIDIA source | What it ports |
 |---|---|---|
@@ -208,7 +208,7 @@ comment at each says where it comes from:
 | | `include/cute/atom/copy_traits_sm100.hpp` | the `stmatrix` source, destination and reference layouts of `SM100_U8x4/x8/x16_STSM_T`, converted from bits to 8-bit elements |
 | `tests/feature_kernels/stmatrix.rs` | `examples/python/CuTeDSL/cute/hopper/kernel/dense_gemm/dense_gemm.py` and `dense_gemm_persistent.py` | follows their design: the register-to-shared epilogue copy made with `make_tiled_copy_C_atom` of `StMatrix8x8x16bOp` (four matrices) and `make_tiled_copy_S`, and the warp-specialised register split (the producer warpgroup at 40 registers, the consumers at 232) |
 
-### Warpgroup MMA (m8-wgmma-core)
+### Warpgroup MMA
 
 | cute-rs file | NVIDIA source | What it ports |
 |---|---|---|
@@ -218,7 +218,7 @@ comment at each says where it comes from:
 | `src/backend/mlir/wgmma.rs` | `include/cute/atom/mma_traits_sm90_gmma.hpp` | `warpgroup_fence_operand`: an empty side-effecting statement that reads and writes each accumulator register (Float16 accumulators as 32-bit pairs) |
 | `tests/feature_kernels/wgmma.rs` | `examples/python/CuTeDSL/cute/hopper/kernel/dense_gemm/dense_gemm.py` | follows its design: the main loop that issues `k_pipe_mmas` k-tiles of MMAs before the loop, then fences, issues, commits and waits with `wait_group(k_pipe_mmas)` before releasing the stage, with `ACCUMULATE` false before the first k-block; and the shared-memory layout orders (K-major tiled along M/N first, MN-major along K first) |
 
-### WGMMA variants and distributed shared memory (m8-wgmma-variants, m8-dsmem)
+### WGMMA variants and distributed shared memory
 
 | cute-rs file | NVIDIA source | What it ports |
 |---|---|---|
@@ -229,14 +229,14 @@ comment at each says where it comes from:
 `Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.`; they and
 the `include/cute` files are under the BSD-3-Clause licence below.
 
-### TMA atoms (m7-tma-atom)
+### TMA atoms
 
 | cute-rs file | NVIDIA source | What it ports |
 |---|---|---|
 | `src/nvgpu/tma_atom.rs` | `include/cute/atom/copy_traits_sm90_tma.hpp` | `make_tma_atom` and `make_tma_copy_atom` (the CTA tile's map `make_identity_layout(shape(gtensor)).compose(cta_tiler)`, the one-thread atom moving the whole box), `construct_tma_gbasis` (inverting the SMEM layout, keeping the leading unit-step runs, `coalesce_256`, appending the missing modes with extent 1, grouping past rank 5), `fill_tma_gmem_shape_stride` (the gcd recurrence for folded modes), the box, multicast split, TMA basis strides and L2 promotion of `make_tma_copy_desc`, and `tma_partition` (the SMEM run tiled over the tile, divided by the box, offset by the CTA's multicast share) |
 | | `include/cute/atom/copy_traits_sm90_tma_swizzle.hpp` | `get_tma_swizzle_bits` for `Swizzle<B,4,3>` (B 0 to 3) |
 
-### TMA stores and cluster copies (m7-tma-store, m7-cluster-copies)
+### TMA stores and cluster copies
 
 | cute-rs file | NVIDIA source | What it ports |
 |---|---|---|
@@ -250,7 +250,7 @@ the `include/cute` files are under the BSD-3-Clause licence below.
 `copy_sm90_desc.hpp` the `include/cute` line below; all three are under the
 BSD-3-Clause licence below.
 
-### Im2col and the SM100 TMA modes (m7-tma-im2col, m7-tma-sm100-modes)
+### Im2col and the SM100 TMA modes
 
 | cute-rs file | NVIDIA source | What it ports |
 |---|---|---|
@@ -260,7 +260,7 @@ BSD-3-Clause licence below.
 Both files carry the `include/cute` copyright line below and are under the BSD-3-Clause
 licence below.
 
-### Async pipelines and grouped GEMM schedulers (m9-pipeline-cp-async-order, m9-grouped-gemm-schedulers)
+### Async pipelines and grouped GEMM schedulers
 
 | cute-rs file | NVIDIA source | What it ports |
 |---|---|---|
@@ -283,7 +283,7 @@ Both are under the BSD-3-Clause licence below.
 `Copyright (c) 2025 - 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.`
 and is under the BSD-3-Clause licence below.
 
-### In-kernel tensor-map updates and the TMA tutorials (m7-tensormap-update, m7-port-tma-tutorials)
+### In-kernel tensor-map updates and the TMA tutorials
 
 | cute-rs file | NVIDIA source | What it ports |
 |---|---|---|
@@ -297,7 +297,7 @@ and is under the BSD-3-Clause licence below.
 and `tma_v1.py` `Copyright (c) 2025 - 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.`;
 all three are under the BSD-3-Clause licence below.
 
-### Cluster RMSNorm (m8-port-rmsnorm-cluster)
+### Cluster RMSNorm
 
 | cute-rs file | NVIDIA source | What it ports |
 |---|---|---|
@@ -310,7 +310,7 @@ and are under the BSD-3-Clause licence below. (`reduce.py` notes that its
 cluster primitives are inspired by Quack, https://github.com/Dao-AILab/quack;
 no Quack code is ported.)
 
-### Hopper dense GEMM (m8-port-hopper)
+### Hopper dense GEMM
 
 | cute-rs file | NVIDIA source | What it ports |
 |---|---|---|
@@ -321,7 +321,7 @@ no Quack code is ported.)
 `Copyright (c) 2025 - 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.`
 and is under the BSD-3-Clause licence below.
 
-### Blackwell layouts and UMMA descriptors (m10-umma-layouts)
+### Blackwell layouts and UMMA descriptors
 
 | cute-rs file | NVIDIA source | What it ports |
 |---|---|---|
@@ -336,7 +336,7 @@ These files carry
 `Copyright (c) 2023 - 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.`
 and are under the BSD-3-Clause licence below.
 
-### TMEM loads and stores (m10-tmem-ld-st)
+### TMEM loads and stores
 
 | cute-rs file | NVIDIA source | What it ports |
 |---|---|---|
@@ -347,7 +347,7 @@ These files carry
 `Copyright (c) 2023 - 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.`
 (`fp16_gemm_0.py`: `Copyright (c) 2024 - 2026 ...`) and are under the BSD-3-Clause licence below.
 
-### Mixed-input GEMM helpers (m10-mixed-input)
+### Mixed-input GEMM helpers
 
 | cute-rs file | NVIDIA source | What it ports |
 |---|---|---|
@@ -517,7 +517,7 @@ Taylor, Cygnus Support, ian@cygnus.com." (`e_expf.c`, `s_expm1f.c`,
 `s_cbrt.c` and `e_rem_pio2.c` say "Optimized by Bruce D. Evans.", `s_cbrtf.c`
 "Debugged and optimized by Bruce D. Evans."
 
-### Ports of roadmap lane m11-extern-distributed
+### Distributed and external-function examples
 
 | cute-rs file | CUTLASS 4.8.1 file | What it ports |
 | --- | --- | --- |
@@ -526,14 +526,14 @@ Taylor, Cygnus Support, ian@cygnus.com." (`e_expf.c`, `s_expm1f.c`,
 That file carries `Copyright (c) 2025 - 2026 NVIDIA CORPORATION & AFFILIATES. All rights
 reserved.` and is under the BSD-3-Clause licence above.
 
-### Hopper persistent GEMM (m9-hopper-persistent-gemm)
+### Hopper persistent GEMM
 
 | cute-rs file | CUTLASS 4.8.1 file | What it ports |
 | --- | --- | --- |
 | `examples/hopper_persistent_gemm.rs` | `examples/python/CuTeDSL/cute/hopper/kernel/dense_gemm/dense_gemm_persistent.py` | `HopperWgmmaGemmPersistentKernel`: its configuration (`__init__`: the DMA and MMA warpgroups, the load and store warps, the register requirements, the epilogue barrier), `__call__`, the `kernel` (the warp-specialised roles, the persistent tile loops of the DMA warp and the MMA warpgroups, the pipeline states carried across tiles, the epilogue's buffer index and TMA stores), `_compute_stages`, `_compute_grid`, and their comments |
 | `tests/hopper_persistent_gemm.rs`, `tests/mlir.rs` (`hopper_persistent_gemm_in_ptx`) | the same | nothing beyond what they call in `examples/hopper_persistent_gemm.rs` |
 
-### tcgen05 UMMA F16/BF16 and tcgen05.commit (m10-umma-f16)
+### tcgen05 UMMA F16/BF16 and tcgen05.commit
 
 | cute-rs file | CUTLASS 4.8.1 file | What it ports |
 | --- | --- | --- |
@@ -545,7 +545,7 @@ reserved.` and is under the BSD-3-Clause licence above.
 Those files carry `Copyright (c) 2023 - 2026 NVIDIA CORPORATION & AFFILIATES. All rights
 reserved.` (the tutorial `2025 - 2026`) and are under the BSD-3-Clause licence above.
 
-### tcgen05 UMMA kinds TF32, I8 and F8F6F4 (m10-umma-dense-kinds)
+### tcgen05 UMMA kinds TF32, I8 and F8F6F4
 
 | cute-rs file | CUTLASS 4.8.1 file | What it ports |
 | --- | --- | --- |
@@ -556,7 +556,7 @@ reserved.` (the tutorial `2025 - 2026`) and are under the BSD-3-Clause licence a
 Those files carry `Copyright (c) 2023 - 2026 NVIDIA CORPORATION & AFFILIATES. All rights
 reserved.` (the tutorial `2025 - 2026`) and are under the BSD-3-Clause licence above.
 
-### Hopper fused multi-head attention forward (m9-hopper-fmha)
+### Hopper fused multi-head attention forward
 
 | cute-rs file | NVIDIA source | What it ports |
 |---|---|---|
@@ -568,7 +568,7 @@ reserved.` (the tutorial `2025 - 2026`) and are under the BSD-3-Clause licence a
 `Copyright (c) 2025 - 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.`
 and are under the BSD-3-Clause licence above.
 
-### SM120 warp-level block-scaled MMA (m10-sm120-blockscaled)
+### SM120 warp-level block-scaled MMA
 
 | cute-rs file | CUTLASS 4.8.1 file | What it ports |
 | --- | --- | --- |
@@ -578,7 +578,7 @@ and are under the BSD-3-Clause licence above.
 Those files carry `Copyright (c) 2023 - 2026 NVIDIA CORPORATION & AFFILIATES. All rights
 reserved.` and are under the BSD-3-Clause licence above.
 
-### tcgen05 TMEM-sourced A and runtime MMA modifiers (m10-umma-kinds)
+### tcgen05 TMEM-sourced A and runtime MMA modifiers
 
 | cute-rs file | CUTLASS 4.8.1 file | What it ports |
 | --- | --- | --- |
@@ -588,7 +588,7 @@ reserved.` and are under the BSD-3-Clause licence above.
 Those files carry `Copyright (c) 2023 - 2026 NVIDIA CORPORATION & AFFILIATES. All rights
 reserved.` (`fp16_gemm_0.py`: 2025 - 2026) and are under the BSD-3-Clause licence above.
 
-### Blackwell pipelines and the TMEM allocator (m10-umma-pipelines)
+### Blackwell pipelines and the TMEM allocator
 
 | cute-rs file | NVIDIA source | What it ports |
 | --- | --- | --- |
@@ -600,7 +600,7 @@ reserved.` (`fp16_gemm_0.py`: 2025 - 2026) and are under the BSD-3-Clause licenc
 Those files carry `Copyright (c) 2023 - 2026 NVIDIA CORPORATION & AFFILIATES. All rights
 reserved.` (the example `2025 - 2026`) and are under the BSD-3-Clause licence above.
 
-### Cluster launch control (m10-clc-scheduling)
+### Cluster launch control
 
 | cute-rs file | CUTLASS 4.8.1 file | What it ports |
 | --- | --- | --- |
@@ -610,7 +610,7 @@ reserved.` (the example `2025 - 2026`) and are under the BSD-3-Clause licence ab
 Those files carry `Copyright (c) 2023 - 2026 NVIDIA CORPORATION & AFFILIATES. All rights
 reserved.` (the Python helper `2025 - 2026`) and are under the BSD-3-Clause licence above.
 
-### MMA-aware TMA atoms and the first Blackwell tutorial GEMM (m10-port-fp16-gemm)
+### MMA-aware TMA atoms and the first Blackwell tutorial GEMM
 
 | cute-rs file | CUTLASS 4.8.1 file | What it ports |
 | --- | --- | --- |
@@ -628,11 +628,11 @@ reserved.` (the Python helper `2025 - 2026`) and are under the BSD-3-Clause lice
 `copy_traits_sm100_tma.hpp` carries `Copyright (c) 2021 - 2026 NVIDIA CORPORATION & AFFILIATES.
 All rights reserved.`, `fp16_gemm_0.py` (and `fp16_gemm_2.py`, `fp16_gemm_3.py`, `fp16_gemm_3_1.py` and
 `fp16_gemm_4.py`) `Copyright (c) 2024 - 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.`; all
-are under the BSD-3-Clause licence above. `src/utils/mixed_cluster.rs` (m10-port-clc-clusters) is
+are under the BSD-3-Clause licence above. `src/utils/mixed_cluster.rs` is
 cute-rs's own: it follows only the semantics of CuTe DSL's `is_preferred_cluster` and its schedulers'
 fallback params.
 
-### The EFC epilogue-fusion GEMMs (m10-port-efc)
+### The EFC epilogue-fusion GEMMs
 
 | cute-rs file | CUTLASS 4.8.1 file | What it ports |
 |---|---|---|
@@ -646,7 +646,7 @@ fallback params.
 The five files carry `Copyright (c) 2025 - 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.`
 and are under the BSD-3-Clause licence above. EFC's Python under `python/CuTeDSL` was not used.
 
-### CTA pairs (m10-cta-pair)
+### CTA pairs
 
 | cute-rs file | CUTLASS 4.8.1 file | What it ports |
 | --- | --- | --- |
@@ -661,7 +661,7 @@ AFFILIATES. All rights reserved.`, `mma_traits_sm100_frag.hpp` `Copyright (c) 20
 AFFILIATES. All rights reserved.`, and `fp16_gemm_1.py` `Copyright (c) 2024 - 2026 NVIDIA
 CORPORATION & AFFILIATES. All rights reserved.`; all are under the BSD-3-Clause licence above.
 
-### Shared-memory-to-TMEM copies (m10-s2t-copies)
+### Shared-memory-to-TMEM copies
 
 | cute-rs file | CUTLASS 4.8.1 file | What it ports |
 | --- | --- | --- |
@@ -673,7 +673,7 @@ AFFILIATES. All rights reserved.`, `mma_traits_sm100.hpp` `Copyright (c) 2022 - 
 CORPORATION & AFFILIATES. All rights reserved.`, and `nvfp4_gemm_0.py` `Copyright (c) 2025 - 2026
 NVIDIA CORPORATION & AFFILIATES. All rights reserved.`; all are under the BSD-3-Clause licence above.
 
-### Block-scaled tcgen05 MMAs (m10-umma-blockscaled)
+### Block-scaled tcgen05 MMAs
 
 | cute-rs file | CUTLASS 4.8.1 file | What it ports |
 | --- | --- | --- |
@@ -686,7 +686,7 @@ NVIDIA CORPORATION & AFFILIATES. All rights reserved.`; all are under the BSD-3-
 `fp16_gemm_1.py` `Copyright (c) 2025 - 2026 NVIDIA CORPORATION & AFFILIATES. All rights
 reserved.`; all are under the BSD-3-Clause licence above.
 
-### Rubin (SM107) tcgen05 MMAs (m10-rubin-umma)
+### Rubin (SM107) tcgen05 MMAs
 
 | cute-rs file | CUTLASS 4.8.1 file | What it ports |
 | --- | --- | --- |
@@ -700,7 +700,7 @@ NVIDIA CORPORATION & AFFILIATES. All rights reserved.`, `mma_sm100_desc.hpp` `Co
 `nvfp4_gemm_0.py` and `fp16_gemm_1.py` `Copyright (c) 2025 - 2026 NVIDIA CORPORATION &
 AFFILIATES. All rights reserved.`; all are under the BSD-3-Clause licence above.
 
-### Sparse tcgen05 MMAs (m10-sparse-umma)
+### Sparse tcgen05 MMAs
 
 | cute-rs file | CUTLASS 4.8.1 file | What it ports |
 | --- | --- | --- |
@@ -715,7 +715,7 @@ AFFILIATES. All rights reserved.`; all are under the BSD-3-Clause licence above.
 `nvfp4_gemm_0.py`, `fp16_gemm_1.py` and `sparse_utils.py` `Copyright (c) 2025 - 2026 NVIDIA
 CORPORATION & AFFILIATES. All rights reserved.`; all are under the BSD-3-Clause licence above.
 
-### Scale-factor SMEM/TMEM layouts and the NVFP4 tutorial GEMM (m10-port-nvfp4-gemm)
+### Scale-factor SMEM/TMEM layouts and the NVFP4 tutorial GEMM
 
 | cute-rs file | CUTLASS 4.8.1 file | What it ports |
 | --- | --- | --- |
@@ -728,7 +728,7 @@ rights reserved.`, and `sm103_dense_blockscaled_gemm_persistent.py` and `nvfp4_g
 `Copyright (c) 2025 - 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.`; all are under
 the BSD-3-Clause licence above.
 
-### Rubin helpers and the TMEM load with sparse compression (m10-rubin-extras)
+### Rubin helpers and the TMEM load with sparse compression
 
 | cute-rs file | CUTLASS 4.8.1 file | What it ports |
 | --- | --- | --- |
@@ -741,7 +741,7 @@ AFFILIATES. All rights reserved.`, and `fp16_gemm_1.py` and `sparse_utils.py` `C
 above. The Rubin epilogue tile table, the spcompress operations and their simulation take only
 names and semantics from CuTe DSL's Python (`rubin_helpers.py`, `tcgen05/copy.py`).
 
-### XLA FFI call frame (m11-framework-exports)
+### XLA FFI call frame
 
 `src/xla_ffi.rs` declares, with hand-written `#[repr(C)]` structs, the part of the XLA FFI C ABI
 (`xla/ffi/api/c_api.h` of OpenXLA, Apache-2.0: `XLA_FFI_CallFrame`, `XLA_FFI_Buffer`, `XLA_FFI_Api`
@@ -750,7 +750,7 @@ error-code numbers) that a handler reads. Only the layouts and numbers (an inter
 reproduced, from memory; no OpenXLA source is copied. The JAX shim in `python/cute_rs_jax` uses
 the names of `cutlass.jax` (EULA) for its helpers and nothing else of it.
 
-### Typed MMA descriptors (m11-prims-descriptors-swizzle)
+### Typed MMA descriptors
 
 | cute-rs file | CUTLASS 4.8.1 file | What it ports |
 | --- | --- | --- |
@@ -762,7 +762,7 @@ The descriptor type names, the `Tcgen05MxOmmaInstrDesc` layout and the base DSL'
 (`src/prims/swizzle.rs`) take only names and semantics from CuTe DSL's Python
 (`experimental/primitives/descriptors.py`, `base_dsl/swizzle.py`).
 
-### Primitives-only MMA forms (m11-prims-mma-forms)
+### Primitives-only MMA forms
 
 | cute-rs file | CUTLASS 4.8.1 file | What it ports |
 | --- | --- | --- |
@@ -779,7 +779,7 @@ above. The function and enum names and the semantics of the modifiers (`.ashift`
 sub-partition, the collector buffers, `scale-input-d`) take only names and semantics from CuTe
 DSL's Python (`experimental/primitives/nvvm_wrapper.py`).
 
-### Task Scheduling resources and schedule capture (m11-ts-resources)
+### Task Scheduling resources and schedule capture
 
 | cute-rs file | CUTLASS 4.8.1 file | What it ports |
 | --- | --- | --- |
@@ -791,7 +791,7 @@ are under the BSD-3-Clause licence above. `src/task_scheduling/` takes only name
 CuTe DSL's Python (`cutlass/experimental/task_scheduling`: `resources.py`, `schedule_builder.py`,
 `enums.py`), under the NVIDIA EULA; its code, listing format and messages are written independently.
 
-### Task Scheduling tasks and the TaskManager (m11-ts-task-manager)
+### Task Scheduling tasks and the TaskManager
 
 | cute-rs file | CUTLASS 4.8.1 file | What it ports |
 | --- | --- | --- |

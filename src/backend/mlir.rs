@@ -36,7 +36,7 @@ use crate::tensor::AddressSpace;
 mod wgmma;
 // External calls, device functions and multimem.
 mod extern_calls;
-// m10-tmem-core.
+// The tcgen05 and TMEM operations.
 mod tcgen05;
 
 mod prims;
@@ -720,7 +720,6 @@ impl Emitter<'_> {
     /// space 7, which LLVM 21 lowers to `ld.shared::cluster` and
     /// `st.shared::cluster`), one with memory attributes as
     /// [`Self::load_with_attrs`] emits it on that space.
-    #[allow(clippy::too_many_arguments)]
     fn dsmem_access(
         &mut self,
         indent: usize,
@@ -756,7 +755,6 @@ impl Emitter<'_> {
     /// scope) and the scope of `cmpxchg`, which LLVM 23 keeps, and NVVM has
     /// no reduction op. Scalar Float16 and BFloat16 operands go in and come
     /// out as their bits (`h` registers), packed pairs as Int32s.
-    #[allow(clippy::too_many_arguments)]
     fn atomic(
         &mut self,
         indent: usize,
@@ -918,7 +916,6 @@ impl Emitter<'_> {
     /// this emits `nvvm.mma.sync`, which takes each pair of bf16 values packed
     /// into an i32 (low half first, as in a `.bf16x2` register), packed as
     /// [`Op::Pack`] is.
-    #[allow(clippy::too_many_arguments)]
     fn mma_bf16(
         &mut self,
         indent: usize,
@@ -964,7 +961,6 @@ impl Emitter<'_> {
     /// registers are 32 bits: four FP8 values, two f16 or bf16 values
     /// ([`Op::Pack`]'s order, the first in the low bits); `nvvm` takes f16
     /// pairs (and f16 accumulators) as `vector<2xf16>`.
-    #[allow(clippy::too_many_arguments)]
     fn mma_nvvm(
         &mut self,
         indent: usize,
@@ -1084,7 +1080,6 @@ impl Emitter<'_> {
         }
     }
 
-    // m10-sm120-blockscaled.
     /// A warp-level block-scaled `mma.sync` (sm_120a): `nvvm.mma.block_scale`
     /// (LLVM 22), or with [`MlirOptions::mma_inline_ptx`] inline PTX (for
     /// LLVM 21, whose NVVM dialect lacks the operation; the inline assembly
@@ -1142,7 +1137,6 @@ impl Emitter<'_> {
         }
     }
 
-    // m11-prims-mma-forms.
     /// A warp-level sparse block-scaled `mma.sp` (sm_120a), always as
     /// inline PTX: mlir-opt 21 has no `nvvm.mma.sp.block_scale` (LLVM 23
     /// does). LLVM does not treat inline assembly as convergent, so the
@@ -1253,7 +1247,6 @@ impl Emitter<'_> {
     /// `constraints`: `results` (SSA names and types) come out of it, as an
     /// LLVM struct unpacked into their names when there are several, and
     /// `args` (SSA names and MLIR types) go into it.
-    #[allow(clippy::too_many_arguments)]
     fn asm_line(
         &mut self,
         indent: usize,
@@ -1462,7 +1455,6 @@ impl Emitter<'_> {
     /// predicate the instruction is `@p`-guarded, and its result is tied to
     /// the first operand, which is what a thread whose predicate is false
     /// gets.
-    #[allow(clippy::too_many_arguments)]
     fn half_inst(
         &mut self,
         indent: usize,
@@ -2309,7 +2301,7 @@ impl Emitter<'_> {
                         )
                     }
                     BulkDirection::S2G => {
-                        // m7-tma-sm100-modes: `.cp_mask` and its i16 mask come after the cache hint.
+                        // `.cp_mask` and its i16 mask come after the cache hint.
                         let mut quals = String::new();
                         let mut tail = String::new();
                         if let Some(p) = cache_policy {
@@ -2370,7 +2362,7 @@ impl Emitter<'_> {
                 let m = self.address(indent, *mbar, DType::I64, *mbar_index);
                 let m32 = self.fresh("tmabar");
                 self.line(indent, &format!("{m32} = arith.trunci {m} : i64 to i32"), None);
-                // m10-cta-pair: `.cta_group::2` signals the pair's even CTA, whose mbarrier is
+                // `.cta_group::2` signals the pair's even CTA, whose mbarrier is
                 // this CTA's address with the peer bit cleared (CUTLASS's Sm100MmaPeerBitMask).
                 let (m32, pair) = if *two_cta {
                     let mask = self.fresh("peermask");
@@ -2456,7 +2448,7 @@ impl Emitter<'_> {
                 );
                 self.line(indent, &text, i);
             }
-            // ---- m7-tma-store and m7-cluster-copies: inline PTX, as for the TMA load ----
+            // ---- TMA stores and cluster copies: inline PTX, as for the TMA load ----
             Op::TmaStore { src, src_index, elem, desc, coords, reduce, cache_policy, mode, overrides, .. } => {
                 let s = self.address(indent, *src, *elem, *src_index);
                 let s32 = self.fresh("tmasrc");
@@ -3146,7 +3138,6 @@ impl Emitter<'_> {
     /// A plain load into `values`, or store of them, at the i64 address
     /// `addr` of `space`, aligned to `align` bytes: one scalar or one vector
     /// `llvm.load`/`llvm.store`.
-    #[allow(clippy::too_many_arguments)]
     fn ptr_access(
         &mut self,
         indent: usize,

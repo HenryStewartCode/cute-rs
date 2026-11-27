@@ -329,6 +329,7 @@ fn a_product_with_zero_divides_by_anything() {
     Kernel::build("zero_product", || {
         let u = param_scalar::<i32>("u");
         let a = assume(param_scalar::<i32>("a"), Some(16), false);
+        // The product with a literal zero is what is being tested.
         #[allow(clippy::erasing_op)]
         let z = u * 0;
         assert_eq!(get_divisibility(&(z + a)), 16);

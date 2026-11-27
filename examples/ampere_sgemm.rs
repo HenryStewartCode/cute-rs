@@ -391,7 +391,6 @@ pub fn build_for(majors: Majors) -> TypedKernel<Params> {
     build(&problem(majors, 16 * d, 16 * d, 16 * d, 1).0)
 }
 
-#[allow(dead_code)]
 fn main() {
     for majors in [Majors::new('m', 'n', 'n', 16), Majors::new('k', 'k', 'm', 1)] {
         let kernel = build_for(majors);

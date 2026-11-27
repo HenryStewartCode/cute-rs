@@ -20,7 +20,7 @@
 //!
 //! Which fields an atom takes comes from its operation. The `mma.sync`
 //! atoms of cute-rs take none; the WGMMA atoms
-//! take [`MmaField::ACCUMULATE`], and the tcgen05 atoms (m10) the rest.
+//! take [`MmaField::ACCUMULATE`], and the tcgen05 atoms the rest.
 
 use std::fmt;
 
@@ -34,9 +34,9 @@ use crate::value::{Boolean, IntoValue, Value};
 /// `NEGATE_A`, `NEGATE_B`, `SFA`, `SFB`, `METADATA`,
 /// `DISABLE_OUTPUT_LANE`) and `warp.Field` (`ACCUMULATE`, `SFA`, `SFB`), in
 /// one enum. `ACCUMULATE`, `NEGATE_A` and `NEGATE_B` are booleans; the
-/// others take pointers and tensors, which arrive with the tcgen05 and SM120
-/// block-scaled atoms (m10).
-#[allow(non_camel_case_types, clippy::upper_case_acronyms)]
+/// others take pointers and tensors, which cute-rs does not support as fields.
+// The variants are named as CuTe's field names are.
+#[allow(non_camel_case_types)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum MmaField {
     ACCUMULATE,
@@ -134,7 +134,7 @@ impl MmaAtom {
         );
         assert!(
             field.is_boolean(),
-            "cute: set({field}): the pointer and tensor fields of tcgen05 and block-scaled MMAs arrive with m10"
+            "cute: set({field}): the pointer and tensor fields of tcgen05 and block-scaled MMAs are not supported"
         );
         if let crate::atom::mma::MmaOp::Sm100(kind) = self.op()
             && matches!(field, MmaField::NEGATE_A | MmaField::NEGATE_B)
@@ -187,7 +187,7 @@ impl MmaAtom {
         );
         assert!(
             field.is_boolean(),
-            "cute: get({field}): the pointer and tensor fields of tcgen05 and block-scaled MMAs arrive with m10"
+            "cute: get({field}): the pointer and tensor fields of tcgen05 and block-scaled MMAs are not supported"
         );
         self.fields.values[field.index()].unwrap_or_else(|| false.into_value())
     }

@@ -7,7 +7,9 @@
 //! and the sm_90a PTX with `ptxas` (register counts, no serialised WGMMA)
 //! where installed.
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/hopper_gemm.rs"]
 mod hopper_gemm;
 

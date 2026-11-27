@@ -1,7 +1,9 @@
 //! The grouped GEMM tile scheduler and the contiguous group search on the simulator, against
 //! plain-Rust models.
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 mod grouped_kernels;
 
 use cute::prelude::*;

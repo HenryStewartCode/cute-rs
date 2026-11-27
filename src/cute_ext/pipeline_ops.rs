@@ -5,7 +5,7 @@
 //! `circular_buffer_pipeline_*` operations).
 //!
 //! In CuTe DSL these lower to closed `lir` operations. cute-rs implements
-//! them over the m9/m10 pipeline classes, which share one mbarrier
+//! them over the pipeline classes, which share one mbarrier
 //! machinery: [`create_pipeline`] maps the pair of operation kinds to a
 //! class ([`PipelineClass`]), builds it for its full and empty
 //! [`MbarrierArray`]s, and the operations here wait and arrive on those.
@@ -325,7 +325,7 @@ fn side_arrival(ops: &OperationTypes, what: &str) -> Arrival {
     found.expect("a non-empty operation set")
 }
 
-/// The m9/m10 pipeline class a pair of sides maps to.
+/// The pipeline class a pair of sides maps to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PipelineClass {
     /// TMA -> UMMA: [`PipelineTmaUmma`].

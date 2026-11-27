@@ -30,8 +30,8 @@
 //! CTAs' empty mbarriers (its own locally, CTA 1's remotely at cluster
 //! scope). `cluster_arrive_relaxed` and `cluster_wait` follow the inits and
 //! `fence.mbarrier_init`. The example's consumer then reads CTA 1's tile
-//! through distributed shared memory, which cute-rs has no loads for yet
-//! (m8): instead each CTA writes its own tile to global memory once its
+//! through distributed shared memory, which this port does not use:
+//! instead each CTA writes its own tile to global memory once its
 //! empty mbarrier completes, which only the chain of mbarriers orders after
 //! the copies of its own producer. It needs SM90: the simulator,
 //! `mlir-opt` for sm_90a and `ptxas` check it.
@@ -201,7 +201,6 @@ pub fn run() {
     check(&args);
 }
 
-#[allow(dead_code)]
 fn main() {
     run();
     println!("cp_async_mbarrier_arrive_cta and _cluster: PASS");

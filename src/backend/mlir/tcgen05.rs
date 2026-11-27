@@ -8,13 +8,13 @@
 //! `.exclusive` forms (PTX ISA 9.4) are known to no installed LLVM, so they
 //! are inline PTX, which LLVM does not treat as convergent.
 //!
-//! m10-tmem-ld-st adds `tcgen05.ld`, `tcgen05.st`, `tcgen05.wait::{ld,st}`
-//! and the thread-sync fences, again as NVVM operations (their intrinsics
+//! `tcgen05.ld`, `tcgen05.st`, `tcgen05.wait::{ld,st}`
+//! and the thread-sync fences are again NVVM operations (their intrinsics
 //! are convergent). The syntax is the same in LLVM 21, 22 and 23, except
 //! that a single register is an `i32` before LLVM 23 and a `vector<1xi32>`
 //! from LLVM 23.
 //!
-//! m10-umma-f16 adds `tcgen05.mma` and `tcgen05.commit`. LLVM 21 has no
+//! `tcgen05.mma` and `tcgen05.commit`: LLVM 21 has no
 //! `nvvm.tcgen05.mma` (LLVM 23 does), so the MMA is inline PTX: the warp
 //! computes its elected lane (the IR's `elect` operand) and the
 //! instruction descriptor (a constant, so the PTX shows it as an
@@ -234,7 +234,6 @@ impl Emitter<'_> {
 
     /// `tcgen05.ld.red` (`nvvm.tcgen05.ld.red`, LLVM 23): the Float32 data as one `vector<Nxf32>`, then
     /// the Float32 reduction; the PTX ISA's `.red` forms need PTX 8.8.
-    #[allow(clippy::too_many_arguments)]
     fn tcgen05_ld_red(
         &mut self,
         indent: usize,
@@ -279,7 +278,7 @@ impl Emitter<'_> {
     }
 
     /// `tcgen05.mma`, as inline PTX issued by
-    /// the elected lane. m10-umma-kinds: A from TMEM (`[a-tmem]`), a runtime
+    /// the elected lane. It handles A from TMEM (`[a-tmem]`), a runtime
     /// instruction descriptor, and `{disable-output-lane}`; an MMA with none
     /// of them is emitted as before.
     pub(super) fn tcgen05_mma(&mut self, indent: usize, inst: &Inst) {
@@ -328,12 +327,12 @@ impl Emitter<'_> {
             inputs.push((v, t));
             format!("${}", inputs.len() - 1)
         };
-        // m10-sparse-umma: `[sp-meta-tmem]` before the descriptor.
+        // Sparse: `[sp-meta-tmem]` before the descriptor.
         let sp = match meta {
             Some(e) => format!(" [{}],", next(&mut inputs, self.v(*e), DType::I32)),
             None => String::new(),
         };
-        // m10-umma-blockscaled: `[sfa-tmem], [sfb-tmem]` after the descriptor.
+        // Block-scaled: `[sfa-tmem], [sfb-tmem]` after the descriptor.
         let scales = match sf {
             Some((x, y)) => {
                 let x = next(&mut inputs, self.v(*x), DType::I32);

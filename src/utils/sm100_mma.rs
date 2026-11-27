@@ -39,7 +39,6 @@ use crate::nvgpu::tcgen05::{
 /// parameters the operation refuses. Only the form with separate `a_dtype`
 /// and `b_dtype` exists (CuTe DSL's single-`ab_dtype` form is deprecated).
 #[track_caller]
-#[allow(clippy::too_many_arguments)]
 pub fn make_trivial_tiled_mma(
     a_dtype: DType,
     b_dtype: DType,
@@ -114,7 +113,6 @@ fn check_e8m0(what: &str, sf_dtype: DType, sf_vec_size: usize) {
 /// other than 32. Only the form with separate `a_dtype` and `b_dtype`
 /// exists (the single-`ab_dtype` form is deprecated in CuTe DSL).
 #[track_caller]
-#[allow(clippy::too_many_arguments)]
 pub fn make_blockscaled_trivial_tiled_mma(
     a_dtype: DType,
     b_dtype: DType,

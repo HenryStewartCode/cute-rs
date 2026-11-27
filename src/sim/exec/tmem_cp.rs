@@ -96,7 +96,6 @@ impl<'a> Machine<'a> {
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn tmem_cp_execute(
         &mut self,
         inst: &'a Inst,

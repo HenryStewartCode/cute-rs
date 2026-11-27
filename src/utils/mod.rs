@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 //! CuTe DSL's `cutlass.utils`: helpers for building kernels on the host
-//! side. So far [`LayoutEnum`] and the SM90 shared-memory layout helpers
+//! side: [`LayoutEnum`] and the SM90 shared-memory layout helpers
 //! ([`sm90`], CuTe DSL's `cutlass.utils.hopper_helpers`).
 //!
 //! The static persistent tile schedulers ([`StaticPersistentTileScheduler`],
@@ -38,7 +38,7 @@ pub mod block {
         crate::block::block_copy(tiled_copy, src, dst, args)
     }
 }
-// m9-gemm-host-helpers.
+// The GEMM host helpers.
 pub mod gemm;
 pub mod sm100;
 // The Rubin (SM107) helpers, CuTe DSL's rubin_helpers.
@@ -57,7 +57,7 @@ mod tensormap;
 // Cutlass.utils.distributed.
 pub mod distributed;
 mod tile_scheduler;
-// m10-clc-scheduling.
+// The cluster launch control tile scheduler.
 mod clc_tile_scheduler;
 pub use clc_tile_scheduler::{
     ClcDynamicPersistentTileScheduler, ClcDynamicPersistentTileSchedulerOptions,
@@ -69,18 +69,18 @@ pub use mixed_cluster::{
     ClusterArm, check_cluster_shape_in_arm, check_mixed_cluster_shapes, current_cluster_arm, is_preferred_cluster,
     mixed_cluster_arms,
 };
-// m10-umma-layouts.
+// Block-scaled and epilogue layouts.
 mod blockscaled_layout;
 mod epilogue_tile;
 
 // In-memory TMA descriptors.
 pub use tensormap::{TensorMapManager, TensorMapUpdateMode};
-// m10-umma-layouts.
+// The block-scaled basic chunks.
 pub use blockscaled_layout::{BlockScaledBasicChunk, Sm103BlockScaledBasicChunk, tile_atom_to_shape_sf};
-// m10-sm120-blockscaled.
+// SM120 block-scaled helpers.
 pub mod sm120;
 pub use blockscaled_layout::{sm120_make_smem_layout_sfa, sm120_make_smem_layout_sfb};
-// m10-port-nvfp4-gemm.
+// Scale-factor layouts.
 pub use blockscaled_layout::{
     make_smem_layout_sf, make_smem_layout_sfa, make_smem_layout_sfb, make_tmem_layout_sfa, make_tmem_layout_sfb,
     sm103_make_smem_layout_sfa, sm103_make_smem_layout_sfb,
@@ -96,6 +96,7 @@ pub use contiguous_group_search::{
     ContiguousGGSearchState, ContiguousGroupWorkTileInfo, contiguous_group_search,
     create_initial_contiguous_group_search_state, make_contiguous_group_work_tile_info,
 };
+// Re-exports a deprecated name, which CuTe's `utils` also exposes.
 #[allow(deprecated)]
 pub use grouped_tile_scheduler::GroupedGemmTileSchedulerHelper;
 pub use grouped_tile_scheduler::{
@@ -127,6 +128,7 @@ use crate::tensor::Tensor;
 /// `ROW_MAJOR` has the second mode contiguous, `COL_MAJOR` the first.
 /// For A `(M, K)` row-major is K-major, for B `(N, K)` row-major is K-major
 /// too, and for C `(M, N)` row-major is N-major.
+// The variants are named as CuTe's are (`ROW_MAJOR`, ...).
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum LayoutEnum {

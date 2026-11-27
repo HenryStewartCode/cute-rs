@@ -90,6 +90,7 @@ macro_rules! bits_impl {
             /// These bits with the `width`-bit field at `lo` replaced by `f`
             /// (which is masked to the field).
             #[track_caller]
+            // Instantiated for every bit width; not every width uses it.
             #[allow(dead_code)]
             fn set_field(self, lo: u32, width: u32, f: Bits<$t>) -> Bits<$t> {
                 let mask = (((1u64 << width) - 1) as $t) << lo;
@@ -414,7 +415,6 @@ impl Tcgen05SmemDesc {
 
     /// Pack fields already in their encoded units (the single place the
     /// bit positions are written; the UMMA atoms' encoder calls it too).
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn pack(
         start: u64,
         lbo: u64,
@@ -809,7 +809,6 @@ impl Tcgen05InstrDesc {
     /// `F8F6F4`) on `a` and `b` into `acc`, `m x n` (a CTA pair's M for
     /// `CtaGroup::TWO`), checking the types the kind takes, the shapes of the
     /// kind and CTA group, and that FP6/FP4 operands are K-major.
-    #[allow(clippy::too_many_arguments)]
     pub fn for_mma(
         kind: UmmaDataKind,
         a: DType,
@@ -987,7 +986,6 @@ pub struct Tcgen05MxInstrDesc {
 }
 
 /// The common part of the block-scaled encodings.
-#[allow(clippy::too_many_arguments)]
 fn mx_bits(
     sparse: bool,
     a_negate: bool,

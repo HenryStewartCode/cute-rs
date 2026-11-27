@@ -54,7 +54,9 @@
 //! Run with `cargo run --release --example hopper_persistent_gemm` (on the
 //! simulator).
 
-#[allow(dead_code)]
+// `hopper_gemm` is included as a module: its `main` and the helpers this example does not call are unused here.
+#![allow(dead_code)]
+
 #[path = "hopper_gemm.rs"]
 mod hopper_gemm;
 
@@ -354,7 +356,6 @@ impl HopperWgmmaGemmPersistentKernel {
     }
 
     /// GPU device kernel performing the batched GEMM computation (`kernel`).
-    #[allow(clippy::too_many_arguments)]
     fn kernel<A: Numeric, B: Numeric, C: Numeric, Acc: Numeric>(
         &self,
         tma_atom_a: &CopyAtom<A>,
@@ -735,7 +736,6 @@ fn static_usize(e: IndexExpr) -> usize {
     e.as_static().expect("a static size")
 }
 
-#[allow(dead_code)]
 fn main() {
     println!("Running Hopper Persistent Dense GEMM (in the simulator) with:");
     let (m, n, k, l) = (384, 256, 128, 1);

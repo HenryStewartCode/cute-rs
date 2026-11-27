@@ -23,7 +23,6 @@
 //!
 //! Run with `cargo run --release --example activation_custom_epilogue_dense_gemm`.
 
-#[allow(dead_code)]
 #[path = "efc/mod.rs"]
 pub mod efc;
 

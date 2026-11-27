@@ -52,7 +52,7 @@ fn filter_zeros<X>(t: &Tensor<X>) -> Tensor<X> {
 ///   and copied (a converged warp calls it; one lane issues each copy).
 ///
 /// `tma_multicast` (the block API's multicast derived from a cluster
-/// shape) is not supported yet.
+/// shape) is not supported.
 #[track_caller]
 pub fn block_copy<'a, T: Numeric, S: CopyElem<T>, D: CopyElem<T>>(
     tiled_copy: &impl BlockCopy<T>,

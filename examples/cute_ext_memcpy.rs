@@ -126,7 +126,6 @@ pub fn run(kernel: &TypedKernel<Params>, mnl: (usize, usize, usize)) -> (SimRepo
     (report, d)
 }
 
-#[allow(dead_code)]
 fn main() {
     let args: Vec<usize> = std::env::args().skip(1).map(|a| a.parse().expect("M N L")).collect();
     let mnl = match args.as_slice() {

@@ -724,9 +724,11 @@ macro_rules! __cute_aggregate {
             __marker: ::core::marker::PhantomData<fn() -> ($($g,)*)>,
         }
 
+        // Expanded in the user's crate: `layout` may go unused, and it takes one argument per parameter.
         #[allow(dead_code, clippy::too_many_arguments)]
         impl<$($g: $crate::Numeric),*> $name<$($g),*> {
             /// The struct's layout for these parameters.
+            // A struct without parameters leaves `layout` with no arguments to use.
             #[allow(unused_variables)]
             #[track_caller]
             pub fn layout($($p: $pt),*) -> $crate::StructLayout {

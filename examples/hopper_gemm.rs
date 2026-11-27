@@ -436,7 +436,6 @@ impl HopperWgmmaGemmKernel {
 
     //  GPU device kernel
     /// GPU device kernel performing the batched GEMM computation (`kernel`).
-    #[allow(clippy::too_many_arguments)]
     fn kernel<A: Numeric, B: Numeric, C: Numeric, Acc: Numeric>(
         &self,
         tma_atom_a: &CopyAtom<A>,
@@ -805,7 +804,6 @@ impl HopperWgmmaGemmKernel {
     /// The epilogue of `kernel`: registers → shared memory (`stmatrix`) →
     /// global memory (TMA store), one `epi_tile` at a time, `epi_stage`
     /// staging buffers in flight.
-    #[allow(clippy::too_many_arguments)]
     fn epilogue<C: Numeric, Acc: Numeric>(
         &self,
         tiled_mma: &TiledMma,
@@ -930,7 +928,6 @@ impl HopperWgmmaGemmKernel {
 
     /// Create shared memory layouts for A, B, and C tensors
     /// (`_make_smem_layouts`).
-    #[allow(clippy::too_many_arguments)]
     pub fn make_smem_layouts(
         tile_shape_mnk: (usize, usize, usize),
         epi_tile: (usize, usize),
@@ -1046,7 +1043,6 @@ impl HopperWgmmaGemmKernel {
     /// Check if the tensor alignment is valid (`is_valid_tensor_alignment`):
     /// the contiguous extent of each tensor is a whole number of 16-byte
     /// vectors.
-    #[allow(clippy::too_many_arguments)]
     pub fn is_valid_tensor_alignment(
         m: usize,
         n: usize,
@@ -1063,7 +1059,6 @@ impl HopperWgmmaGemmKernel {
     /// check): `check_gemm_tma_alignment` over A, B and C, the contiguous
     /// extent of each a whole number of TMA's 16-byte units. The error names
     /// the tensor and its extent.
-    #[allow(clippy::too_many_arguments)]
     pub fn can_implement(
         m: usize,
         n: usize,
@@ -1337,7 +1332,6 @@ pub fn gemm_majors(gemm: &HopperWgmmaGemmKernel) -> Majors {
     }
 }
 
-#[allow(dead_code)]
 fn main() {
     println!("Running Hopper Dense GEMM (in the simulator) with:");
     let (m, n, k, l) = (256, 256, 256, 1);

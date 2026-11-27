@@ -1,7 +1,9 @@
 //! Host tensor helpers (`cute::host`), the dtype conversion kernel (`cute::testing::convert`
 //! on the simulator) and dtype interop. The GPU half is `tests/gpu_host_tensor.rs`.
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/sgemm.rs"]
 mod sgemm;
 

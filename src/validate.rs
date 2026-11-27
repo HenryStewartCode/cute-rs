@@ -20,7 +20,6 @@ use crate::ir::{
     carry_flag_breaker, float_inst_name, half_inst_name, int_inst_name, redux_inst_name,
 };
 pub use extern_calls::MULTIMEM_FP8;
-// m7-tma-im2col and m7-tma-sm100-modes.
 use crate::ir::TmaMode;
 use crate::ir::{UmmaDataKind, UmmaKind};
 
@@ -185,7 +184,6 @@ impl Checker<'_> {
     /// of the type's width and kind (an Int32 for a packed pair), memory
     /// semantics the instruction takes, and global or shared memory aligned
     /// to the access.
-    #[allow(clippy::too_many_arguments)]
     fn atomic(
         &self,
         red: bool,
@@ -748,7 +746,6 @@ impl Checker<'_> {
                 }
                 self.expect(*result, DType::Bool, "mbarrier wait result")?;
             }
-            // m11-prims-nvvm-layer.
             Op::BarrierRed { result, kind, pred, id, threads } => {
                 self.expect(*pred, DType::Bool, "barrier_cta_red predicate")?;
                 let want = if *kind == crate::ir::BarrierRedKind::Popc { DType::U32 } else { DType::Bool };
@@ -903,7 +900,7 @@ impl Checker<'_> {
                     self.expect(*m, DType::I16, "multicast CTA mask")?;
                 }
             }
-            // ---- m7-tma-store and m7-cluster-copies ----
+            // ---- TMA stores and cluster copies ----
             Op::TmaStore { src, src_index, elem, desc, coords, reduce, cache_policy, mode, overrides, .. } => {
                 if self.ir.buffer(*src).space != MemSpace::Shared {
                     return Err(self.err("a TMA store reads shared memory"));
@@ -1096,7 +1093,6 @@ impl Checker<'_> {
                     self.expect(v, tc, "mma C/D")?;
                 }
             }
-            // m11-prims-mma-forms.
             Op::MmaSpBlockScaled { kind, d, a, b, c, e, sfa, sfb } => {
                 if a.len() != 4 || b.len() != 4 || c.len() != 4 || d.len() != 4 {
                     return Err(self.err(format!("{} takes 4 A and 4 B registers and 4 accumulators", kind.ptx())));
@@ -1114,7 +1110,6 @@ impl Checker<'_> {
                     self.expect(v, DType::F32, "sparse block-scaled mma C/D")?;
                 }
             }
-            // m10-sm120-blockscaled.
             Op::MmaBlockScaled { kind, d, a, b, c, sfa, sfb } => {
                 let (ra, rb) = kind.operand_registers();
                 if a.len() != ra || b.len() != rb || c.len() != 4 || d.len() != 4 {
@@ -1413,7 +1408,6 @@ impl Checker<'_> {
                     return Err(self.err(format!("{}: no operand format for {} x {}", kind.ptx(), kind.a, kind.b)));
                 }
             }
-            // m10-clc-scheduling.
             Op::ClcTryCancel { buffer, index, mbar, mbar_index, .. } => {
                 if self.ir.buffer(*buffer).space != MemSpace::Shared {
                     return Err(self.err("clusterlaunchcontrol.try_cancel writes its response to shared memory"));
@@ -1432,7 +1426,6 @@ impl Checker<'_> {
                 }
                 self.base_alignment(*buffer, 16, "clc_response")?;
             }
-            // m10-s2t-copies.
             Op::Tcgen05Cp { taddr, desc, elect, .. } => {
                 self.expect(*taddr, DType::I32, "a tcgen05.cp TMEM address")?;
                 self.expect(*desc, DType::U64, "a tcgen05.cp shared-memory descriptor")?;
@@ -1858,7 +1851,6 @@ impl Checker<'_> {
 
     /// A floating-point instruction must exist in PTX with exactly these
     /// modifiers.
-    #[allow(clippy::too_many_arguments)]
     fn float_inst(
         &self,
         result: ValueId,
@@ -2434,8 +2426,7 @@ fn half_inst_requirement(func: HalfFn, ty: HalfType, mods: HalfModifiers) -> Vec
 
 /// The targets of `cvt` with the `.s2f6x2` type, from PTX ISA 9.1: the PTX
 /// ISA's target notes list sm_100a, sm_103a, sm_107a, sm_110a, sm_120a and
-/// sm_121a, and no family. [`Arch`] has sm_100a and sm_120a so far
-/// (m6-arch-targets adds the others).
+/// sm_121a, and no family.
 pub const S2F6X2: ArchSpecific = ArchSpecific {
     chips: &[(100, 91), (103, 91), (107, 91), (110, 91), (120, 91), (121, 91)],
     families: &[],
@@ -2557,10 +2548,8 @@ pub struct TargetRequirement {
 /// family (sm_103f, sm_103a) have too (the PTX ISA's Table 70 lists the
 /// families: sm_10x, sm_11x and sm_12x).
 ///
-/// Targets are given by architecture number (100 for sm_100a and sm_100f),
-/// so that targets cute-rs does not have yet are listed too: [`Arch`] has
-/// sm_90a, sm_100a and sm_120a, and m6-arch-targets adds the rest, and the
-/// `f` targets, which this check accepts by their names.
+/// Targets are given by architecture number (100 for sm_100a and sm_100f);
+/// the `f` targets are accepted by their names.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct ArchSpecific {
     /// The `a` targets that have the feature (100 for sm_100a), each with
@@ -2675,7 +2664,7 @@ pub const LDMATRIX_B8: ArchSpecific = ArchSpecific {
 
 /// The architecture-specific Hopper features (`wgmma.mma_async`,
 /// `wgmma.fence` and the like): sm_90a only, from PTX ISA 8.0; plain sm_90
-/// and later chips lack them. m8's WGMMA uses it.
+/// and later chips lack them. WGMMA uses it.
 pub const SM90A_ONLY: ArchSpecific = ArchSpecific { chips: &[(90, 80)], families: &[], baselines: &[] };
 
 /// `wgmma.mma_async` on mixed signed and unsigned 8-bit integers
@@ -2684,7 +2673,7 @@ pub const SM90A_PTX84: ArchSpecific = ArchSpecific { chips: &[(90, 84)], familie
 
 /// `setmaxnreg`: sm_90a from PTX ISA 8.0, sm_100a and sm_120a from 8.6,
 /// the sm_100f and sm_120f families from 8.8 and sm_110f from 9.0 (the PTX
-/// ISA's table of architecture-specific features). m8 uses it.
+/// ISA's table of architecture-specific features).
 pub const SETMAXNREG: ArchSpecific = ArchSpecific {
     chips: &[(90, 80), (100, 86), (120, 86)],
     families: &[(100, 88), (120, 88), (110, 90)],
@@ -2746,7 +2735,6 @@ pub const TCGEN05_LD_SPCOMPRESS: ArchSpecific = ArchSpecific { chips: &[(107, 94
 pub const TCGEN05_MMA_I8: ArchSpecific =
     ArchSpecific { chips: &[(100, 86), (101, 86), (110, 90)], families: &[], baselines: &[] };
 
-// m10-umma-blockscaled.
 /// `tcgen05.mma.kind::mxf8f6f4.block_scale` (without `.scale_vec`): the
 /// targets of `tcgen05.alloc` (sm_100a, sm_101a/sm_110a, and the `f`
 /// families from PTX ISA 8.8, so sm_103a and sm_107a too).
@@ -2776,7 +2764,7 @@ pub const TCGEN05_MMA_K96: ArchSpecific =
 /// too) from PTX ISA 9.4.
 pub const TCGEN05_MMA_SM107: ArchSpecific = ArchSpecific { chips: &[], families: &[(107, 94)], baselines: &[] };
 
-/// m11-prims-mma-forms: `tcgen05.mma` with `scale-input-d`: sm_100a from
+/// `tcgen05.mma` with `scale-input-d`: sm_100a from
 /// PTX ISA 8.6 and the sm_100f family from 8.8.
 pub const TCGEN05_MMA_SCALE_INPUT_D: ArchSpecific =
     ArchSpecific { chips: &[(100, 86)], families: &[(100, 88)], baselines: &[] };
@@ -2819,7 +2807,6 @@ fn redux_f32_name(kind: ReduxKind, abs: bool, nan: bool) -> &'static str {
     }
 }
 
-// m10-sm120-blockscaled.
 /// The warp-level block-scaled `mma.sync` forms (PTX ISA 8.7 on sm_120a and
 /// sm_121a; 8.8 on the family targets sm_120f and sm_121f), CuTe DSL's
 /// admissible architectures for `MmaSM120BlockScaledOp`.
@@ -2869,9 +2856,8 @@ pub fn target_requirement(op: &Op) -> Option<TargetRequirement> {
     };
     let mut needs: Vec<Option<TargetRequirement>> = match op {
         Op::Mma { kind, .. } => vec![mma_requirement(*kind)],
-        // m10-sm120-blockscaled.
         Op::MmaBlockScaled { kind, .. } => vec![specific(block_scaled_mma_what(*kind), SM120_BLOCK_SCALED_MMA)],
-        // m11-prims-mma-forms: .scale_vec::4X with UE8M0 scales and kind::mxf4nvf4 needs PTX 9.1.
+        // .scale_vec::4X with UE8M0 scales and kind::mxf4nvf4 needs PTX 9.1.
         Op::MmaSpBlockScaled { kind, .. } if kind.scale_vec == 4 && kind.sf == DType::F8E8M0FNU => vec![specific(
             "mma.sp.block_scale.scale_vec::4X with UE8M0 scales (prims::mma_sp_block_scale)",
             SM120_SP_BLOCK_SCALED_MMA_4X_UE8M0,
@@ -2896,7 +2882,6 @@ pub fn target_requirement(op: &Op) -> Option<TargetRequirement> {
             vec![need(90, 78, "mbarrier.try_wait with a suspend-time hint")]
         }
         Op::MbarrierWait { kind: MbarrierWaitKind::Try, .. } => vec![need(90, 78, "mbarrier.try_wait")],
-        // m11-prims-nvvm-layer.
         Op::MbarrierExt { kind, .. } => vec![match kind {
             MbarrierExtKind::ArriveDropExpectTx => need(90, 80, "mbarrier.arrive_drop.expect_tx"),
             MbarrierExtKind::CompleteTx => need(90, 80, "mbarrier.complete_tx"),
@@ -2923,7 +2908,7 @@ pub fn target_requirement(op: &Op) -> Option<TargetRequirement> {
         Op::TmaLoad { overrides: Some(_), .. } | Op::TmaStore { overrides: Some(_), .. } => {
             vec![specific("cp.async.bulk.tensor with .override::global_address (a TMA override copy)", TMA_OVERRIDE)]
         }
-        // m10-cta-pair: `.cta_group::2` (PTX 8.6 on sm_100a, sm_101a, sm_110a; the f families
+        // `.cta_group::2` (PTX 8.6 on sm_100a, sm_101a, sm_110a; the f families
         // from 8.8), the targets of tcgen05's CTA pairs.
         Op::TmaLoad { two_cta: true, .. } => {
             vec![specific("cp.async.bulk.tensor with .cta_group::2 (a CTA-pair TMA load)", TCGEN05_ALLOC)]
@@ -3080,7 +3065,6 @@ pub fn target_requirement(op: &Op) -> Option<TargetRequirement> {
                 if kind.two_cta { "tcgen05.mma.cta_group::2" } else { "tcgen05.mma (cute.gemm)" },
                 TCGEN05_ALLOC,
             )],
-            // m10-umma-blockscaled.
             UmmaDataKind::Mxf8f6f4 => {
                 vec![specific("tcgen05.mma.kind::mxf8f6f4.block_scale (tcgen05.MmaMXF8F6F4Op)", TCGEN05_MMA_MXF8F6F4)]
             }
@@ -3103,7 +3087,6 @@ pub fn target_requirement(op: &Op) -> Option<TargetRequirement> {
         Op::Tcgen05Commit { .. } => vec![specific("tcgen05.commit (tcgen05::commit)", TCGEN05_ALLOC)],
         // The same targets.
         Op::Tcgen05Cp { .. } => vec![specific("tcgen05.cp (an SMEM-to-TMEM copy atom, tcgen05.Cp..Op)", TCGEN05_ALLOC)],
-        // m10-clc-scheduling.
         Op::ClcTryCancel { multicast: false, .. } => vec![need(100, 86, "clusterlaunchcontrol.try_cancel")],
         Op::ClcTryCancel { multicast: true, .. } => {
             vec![specific("clusterlaunchcontrol.try_cancel.multicast::cluster::all (issue_clc_query)", CLC_MULTICAST)]
@@ -3395,7 +3378,7 @@ mod tests {
             [Some(88), Some(88), Some(88), Some(90)]
         );
         assert_eq!([on(Arch::Sm90), on(Arch::Sm100), on(Arch::Sm107)], [None, None, None]);
-        // The FP4/FP6/UE8M0 conversions of m3: 8.6 on sm_100a and sm_101a
+        // The FP4/FP6/UE8M0 conversions: 8.6 on sm_100a and sm_101a
         // (sm_110a's old name), 8.7 on sm_120a, 8.8 on the families.
         let ue = |a| UE8M0X2.ptx_on(a);
         assert_eq!([ue(Arch::Sm100a), ue(Arch::Sm110a), ue(Arch::Sm120a)], [Some(86), Some(86), Some(87)]);

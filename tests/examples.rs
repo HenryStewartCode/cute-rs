@@ -3,89 +3,66 @@
 //! The examples are compiled into this test as modules, so the kernels
 //! tested here are exactly the ones in `examples/`.
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/ampere_sgemm.rs"]
 mod ampere_sgemm;
-#[allow(dead_code)]
 #[path = "../examples/async_pipeline.rs"]
 mod async_pipeline;
 // The first Blackwell tutorial GEMM.
 // The canonical Blackwell GEMM.
-#[allow(dead_code)]
 #[path = "../examples/blackwell_dense_gemm.rs"]
 mod blackwell_dense_gemm;
-#[allow(dead_code)]
 #[path = "../examples/blackwell_fp16_gemm.rs"]
 mod blackwell_fp16_gemm;
 // The first Blackwell tutorial NVFP4 GEMM.
-#[allow(dead_code)]
 #[path = "../examples/blackwell_nvfp4_gemm.rs"]
 mod blackwell_nvfp4_gemm;
-#[allow(dead_code)]
 #[path = "../examples/block_reduce.rs"]
 mod block_reduce;
-#[allow(dead_code)]
 #[path = "../examples/cooperative_launch.rs"]
 mod cooperative_launch;
-#[allow(dead_code)]
 #[path = "../examples/cp_async_mbarrier_arrive.rs"]
 mod cp_async_mbarrier_arrive;
-#[allow(dead_code)]
 #[path = "../examples/cta_norm.rs"]
 mod cta_norm;
 // The cute_ext foundation ports.
-#[allow(dead_code)]
 #[path = "../examples/cute_ext_memcpy.rs"]
 mod cute_ext_memcpy;
-#[allow(dead_code)]
 #[path = "../examples/cute_ext_sgemm.rs"]
 mod cute_ext_sgemm;
 #[path = "support/dlpack_alloc.rs"]
 mod dlpack_alloc;
-#[allow(dead_code)]
 #[path = "../examples/elementwise_add.rs"]
 mod elementwise_add;
-#[allow(dead_code)]
 #[path = "../examples/elementwise_add_autotune.rs"]
 mod elementwise_add_autotune;
-#[allow(dead_code)]
 #[path = "../examples/elementwise_apply.rs"]
 mod elementwise_apply;
-#[allow(dead_code)]
 #[path = "../examples/fp4_x2_tensor.rs"]
 mod fp4_x2_tensor;
-#[allow(dead_code)]
 #[path = "../examples/grouped_gemm.rs"]
 mod grouped_gemm;
-#[allow(dead_code)]
 #[path = "../examples/pipeline_software_fill.rs"]
 mod pipeline_software_fill;
-#[allow(dead_code)]
 #[path = "../examples/red.rs"]
 mod red;
-#[allow(dead_code)]
 #[path = "../examples/redux_sync.rs"]
 mod redux_sync;
-#[allow(dead_code)]
 #[path = "../examples/sgemm.rs"]
 mod sgemm;
-#[allow(dead_code)]
 #[path = "../examples/single_warp_pipeline.rs"]
 mod single_warp_pipeline;
-#[allow(dead_code)]
 #[path = "../examples/tensorop_gemm.rs"]
 mod tensorop_gemm;
-#[allow(dead_code)]
 #[path = "../examples/tvm_ffi_add.rs"]
 mod tvm_ffi_add;
-#[allow(dead_code)]
 #[path = "../examples/warp_named_barrier.rs"]
 mod warp_named_barrier;
 // The TMA tutorials.
-#[allow(dead_code)]
 #[path = "../examples/tma_copy.rs"]
 mod tma_copy;
-#[allow(dead_code)]
 #[path = "../examples/tma_transpose.rs"]
 mod tma_transpose;
 

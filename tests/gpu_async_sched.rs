@@ -8,10 +8,11 @@
 //! cargo test --release --features cuda --test gpu_async_sched
 //! ```
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/persistent_gemm.rs"]
 mod persistent_gemm;
-#[allow(dead_code)]
 mod pipeline_kernels;
 
 use cute::cuda::{CudaContext, FuncAttribute, HardwareInfo};

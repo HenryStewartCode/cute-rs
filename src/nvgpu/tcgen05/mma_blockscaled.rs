@@ -44,7 +44,6 @@ use crate::nvgpu::warpgroup::InstructionShape;
 const MXF8F6F4_TYPES: [DType; 5] = [DType::F8E4M3FN, DType::F8E5M2, DType::F6E2M3FN, DType::F6E3M2FN, DType::F4E2M1FN];
 
 /// The checks of every block-scaled MMA, and its instruction.
-#[allow(clippy::too_many_arguments)]
 #[track_caller]
 fn block_scaled(
     name: &str,
@@ -202,7 +201,6 @@ impl MmaMXF8F6F4Op {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
     #[track_caller]
     fn checked(
         name: &str,

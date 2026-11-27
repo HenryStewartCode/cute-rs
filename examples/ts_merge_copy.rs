@@ -280,7 +280,6 @@ pub fn run(n: usize, tma_for_b: bool) {
     assert_eq!(a[3].to_vec::<F16>(), rb);
 }
 
-#[allow(dead_code)]
 fn main() {
     run(N_ELEMENTS, true);
     run(N_ELEMENTS, false);

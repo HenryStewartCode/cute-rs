@@ -61,7 +61,6 @@ fn cluster_mode(shape: &Shape, i: usize) -> Result<usize, String> {
         .ok_or_else(|| format!("cluster_shape_vmnk {shape} has a runtime extent; the multicast count is static"))
 }
 
-#[allow(clippy::too_many_arguments)]
 fn make_ab<T: Numeric>(
     loc: &'static Location<'static>,
     what: &str,

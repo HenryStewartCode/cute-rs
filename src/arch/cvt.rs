@@ -1,7 +1,7 @@
 //! CuTe DSL's narrow conversion helpers (`cute.arch.cvt_f32x2_bf16x2`,
 //! `cvt_f32_tf32`, `cvt_i8x4_to_f32x4`, `cvt_i8_bf16_intrinsic`,
 //! `sext_unpacked_i4x4_to_i8x4`, ...). CuTe DSL takes and returns MLIR
-//! vectors; until TensorSSA (m4) these take arrays of values or their bits
+//! vectors; these take arrays of values or their bits
 //! packed into one integer, and return arrays.
 
 use std::panic::Location;
@@ -561,7 +561,7 @@ fn cvt_i4x8_to_mxf8x8_impl(src: Uint32) -> [Uint32; 2] {
 /// (sm_20; it runs on every target). `F` is the 8-bit type the bytes are
 /// read as, typically [`F8E4M3FN`](crate::F8E4M3FN) (CuTe DSL's callers
 /// often take [`Int8`] and bitcast later); the bytes are E4M3 encodings
-/// whatever `F` is. The operands of MXF8 block-scaled MMAs (milestone m10).
+/// whatever `F` is. The operands of MXF8 block-scaled MMAs.
 #[track_caller]
 pub fn cvt_i4x8_to_mxf8x8<F: crate::value::Numeric>(src_vec8: [crate::numeric::Int4; 8]) -> [Value<F>; 8] {
     assert_eq!(F::DTYPE.bits(), 8, "cute: cvt_i4x8_to_mxf8x8: dst_type must be an 8-bit type, not {}", F::DTYPE);

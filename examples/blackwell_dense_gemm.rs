@@ -28,8 +28,8 @@
 //!   accumulator from the MMA to the epilogue, and `PipelineTmaStore` paces the TMA stores of
 //!   C.
 //!
-//! The roles of the warps are separate functions, which the roadmap's CLC and EFC ports
-//! reuse: [`tma_load_warp`] issues the TMA loads of one k-tile, [`mma_warp`] runs the MMAs
+//! The roles of the warps are separate functions:
+//! [`tma_load_warp`] issues the TMA loads of one k-tile, [`mma_warp`] runs the MMAs
 //! of one k-tile (on the leader CTA of a pair) and [`epilogue_warps`] drains the accumulator
 //! (all four warps). As in the example, warp 0 plays both the TMA and the MMA role, with the
 //! loads running `ab_stages - 2` k-tiles ahead of the MMAs ([`for_range_pipelined`] is
@@ -244,7 +244,6 @@ impl DenseGemm {
     /// `_compute_stages`: the accumulator and C stages by default, then as many A/B stages
     /// as fit the shared memory beside the C stages and the barriers' bytes, and the
     /// shared memory left over goes to C.
-    #[allow(clippy::too_many_arguments)]
     pub fn compute_stages(
         tiled_mma: &TiledMma,
         mma_tiler_mnk: (usize, usize, usize),
@@ -461,7 +460,6 @@ pub fn mma_warp<'p>(ml: &Mainloop, mut ab_consumer: AbConsumer<'p>, tiled_mma: T
 
 /// The epilogue role (all four warps): TMEM -> registers -> shared memory -> global memory
 /// through [`epilogue_tma_store`], waiting for the accumulator and releasing it.
-#[allow(clippy::too_many_arguments)]
 pub fn epilogue_warps<C: CType>(
     ecfg: &EpilogueConfig,
     tidx: Int32,
@@ -517,7 +515,6 @@ pub fn epilogue_warps<C: CType>(
 }
 
 /// The kernel of `DenseGemmKernel`.
-#[allow(clippy::too_many_arguments)]
 pub fn kernel<C: CType>(
     cfg: &DenseGemm,
     st: &Setup,
@@ -858,7 +855,6 @@ pub fn run<C: CType>(cfg: &DenseGemm, mnk: (usize, usize, usize)) -> SimReport {
     run_with::<C>(cfg, mnk, &SimOptions::default(), &[])
 }
 
-#[allow(dead_code)]
 fn main() {
     // The three configurations on problems the simulator can run (the example's default,
     // 8192x8192x8192, is too large to simulate).

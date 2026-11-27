@@ -268,7 +268,6 @@ pub fn tma_load_with<T: Numeric>(src: &Tensor<T>, dst: &Tensor<T>, mbar: &Ptr<u6
 /// multicast operation type.
 #[deprecated(note = "use tma_load_with with a multicast tma_operation_type, vmnk_layout and multicast_mode")]
 #[track_caller]
-#[allow(clippy::too_many_arguments)]
 pub fn tma_load_multicast<T: Numeric>(
     src: &Tensor<T>,
     dst: &Tensor<T>,

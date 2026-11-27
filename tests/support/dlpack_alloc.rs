@@ -1,6 +1,7 @@
 //! DLPack managed tensors built in tests, over host memory or a raw device address, with
 //! deleters that count their calls (and keep a copy of host data as it was when deleted).
 
+// Shared by several test binaries; each uses part of it.
 #![allow(dead_code)]
 
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -80,7 +81,6 @@ unsafe extern "C" fn delete_managed(p: *mut DLManagedTensor) {
 }
 
 /// A managed tensor (versioned or not) over `data`.
-#[allow(clippy::too_many_arguments)]
 pub fn managed(
     data: Owned,
     dtype: DLDataType,
@@ -105,7 +105,6 @@ pub fn managed_version(
     make(data, dtype, shape, None, 0, 0, device, Some(major))
 }
 
-#[allow(clippy::too_many_arguments)]
 fn make(
     data: Owned,
     dtype: DLDataType,

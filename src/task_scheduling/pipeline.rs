@@ -291,7 +291,6 @@ impl TsPipeline {
     }
 
     /// A pipeline over barriers made elsewhere (a group's shared ones).
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn from_parts(
         pipeline_type: PipelineType,
         full: MbarrierArray,

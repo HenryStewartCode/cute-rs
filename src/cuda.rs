@@ -196,7 +196,6 @@ struct Api {
     module_load_data_ex:
         unsafe extern "C" fn(*mut CuModule, *const c_void, c_uint, *mut c_int, *mut *mut c_void) -> CuResult,
     link_create: unsafe extern "C" fn(c_uint, *mut c_int, *mut *mut c_void, *mut LinkState) -> CuResult,
-    #[allow(clippy::type_complexity)]
     link_add_data: unsafe extern "C" fn(
         LinkState,
         c_int,
@@ -215,7 +214,6 @@ struct Api {
     mem_free: unsafe extern "C" fn(CuDevicePtr) -> CuResult,
     memcpy_htod: unsafe extern "C" fn(CuDevicePtr, *const c_void, usize) -> CuResult,
     memcpy_dtoh: unsafe extern "C" fn(*mut c_void, CuDevicePtr, usize) -> CuResult,
-    #[allow(clippy::type_complexity)]
     launch_kernel: unsafe extern "C" fn(
         CuFunction,
         c_uint,

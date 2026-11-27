@@ -22,8 +22,7 @@
 //! converted back with `.to()`.
 //!
 //! Differences from the example: `N` and the thread count are static (as
-//! the example's are, at compile time), `M` too (runtime shapes arrive with
-//! m5); `eps` is a constant rather than a kernel argument; and each chunk
+//! the example's are, at compile time), `M` too; `eps` is a constant rather than a kernel argument; and each chunk
 //! is loaded with `load_ssa` inside an `if_else_yield` that yields zeros
 //! when its predicate is off, where the example zero-fills `x`'s fragment
 //! and `autovec_copy`s under `if pred[i]` (a register written inside a
@@ -288,7 +287,6 @@ pub fn run_f32(cfg: NormConfig) -> SimReport {
     run::<f32>(cfg, |x| x, |x| x, 1e-4)
 }
 
-#[allow(dead_code)]
 fn main() {
     for cfg in CONFIGS {
         run_f16(cfg);

@@ -5,7 +5,9 @@
 //!
 //! `CUTE_RS_BLESS=1` rewrites the golden headers.
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/runtime_gemm.rs"]
 mod runtime_gemm;
 

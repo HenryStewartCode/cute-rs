@@ -6,7 +6,9 @@
 //! loop over a `PipelineTmaAsync`, simulated and assembled for sm_90a. With
 //! the `cuda` feature the SM89 kernels also run on the GPU.
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/tensorop_gemm.rs"]
 mod tensorop_gemm;
 

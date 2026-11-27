@@ -3,14 +3,14 @@
 ## TMA descriptors, stmatrix and setmaxnreg
 
 The TMA instructions that use
-these descriptors came with m7-tma-load and later parts (below).
+these descriptors are described below.
 
 | CuTe DSL (Python) | cute-rs |
 |---|---|
 | `cutlass.GridConstant[T]`, `cutlass.grid_constant` | `param_bytes(name, size, align, true)` (one `.param .align A .b8 k_param_i[N]`, `llvm.byval` and `nvvm.grid_constant` set on the lowered `llvm.func`); `StructParam::address()` is its generic address in place (`cvta.param.u64`, PTX 7.7). The simulator keeps it read-only |
 | a TMA atom's `CUtensorMap` (`TmaTrait`), passed as a 128-byte `__grid_constant__` | `tma_descriptor(&tensor, &box_dims, stride_order, &TensorMapOptions)`: a hidden parameter appended after the kernel's own (launches pass the same arguments), described by a `TmaDescSpec` whose extents, byte strides and start are expressions over constants and scalar parameters. `KernelSignature::hidden_tensor_map` turns it into a `TmaDesc` for each launch; the CUDA launcher encodes that with `cuTensorMapEncodeTiled` from the tensor's device address, the simulator with its own 128-byte encoding (`TmaDesc::to_sim_bytes`: magic `CuTM`, version, fields) from its address map. `TmaDescriptor::get_ptr()` is the descriptor's generic address |
 | `cutlass.experimental.cuda.create_tensor_map_tiled(global_address, dtype, global_dims, global_strides, box_dims, traversal_strides=, interleave=, swizzle=, l2_promotion=, oob_fill=, tma_format=)`, `create_tensor_map_tiled_from_view(tensor, box_dims, stride_order=, ...)`, `TensorMap` (`element_type`, `box_volume`, `shared_storage_dtype`, `shared_storage_bytes`, `global_tx_bytes`, `get_ptr`) | `create_tensor_map_tiled(address, dtype, &dims, &strides_16b, &box, &TensorMapOptions)` (strides of dimensions 1 and up in 16-byte units, TMA order), `create_tensor_map_tiled_from_view(&TensorMapView, &box, stride_order, &opts)`, `TensorMap` with the same queries; also `cute::cuda::tensor_map`. A kernel takes one with `param_tensormap(name)`, a launch with `KernelArg::tensor_map(&map)`; `TmaDescriptor::get_ptr()` is `get_ptr` |
-| `TensorMapDataType`, `TensorMapDataFormat`, `TensorMapInterleave`, `TensorMapSwizzle`, `TensorMapL2Promotion`, `TensorMapFloatOOBFill` | the same names and values (the driver's codes). The FP4/FP6 encodings (`f416u4_align8b`, `B4X16`, ...) are supported; the `s128b_atom_*` swizzles exist and are refused until m10-umma-layouts |
+| `TensorMapDataType`, `TensorMapDataFormat`, `TensorMapInterleave`, `TensorMapSwizzle`, `TensorMapL2Promotion`, `TensorMapFloatOOBFill` | the same names and values (the driver's codes). The FP4/FP6 encodings (`f416u4_align8b`, `B4X16`, ...) are supported; `s128b_atom_32b` is supported on sm_100 and newer, and the other `s128b_atom_*` swizzles exist and are refused |
 | `cute.nvgpu.warp.StMatrix8x8x16bOp(transpose, num_matrices)` | `CopyOp::StMatrix { num, trans }`: `stmatrix.sync.aligned.m8n8.x{1,2,4}[.trans].shared.b16` (sm_90, PTX 7.8), thread-value layouts of CuTe C++'s `SM90_U32x{1,2,4}_STSM_N` / `SM90_U16x{2,4,8}_STSM_T`. Works with `make_tiled_copy_c_atom` and `make_tiled_copy_s`, as Hopper epilogues use it |
 | `cute.nvgpu.warp.StMatrix16x8x8bOp(transpose=True, num_matrices)` | `CopyOp::StMatrix16x8x8b { num, trans: true }`: `stmatrix.sync.aligned.m16n8.x{1,2,4}.trans.shared.b8` (sm_100a, sm_101a/sm_110a, sm_120a; the f families from PTX 8.8), CuTe C++'s `SM100_U8x{4,8,16}_STSM_T`. `CopyOp::LdMatrix16x8x8b` loads it back |
 | `cute.arch.setmaxregister_increase(n)`, `setmaxregister_decrease(n)`, `warpgroup_reg_alloc`, `warpgroup_reg_dealloc` (deprecated) | the same names (`#[deprecated]` for the last two): `setmaxnreg.{inc,dec}.sync.aligned.u32 n`, `n` a multiple of 8 from 24 to 256 checked when the kernel is built, sm_90a, sm_100a and sm_120a (the f families from PTX 8.8). The kernel must declare its block (`.reqntid`) or `max_threads` (`.maxntid`) |
@@ -63,7 +63,7 @@ Building and partitioning TMA atoms; the next section issues the loads.
 
 | CuTe DSL (Python) | cute-rs |
 |---|---|
-| `cpasync.CopyBulkTensorTileG2SOp(cta_group)`, `CopyBulkTensorTileG2SMulticastOp(cta_group)`, `CopyBulkTensorTileS2GOp()`, `CopyReduceBulkTensorTileS2GOp(reduction_kind)`, `CtaGroup`, `ReductionKind` | the same names in `cute::cpasync` (`CtaGroup::{ONE, TWO}`, `ReductionKind::{ADD, MIN, MAX, INC, DEC, AND, OR, XOR}`), converting into `CopyOp::TmaLoad { multicast, cta_group }`, `CopyOp::TmaStore` and `CopyOp::TmaReduce(kind)`. `CtaGroup::TWO` is refused until m10-cta-pair |
+| `cpasync.CopyBulkTensorTileG2SOp(cta_group)`, `CopyBulkTensorTileG2SMulticastOp(cta_group)`, `CopyBulkTensorTileS2GOp()`, `CopyReduceBulkTensorTileS2GOp(reduction_kind)`, `CtaGroup`, `ReductionKind` | the same names in `cute::cpasync` (`CtaGroup::{ONE, TWO}`, `ReductionKind::{ADD, MIN, MAX, INC, DEC, AND, OR, XOR}`), converting into `CopyOp::TmaLoad { multicast, cta_group }`, `CopyOp::TmaStore` and `CopyOp::TmaReduce(kind)`. `CtaGroup::TWO` loads a CTA pair (sm_100 and newer) |
 | `cpasync.make_tiled_tma_atom(op, gmem_tensor, smem_layout, cta_tiler, num_multicast=1, *, gmem_coord_tensor=None, internal_type=None)` -> `TmaInfo` (`.atom`, `.tma_tensor`, `.smem_layout`; unpacks to `(atom, tma_tensor)`) | `cpasync::make_tiled_tma_atom(op, &gmem, smem_layout, cta_tiler, num_multicast)` -> `TmaInfo { atom, tma_tensor, smem_layout }` (`let (atom, t) = info.into()`); `make_tiled_tma_atom_with(.., &TmaAtomOptions)` takes the keyword arguments (`gmem_coord_tensor`, `internal_type`). C++ CuTe's algorithm (`make_tma_atom`): the box is the SMEM layout's largest contiguous run along unit steps of the global modes, merged up to 256 elements, other modes appended with extent 1, folded to at most 5 dimensions, split across the multicast; the swizzle is the layout's restated on bytes (`Swizzle<1|2|3,4,3>`). A staged layout (one more mode than the tiler) uses its first stage. The atom registers a hidden descriptor parameter (`atom.tma_info().unwrap().descriptor()`), one thread issues it (`thr_id` `1:0`) and it moves the whole box (`num_val_src`). The TMA tensor is a coordinate tensor over the global shape with scaled-basis strides (`(m,k):(1@1,1@0)` for a K-major tile) |
 | `cpasync.tma_partition(atom, cta_coord, cta_layout, smem_tensor, gmem_tensor)` -> `(tXsX, tXgX)` | `cpasync::tma_partition(&atom, cta_coord, &cta_layout, &smem, &gmem)` -> `(tXsX, tXgX)`, mode 0 `(TMA, TMA_Iter)`, both views starting at the CTA's multicast share. The list form for gather4/scatter4 is `tma_partition_indexed`, and for the override copies `tma_partition_override` |
 
@@ -87,14 +87,14 @@ Building and partitioning TMA atoms; the next section issues the loads.
 |---|---|
 | `cute.copy(tma_atom, tAgA[(None, k)], tAsA[(None, s)], tma_bar_ptr=mbar, cache_policy=p, tma_desc_ptr=d)` | `copy_with(&atom, &tAgA.slice((.., k)), &tAsA.slice((.., s)), CopyArgs::new().tma_bar_ptr(&mbar).cache_policy(p).tma_desc_ptr(d))`: one `cp.async.bulk.tensor.Nd.shared::cluster.global.tile.mbarrier::complete_tx::bytes[.L2::cache_hint]` per box (sm_90, PTX 8.0), as inline PTX (32-bit shared addresses, the descriptor's generic address, one register per coordinate, a memory clobber). The coordinates are the TMA tensor's element at each box's start, the destination the box's unswizzled start. As in CuTe DSL the copy elects one lane of each warp that executes it: call it from one warp, unelected; `mbarrier_init`, `mbarrier_init_fence` and `expect_tx` stay the program's |
 | `cute.copy(atom, src, dst, *, pred=, unroll_factor=, **kwargs)` | `copy_with(&atom, &src, &dst, CopyArgs { .. })` (or `&CopyArgs`; `CopyOptions` is the same struct). `pred` takes one flag per source element or one per atom application (`(ATOM_REST, REST...)`). `unroll_factor` loops over the rest modes (which may then be runtime extents) with `LoopUnroll(count)` when both operands are memory or coordinates, and unrolls fully otherwise. `copy` accepts a coordinate tensor (`Tensor<Ident>`) as a TMA load's source |
-| `cute.copy(atom, [src, aux...], [dst, aux...])` | `copy_aux(&atom, (&src, &[AuxOperand::from(&t)]), (&dst, &[]), args)`; the gather4/scatter4 atoms take the index tensor's partition and the override atoms the residue's. `tma_multicast=` (the block API) panics, pointing to m10-s2t-copies |
+| `cute.copy(atom, [src, aux...], [dst, aux...])` | `copy_aux(&atom, (&src, &[AuxOperand::from(&t)]), (&dst, &[]), args)`; the gather4/scatter4 atoms take the index tensor's partition and the override atoms the residue's. `tma_multicast=` (the block API) panics, pointing to the multicast atoms |
 | `atom.with_(tma_bar_ptr=..., ...)`, `tiled_copy.with_(...)` | `atom.with_(CopyArgs::new().tma_bar_ptr(&mbar))`, `tiled_copy.with_(..)`: the fields every later copy with it uses; giving a bound field again panics |
 | `mma.set(field, v)`, `mma.get(field)`, `mma.with_(...)`, `warpgroup.Field`, `tcgen05.Field`, `warp.Field` | `MmaAtom`/`TiledMma::set(MmaField::ACCUMULATE, v)`, `get(field) -> Boolean`, `with_(field, v)`; `MmaField::{ACCUMULATE, NEGATE_A, NEGATE_B, SFA, SFB, METADATA, DISABLE_OUTPUT_LANE}`. `TiledMma` and `MmaAtom` are `Carry`: a field set inside `for_range_carry` is carried, as CuTe DSL's K loops need. No `mma.sync` atom takes a field; WGMMA is the first |
 
 * **Fields per atom.** A TMA load takes `tma_bar_ptr` (needed), `cache_policy`,
   `tma_desc_ptr` and `mcast_mask` (ignored, as CuTe DSL ignores it for the plain load);
   `CopyOp::G2R`/`R2G` take `cache_policy`; the TMA stores, multicast loads and bulk copies
-  take theirs (next sections); `byte_mask` belongs to m7-tma-sm100-modes. Any other field, a
+  take theirs (next sections); `byte_mask` belongs to the byte-masked bulk store. Any other field, a
   missing `tma_bar_ptr`, a data tensor as a TMA load's source, a predicated TMA load, a
   CTA-pair load
  and a box start at a static offset that is not 128-byte aligned fail
@@ -273,7 +273,7 @@ each need their own tensor map.
   rank 6) are the validator's too: the SM89 driver (595) does not reject the 16U4/16U6
   types as invalid values, but whether it encodes them needs an SM90 or SM100 GPU.
 
-### The TMA APIs at a glance (m7)
+### The TMA APIs at a glance
 
 | CuTe DSL | cute-rs |
 |---|---|
@@ -304,7 +304,7 @@ themselves are built and checked on a GPU (`tests/gpu_wgmma.rs`).
 
 | CuTe DSL (Python) | cute-rs |
 |---|---|
-| `warpgroup.MmaF16BF16Op(ab_dtype, acc_dtype, instruction_shape, a_src, a_major_mode, b_major_mode)` | `warpgroup::MmaF16BF16Op::new(ab, acc, (64, n), OperandSource::SMEM, a_major, b_major)` (`(64, n, 16)` too): `wgmma.mma_async.sync.aligned.m64n{N}k16.{f32,f16}.{f16,bf16}.{f16,bf16}`, N a multiple of 8 from 8 to 256, Float16 accumulating in Float16 or Float32 and BFloat16 in Float32, either operand K- or MN-major (the transpose immediates). The atom spans 128 threads (`ABLayout`, `CLayout_64xN`) and takes `MmaField::ACCUMULATE` (scale-d; false until set). `OperandSource::RMEM` (A in registers): see m8-wgmma-variants below. Kernels that use it compile for sm_90a only |
+| `warpgroup.MmaF16BF16Op(ab_dtype, acc_dtype, instruction_shape, a_src, a_major_mode, b_major_mode)` | `warpgroup::MmaF16BF16Op::new(ab, acc, (64, n), OperandSource::SMEM, a_major, b_major)` (`(64, n, 16)` too): `wgmma.mma_async.sync.aligned.m64n{N}k16.{f32,f16}.{f16,bf16}.{f16,bf16}`, N a multiple of 8 from 8 to 256, Float16 accumulating in Float16 or Float32 and BFloat16 in Float32, either operand K- or MN-major (the transpose immediates). The atom spans 128 threads (`ABLayout`, `CLayout_64xN`) and takes `MmaField::ACCUMULATE` (scale-d; false until set). `OperandSource::RMEM` (A in registers): see the WGMMA variants below. Kernels that use it compile for sm_90a only |
 | `tiled_mma.make_fragment_A(tCsA)`, `make_fragment_B`, `make_fragment_C` | `tiled_mma.make_fragment_a(&tCsA)`, `make_fragment_b`, `make_fragment_c::<T>(&tCgC or layout or shape)`: for WGMMA, A and B become tensors of 64-bit shared-memory matrix descriptors, one per MMA tile (`(1, MMA_M, MMA_K, stages...)`, strides in 16-byte units, `Tensor::smem_desc(coord)` reads one); otherwise register fragments. The tile must be a canonical GMMA layout (from `warpgroup::make_smem_layout_atom` atoms; the swizzle may sit in the layout or the pointer) in a buffer aligned to the swizzle's repeat (`make_smem_tensor_aligned(.., 1024)` for 128-byte swizzles). `ThrMma::partition_fragment_a/b/c` give the same |
 | `cute.gemm(mma, d, a, b, c)` on WGMMA fragments | `gemm(&mma, &acc, &frag_a.slice((.., .., k)), &frag_b.slice((.., .., k)), &acc)`: one MMA per `(MMA_M, MMA_N, MMA_K)` tile, each with the atom's current `ACCUMULATE` |
 | `warpgroup.fence()`, `commit_group()`, `wait_group(n)` | `warpgroup::fence()`, `commit_group()`, `wait_group(n)`: `nvvm.wgmma.fence.aligned`, `nvvm.wgmma.commit.group.sync.aligned`, `nvvm.wgmma.wait.group.sync.aligned n` |
@@ -371,10 +371,9 @@ with `mlir-opt` and their PTX assembled with `ptxas` for sm_90a and sm_90.
 ## The Hopper dense GEMM and its APIs at a glance
 
 This ports `dense_gemm.py` as `examples/hopper_gemm.rs`, keeping its
-class, method and variable names, and completes milestone m8. Porting it needed no new API;
-m9-hopper-dense-gemm then swapped in m9's `PipelineTmaAsync`, `PipelineTmaStore`, `cute_struct!`
-and helpers for the hand-written versions (the differences that remain are listed in its header).
-Every m8 API, and where it is described:
+class, method and variable names, and needed no new API. It uses `PipelineTmaAsync`, `PipelineTmaStore`, `cute_struct!`
+and helpers in place of hand-written versions (the differences that remain are listed in its header).
+Every API it uses, and where it is described:
 
 | CuTe DSL | cute-rs | See |
 |---|---|---|
@@ -394,9 +393,9 @@ Every m8 API, and where it is described:
 | `cutlass.utils.LayoutEnum` | `LayoutEnum` (`from_tensor`, `sm90_mma_major_mode`, `is_k_major_a`, ...) | CuTe DSL → cute-rs |
 | `cute.nvgpu.OperandMajorMode` | `OperandMajorMode::{K, MN}` | CuTe DSL → cute-rs |
 
-What the port uses from m7 is in "The TMA APIs at a glance (m7)" above. Its
-`compute_tile_shape_or_override` and `sm90_get_smem_store_op` (`cutlass.utils.sm90`) are
-computed inline, as m9 brings them.
+What the port uses from the TMA is in "The TMA APIs at a glance" above. Its
+`compute_tile_shape_or_override` and `sm90_get_smem_store_op` (`cutlass.utils.sm90`) come
+from `cute::utils::sm90`.
 
 ## TMA pipelines
 
@@ -424,5 +423,5 @@ host tensors, under `cute::utils::{sm90, sm100, gemm}`. The checks return a
 | `utils.sm100.get_tma_aligned_contiguous_elements(elem_ty)`, `check_tma_tensor_alignment(...)`, `check_gemm_tma_alignment(...)` | `utils::sm100::{get_tma_aligned_contiguous_elements, check_tma_tensor_alignment, check_gemm_tma_alignment}`: `Result<_, CantImplement>`, CuTe DSL's messages; the majors are `GemmMajor::{M, N, K}` (`FromStr` for `"m"`/`"n"`/`"k"`), or `check_gemm_tma_alignment_str` for CuTe DSL's strings |
 | `utils.sm100.check_int8_mma_arch(ab_dtype, target_arch=None)` | `utils::sm100::check_int8_mma_arch(dtype, Option<Arch>)`: Int8/Uint8 fail on sm_107; the target is the argument, else `CUTE_DSL_ARCH`, else the detected GPU (feature `cuda`), else unchecked; `check_int8_mma_target(dtype, "sm_107")` takes a string |
 | `utils.gemm.create_gemm_tensor_torch(...)`, `get_gemm_tensor(...)`, `get_gemm_tensors(...)` | `utils::gemm::{create_gemm_tensor, get_gemm_tensor, get_gemm_tensors}` with a seeded `Rng`: `(MN, K, L)` operands of {-1, 0, 1} with MN-major `(1, MN, MN K)` or K-major `(K, 1, MN K)` strides; a `GemmTensor` holds the `KernelArg`, the `Layout` and the logical values; `host_tensor()` marks the leading dimension dynamic. FP4 operands are one byte per element, as in CuTe DSL |
-| `create_scale_factor_tensor(...)`, `unpack_scale_factors(...)`, `decode_float4e2m1fn(...)` | `utils::gemm::{create_scale_factor_tensor, unpack_scale_factors, pack_scale_factors, scale_factor_offset, decode_float4e2m1fn}`: from the explicit index map (to be cross-checked with `BlockScaledBasicChunk` in the m10 block-scaled port) |
+| `create_scale_factor_tensor(...)`, `unpack_scale_factors(...)`, `decode_float4e2m1fn(...)` | `utils::gemm::{create_scale_factor_tensor, unpack_scale_factors, pack_scale_factors, scale_factor_offset, decode_float4e2m1fn}`: from the explicit index map (written from the explicit formula, not from `BlockScaledBasicChunk`) |
 | (the examples' torch reference) | `utils::gemm::{reference_gemm, reference_gemm_values, to_memory_order}`: `D = A B^T` with f64 accumulation |

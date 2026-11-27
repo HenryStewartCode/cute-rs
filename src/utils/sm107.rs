@@ -60,7 +60,6 @@ pub fn canonicalize_rubin_resource_arch(arch: &str) -> Result<Arch, String> {
 /// 256. Any other MMA or tile is
 /// [`compute_epilogue_tile_shape`](super::compute_epilogue_tile_shape)'s
 /// (SM100's).
-#[allow(clippy::too_many_arguments)]
 #[track_caller]
 pub fn compute_epilogue_tile_shape(
     mma_op: &MmaOp,
@@ -109,7 +108,6 @@ pub fn compute_epilogue_tile_shape(
 /// other than `DISCARD` for them panics (CuTe DSL's `TypeError`), as does
 /// any other pair of types.
 #[track_caller]
-#[allow(clippy::too_many_arguments)]
 pub fn make_trivial_tiled_mma(
     a_dtype: DType,
     b_dtype: DType,
@@ -183,7 +181,6 @@ fn tile(atom: MmaAtom, atom_layout_mnk: (usize, usize, usize), permutation: Opti
 ///
 /// Panics (`TypeError`) for other types.
 #[track_caller]
-#[allow(clippy::too_many_arguments)]
 pub fn make_blockscaled_trivial_tiled_mma(
     a_dtype: DType,
     b_dtype: DType,

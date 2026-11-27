@@ -9,12 +9,14 @@
 // steps. Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights
 // reserved. See THIRD-PARTY-NOTICES.md.
 
-//! Task Scheduling part 1: schedule capture
+//! Task Scheduling resources and schedule capture: capture
 //! of the copy tutorials compared with expected listings, the capture
 //! diagnostics, pipeline configuration checks, and hand-written
 //! warp-specialised kernels calling resources directly on the simulator.
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 mod ts_kernels;
 
 use cute::pipeline::{Agent, CooperativeGroup, PipelineOp};

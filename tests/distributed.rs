@@ -4,7 +4,9 @@
 //! of co-resident blocks, and a wait that can never succeed), the all-reduce example, and the
 //! diagnostics. Multi-GPU execution is untested: one GPU cannot make multicast memory.
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/all_reduce_two_shot_multimem.rs"]
 mod all_reduce;
 

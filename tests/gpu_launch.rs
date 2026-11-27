@@ -5,7 +5,9 @@
 //! cargo test --release --features cuda --test gpu_launch
 //! ```
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/cuda_graphs.rs"]
 mod cuda_graphs;
 

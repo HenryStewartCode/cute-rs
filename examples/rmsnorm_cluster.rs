@@ -376,7 +376,6 @@ pub fn cluster_reduce(
 /// `threads_per_row` and `cluster_n` (`row_reduce`): each thread folds its
 /// values, a warp reduction over the row's lanes, then a block reduction
 /// (more than one warp per row) or a cluster reduction (`cluster_n > 1`).
-#[allow(clippy::too_many_arguments)]
 pub fn row_reduce(
     x: &TensorSsa<f32>,
     op: ReductionOp,
@@ -460,7 +459,6 @@ pub fn rmsnorm_with_misuse<T: Numeric>(cfg: RMSNormConfig, misuse: Misuse) -> Ke
 }
 
 /// The device kernel implementing RMSNorm with cluster support.
-#[allow(clippy::too_many_arguments)]
 fn kernel<T: Numeric>(
     cfg: &RMSNormConfig,
     m_x: &Tensor<T>,
@@ -728,7 +726,6 @@ pub fn run_f32(kernel: &Kernel, cfg: &RMSNormConfig, m: usize) -> SimReport {
     run::<f32>(kernel, cfg, m, |x| x, |x| x, 1e-4)
 }
 
-#[allow(dead_code)]
 fn main() {
     // One CTA per row on SM80 and for short rows; a cluster of two and of
     // four CTAs on SM90 for rows of 20000 and 40000 Float16 elements (ragged:

@@ -2,8 +2,10 @@
 //! hand-offs under seeded schedules, both paths of the token-taking waits,
 //! and one generic kernel body over a real and an empty pipeline.
 
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 mod feature_kernels;
-#[allow(dead_code)]
 mod pipeline_kernels;
 
 use cute::ir::Op;

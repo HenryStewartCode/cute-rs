@@ -29,6 +29,7 @@ enum Source {
 /// A module whose kernels' TVM-FFI functions share one load per thread and device.
 pub(super) struct SharedModule {
     /// The module's identity: a hash of its kernels' names and its images.
+    // Read only when the module is loaded on a GPU.
     #[cfg_attr(not(feature = "cuda"), allow(dead_code))]
     key: [u8; 32],
     source: Source,

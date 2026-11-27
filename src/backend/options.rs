@@ -17,8 +17,8 @@
 //!   difference from CuTe DSL, which applies its environment on top of the explicit options;
 //!   among the variables, CuTe's order is kept (see [`CompileOptions::from_env_with`]).
 //!
-//! Every CuTe DSL 4.8.1 spelling is recognised. Options whose feature has not been built yet
-//! are rejected with a message naming the part of the roadmap that adds them, rather than
+//! Every CuTe DSL 4.8.1 spelling is recognised. Options that cannot be set by option string
+//! are rejected with a message saying so, rather than
 //! ignored; options that select one of NVIDIA's other Python front ends are accepted and do
 //! nothing (cute-rs has one front end and one pipeline). The README's "Compile options"
 //! section has the full table.
@@ -983,7 +983,7 @@ impl CompileOptions {
 const NO_PYIR: &str = "cute-rs records structured control flow directly, with no PyIR to convert";
 
 fn pending(shown: &str, feature: &str) -> OptionError {
-    OptionError::new(format!("`{shown}`: {feature} is not available yet"))
+    OptionError::new(format!("`{shown}`: {feature} is not supported as a compile option string"))
 }
 
 fn opt_level_range(level: &str) -> String {
@@ -1574,7 +1574,7 @@ mod tests {
     fn unavailable_options_say_so() {
         for text in ["--link-libraries libdevice.bc", "--rdc", "rdc", "iket", "--iket"] {
             let e = error(text);
-            assert!(e.contains("not available yet"), "{text}: {e}");
+            assert!(e.contains("not supported as a compile option string"), "{text}: {e}");
         }
         // The value after --ptxas-options is consumed even though it starts with '-'; other
         // flags take such a value only after `=` (see values_that_start_with_a_dash).
@@ -1720,9 +1720,6 @@ mod tests {
         ] {
             let e = CompileOptions::from_env_with(env(&vars)).unwrap_err().to_string();
             assert!(e.contains(want), "{vars:?}: {e}");
-            if want.contains("m6-") {
-                assert!(e.contains("m6-") && e.contains("not available yet"), "{vars:?}: {e}");
-            }
         }
         // The artifact variables switch things on.
         let o = CompileOptions::from_env_with(env(&[

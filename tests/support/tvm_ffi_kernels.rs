@@ -1,6 +1,7 @@
 //! Kernels, DLTensors and a stub TVM-FFI runtime for the TVM-FFI tests (`tests/tvm_ffi.rs`
 //! on any machine, `tests/gpu_tvm_ffi.rs` on a GPU).
 
+// Shared by several test binaries; each uses part of it.
 #![allow(dead_code)]
 
 use std::cell::{Cell, RefCell};

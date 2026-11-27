@@ -553,6 +553,7 @@ const EXTREMA_COLS: usize = ADD_ROUNDS * 8 + 8;
 /// `atomic_fmin_with` with the sign bit given (with `sem=` and `scope=`),
 /// and the deprecated `atomic_max_float32`; and every thread's input value
 /// into one cell of each memory.
+// Tests the deprecated names, which still have to work.
 #[allow(deprecated)]
 pub fn atomic_float_extrema() -> Case {
     let kernel = Kernel::builder("atomic_float_extrema").block_dim([N as u32, 1, 1]).build(|| {

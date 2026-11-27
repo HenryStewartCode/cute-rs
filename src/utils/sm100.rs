@@ -160,7 +160,6 @@ pub fn check_tma_tensor_alignment(
 /// `M` or `K`, `b_major` `N` or `K`, `d_major` `M` or `N` (needed with
 /// `d_dtype`); anything else is an "Invalid ..._major" error.
 /// `output_tensor_name` is `"D"` in CuTe DSL.
-#[allow(clippy::too_many_arguments)]
 pub fn check_gemm_tma_alignment(
     m: usize,
     n: usize,
@@ -190,7 +189,6 @@ pub fn check_gemm_tma_alignment(
 /// [`check_gemm_tma_alignment`] with CuTe DSL's strings for the majors
 /// (`"m"`, `"n"`, `"k"`, case-sensitive as there), so that a string that is
 /// not one gives CuTe DSL's "Invalid a_major: x" message.
-#[allow(clippy::too_many_arguments)]
 pub fn check_gemm_tma_alignment_str(
     m: usize,
     n: usize,
@@ -290,7 +288,6 @@ pub fn default_tmem_warp_shape_mn(cta_tile_m: usize, use_2cta: bool) -> (usize, 
 /// does not check the minimums against `cta_tile_n`
 /// ([`compute_epilogue_tile_shape`](super::compute_epilogue_tile_shape)
 /// does).
-#[allow(clippy::too_many_arguments)]
 pub fn compute_epilogue_tile_size(
     cta_tile_m: usize,
     cta_tile_n: usize,

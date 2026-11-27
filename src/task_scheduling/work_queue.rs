@@ -30,7 +30,7 @@ type Shared = Rc<RefCell<Option<SchedulerState>>>;
 type SkipFn = Rc<dyn Fn(&WorkTileInfo) -> Boolean>;
 
 /// A resource that hands out work tiles (CuTe DSL's `WorkQueue`), over
-/// m9's [`StaticPersistentTileScheduler`] or m10's
+/// the [`StaticPersistentTileScheduler`] or the
 /// [`ClcDynamicPersistentTileScheduler`].
 ///
 /// Its consumer variables are `work_tile` (the current [`WorkTileInfo`])

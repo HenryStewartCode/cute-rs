@@ -212,7 +212,6 @@ fn pack(
 /// [`plan_accumulator_buffering`] and testable on its own): see the
 /// module docs. Panics for a zero count or alignment and when not even one
 /// view fits.
-#[allow(clippy::too_many_arguments)]
 #[track_caller]
 pub fn plan_accumulator_buffering_columns(
     one_stage_columns: usize,

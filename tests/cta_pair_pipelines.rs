@@ -11,7 +11,7 @@
 // Those portions are under the BSD-3-Clause licence, and the rest of the file is cute-rs's
 // own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the licence text.
 
-//! Roadmap part m10-cta-pair-pipelines on the simulator:
+//! CTA-pair pipelines on the simulator:
 //!
 //! * the `blackwell_fp16_gemm` example in `fp16_gemm_1.py`'s configuration (a CTA pair,
 //!   `256x256x16` MMAs, 7 stages, multicast TMA loads) and on larger clusters, bit for bit
@@ -27,7 +27,9 @@
 //! * the TMA load selection for a cluster shape and an MMA (`cluster_shape_to_tma_atom_*`);
 //! * the sm_100a PTX, assembled by `ptxas` when it is on PATH.
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/blackwell_fp16_gemm.rs"]
 mod blackwell_fp16_gemm;
 

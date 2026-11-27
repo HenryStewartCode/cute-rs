@@ -2,73 +2,56 @@
 //! compiles to PTX containing the instructions the kernel is built around.
 //! Skipped (with a note) when no `mlir-opt` is installed.
 
-#[allow(dead_code)]
+// The examples are included as modules: their `main`s, and the helpers this file does not call, are unused here.
+#![allow(dead_code)]
+
 #[path = "../examples/ampere_sgemm.rs"]
 mod ampere_sgemm;
-#[allow(dead_code)]
 #[path = "../examples/async_pipeline.rs"]
 mod async_pipeline;
-#[allow(dead_code)]
 #[path = "../examples/block_reduce.rs"]
 mod block_reduce;
-#[allow(dead_code)]
 #[path = "../examples/cooperative_launch.rs"]
 mod cooperative_launch;
-#[allow(dead_code)]
 #[path = "../examples/cp_async_mbarrier_arrive.rs"]
 mod cp_async_mbarrier_arrive;
-#[allow(dead_code)]
 #[path = "../examples/cta_norm.rs"]
 mod cta_norm;
-#[allow(dead_code)]
 #[path = "../examples/elementwise_add.rs"]
 mod elementwise_add;
-#[allow(dead_code)]
 #[path = "../examples/elementwise_apply.rs"]
 mod elementwise_apply;
-#[allow(dead_code)]
 #[path = "../examples/fp4_x2_tensor.rs"]
 mod fp4_x2_tensor;
-#[allow(dead_code)]
 #[path = "../examples/grouped_gemm.rs"]
 mod grouped_gemm;
-#[allow(dead_code)]
 #[path = "../examples/pipeline_software_fill.rs"]
 mod pipeline_software_fill;
-#[allow(dead_code)]
 #[path = "../examples/red.rs"]
 mod red;
-#[allow(dead_code)]
 #[path = "../examples/redux_sync.rs"]
 mod redux_sync;
-#[allow(dead_code)]
 #[path = "../examples/runtime_gemm.rs"]
 mod runtime_gemm;
-#[allow(dead_code)]
 #[path = "../examples/sgemm.rs"]
 mod sgemm;
-#[allow(dead_code)]
 #[path = "../examples/single_warp_pipeline.rs"]
 mod single_warp_pipeline;
-#[allow(dead_code)]
 #[path = "../examples/tensorop_gemm.rs"]
 mod tensorop_gemm;
-#[allow(dead_code)]
 #[path = "../examples/warp_named_barrier.rs"]
 mod warp_named_barrier;
 // The TMA tutorials.
-#[allow(dead_code)]
 #[path = "../examples/tma_copy.rs"]
 mod tma_copy;
-#[allow(dead_code)]
 #[path = "../examples/tma_transpose.rs"]
 mod tma_transpose;
 // The Hopper dense GEMM port.
-#[allow(dead_code)]
 #[path = "../examples/hopper_gemm.rs"]
 mod hopper_gemm;
 // The Hopper persistent GEMM port.
-#[allow(dead_code, clippy::duplicate_mod)]
+// hopper_persistent_gemm loads its own copy of hopper_gemm, included above.
+#[allow(clippy::duplicate_mod)]
 #[path = "../examples/hopper_persistent_gemm.rs"]
 mod hopper_persistent_gemm;
 
@@ -933,10 +916,10 @@ fn examples() -> Vec<(Kernel, Arch)> {
     ]
 }
 
-/// The m3 example kernels, with their targets: they need newer targets or NVVM forms (the FP8
+/// The FP8 and FP4 conversion example kernels, with their targets: they need newer targets or NVVM forms (the FP8
 /// `mma.sync` and its `nvvm.mma.sync` of LLVM 23) than [`examples`] holds, so they are compiled
 /// through [`feature_kernels::options_for`] with the feature kernels.
-fn m3_examples() -> Vec<(String, Kernel, Arch)> {
+fn conversion_examples() -> Vec<(String, Kernel, Arch)> {
     use tensorop_gemm::GemmConfig;
     let fp8 = GemmConfig::fp8(256, 256, 256, DType::F8E4M3FN);
     [
@@ -966,7 +949,7 @@ fn every_kernel() -> Vec<(String, Kernel, Arch)> {
     let sm90a = feature_kernels::sm90a().into_iter().map(|c| (c.name.to_string(), c.kernel, Arch::Sm90a));
     let sm100 = feature_kernels::sm100().into_iter().map(|c| (c.name.to_string(), c.kernel, Arch::Sm100a));
     examples
-        .chain(m3_examples())
+        .chain(conversion_examples())
         .chain(features)
         .chain(sm90)
         .chain(math_and_loop_kernels())
@@ -2224,7 +2207,7 @@ fn runtime_extent_kernels() {
     );
 }
 
-/// The m5 ports, built once for runtime shapes, verify and compile for
+/// The runtime-shape ports, built once for runtime shapes, verify and compile for
 /// sm_80. `elementwise_add.py`'s kernel moves one element per instruction
 /// (nothing is known of the runtime row stride), bounds-checked against the
 /// runtime extents. `sgemm.py`'s fills shared memory with `cp.async`: 16-byte
@@ -2234,7 +2217,7 @@ fn runtime_extent_kernels() {
 /// main loop holds the 8 x 64 FMAs of a K tile and the per-thread fragments
 /// live in registers, not local memory.
 #[test]
-fn m5_example_ports() {
+fn runtime_shape_example_ports() {
     let Some(tc) = toolchain() else { return };
     let add = ptx(elementwise_add::dynamic().kernel(), &tc);
     assert_eq!(count(&add, "ld.global.v"), 0, "{add}");
@@ -3534,7 +3517,7 @@ fn struct_addressed_only_in_dynamic_window() {
     kernel.compile_ptx(&tc, Arch::Sm80).unwrap();
 }
 
-// ---- m9: pipeline primitives ----
+// ---- Pipeline primitives ----
 
 /// The sm_89 pipeline kernels wait with `mbarrier.test_wait` and have
 /// neither `mbarrier.try_wait` nor `fence.mbarrier_init`; each stage of each
@@ -3587,7 +3570,7 @@ fn sm90_pipeline_ptx() {
     assert!(p.contains("mapa.shared::cluster") && p.contains("mbarrier.arrive.expect_tx."), "{p}");
 }
 
-// ---- m9: PipelineAsync ----
+// ---- PipelineAsync ----
 
 /// `PipelineAsync` built without a target emits what CuTe DSL's does: the
 /// init fence and CTA barrier of `create`, and `mbarrier.try_wait.parity`
@@ -3617,7 +3600,7 @@ fn pipeline_async_ptx() {
     assert!(p.contains("fence.mbarrier_init.release.cluster;") && p.contains("barrier.cluster.wait"), "{p}");
 }
 
-// ---- m9: PipelineCpAsync, PipelineOrder and async_pipeline.ipynb ----
+// ---- PipelineCpAsync, PipelineOrder and async_pipeline.ipynb ----
 
 /// `async_pipeline.ipynb`'s pipeline kernels built for sm_90 emit what CuTe
 /// DSL's do (`fence.mbarrier_init`, `mbarrier.try_wait.parity` waits, and
@@ -3664,7 +3647,7 @@ fn cpasync_order_ptx() {
     }
 }
 
-// ---- m9: grouped GEMM schedulers ----
+// ---- Grouped GEMM schedulers ----
 
 /// The grouped GEMM's search is a warp-wide scan (`shfl.sync.up`), ballot
 /// and population count, with `shfl.sync.idx` broadcasts, around

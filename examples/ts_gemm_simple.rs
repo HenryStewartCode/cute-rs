@@ -623,7 +623,6 @@ pub fn run_random<T: IoDtype>(m: usize, n: usize, k: usize) {
     }
 }
 
-#[allow(dead_code)]
 fn main() {
     let (m, n, k) = MNK;
     run_exact::<F16>(m, n, k);

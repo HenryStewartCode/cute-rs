@@ -28,7 +28,6 @@ use crate::layout::{Layout, Tiler, Tree};
 ///
 /// Panics with "CTA tile too small" when `cta_tile_shape`'s N is below
 /// the TMA store's minimum N for D or C.
-#[allow(clippy::too_many_arguments)]
 #[track_caller]
 pub fn compute_epilogue_tile_shape(
     cta_tile_shape: &[usize],

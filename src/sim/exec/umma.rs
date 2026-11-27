@@ -15,7 +15,7 @@
 //!   [`UmmaOperandMap`] (the PTX ISA's canonical layouts and swizzles). Each
 //!   byte read must have been written, by a write ordered before the issue
 //!   in the issuing warp; generic-proxy writes need a `fence.proxy.async`
-//!   since (m7's proxy model); no asynchronous copy may still be writing it.
+//!   since (the proxy model); no asynchronous copy may still be writing it.
 //! * **D.** The accumulator is written into TMEM by the PTX ISA's data-path
 //!   layouts for `cta_group::1`: Layout D for M = 128 (row `i` in TMEM lane
 //!   `i`) and Layout F for M = 64 (rows `16 q` to `16 q + 15` in lanes `32 q`
@@ -277,7 +277,6 @@ impl<'a> Machine<'a> {
             if let Some((a, b)) = sf {
                 uniform.extend([(*a, "TMEM address of SFA"), (*b, "TMEM address of SFB")]);
             }
-            // m10-sparse-umma.
             if let Some(e) = meta {
                 uniform.push((*e, "TMEM address of the sparsity metadata"));
             }
@@ -695,7 +694,7 @@ impl<'a> Machine<'a> {
         for (blk, lane, col, bits) in out {
             self.tmem.blocks.entry(blk).or_default().cell_mut(lane, col).bits = bits;
         }
-        // m11-prims-mma-forms: .ashift moves A's rows up by one within each 32-lane
+        // .ashift moves A's rows up by one within each 32-lane
         // sub-partition once the MMA has read A (the last row of each keeps its value).
         if kind.prims.ashift
             && let Some((_, a_cols)) = a_cells.first().cloned()
@@ -919,7 +918,6 @@ impl<'a> Machine<'a> {
 
     /// One 32-bit TMEM cell an MMA reads as an operand (metadata), with the
     /// ordering checks of [`umma_tmem_sf`](Self::umma_tmem_sf).
-    #[allow(clippy::too_many_arguments)]
     fn umma_tmem_operand_cell(
         &mut self,
         name: &str,
@@ -1011,7 +1009,6 @@ impl<'a> Machine<'a> {
     /// warp issued (the tensor-core pipe is in order), or by one another
     /// warp issued whose completion this warp has observed. Returns the
     /// values (`[row * nsf + j]`) and the cells read.
-    #[allow(clippy::too_many_arguments)]
     fn umma_tmem_sf(
         &mut self,
         name: &str,
@@ -1162,7 +1159,6 @@ impl<'a> Machine<'a> {
     /// Read an `mn x kk` operand of type `ty` of a `.kind::<data>` MMA
     /// through descriptor `desc`: its values, row-major (`[row * kk + k]`),
     /// TF32 operands truncated. The bytes read are added to `ranges`.
-    #[allow(clippy::too_many_arguments)]
     fn umma_operand(
         &mut self,
         desc: u64,
@@ -1236,7 +1232,6 @@ impl<'a> Machine<'a> {
     /// reads shared memory. Reports a collector nothing filled, one filled
     /// from another tile or form, and a tile whose shared memory has changed
     /// since the fill; `LASTUSE` empties the collector.
-    #[allow(clippy::too_many_arguments)]
     fn umma_collected(
         &mut self,
         op: CollectorOp,
@@ -1301,7 +1296,6 @@ impl<'a> Machine<'a> {
     /// After an MMA read an operand from shared memory:
     /// `FILL` keeps it (and the bytes it came from) in the collector of
     /// `block`; any other usage leaves the collector empty.
-    #[allow(clippy::too_many_arguments)]
     fn umma_fill(
         &mut self,
         inst: &'a Inst,
