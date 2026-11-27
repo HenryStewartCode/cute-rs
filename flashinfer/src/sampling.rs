@@ -5,9 +5,8 @@
 //! `TopKTopPSamplingFromProbKernel` (`include/flashinfer/sampling.cuh`; Python
 //! `flashinfer.sampling.{sampling_from_probs, top_k_sampling_from_probs,
 //! top_p_sampling_from_probs, top_k_top_p_sampling_from_probs(filter_apply_order="joint")}`).
-//! This is cute-rs's own code: it follows the published design (one block per row, rejection
-//! rounds with two pivots, the accept rules, curand's Philox stream per row), but no
-//! FlashInfer source was translated.
+//! It follows FlashInfer's design (one block per row, rejection
+//! rounds with two pivots, the accept rules, curand's Philox stream per row).
 //!
 //! # Algorithm
 //!
@@ -56,8 +55,7 @@
 //! # Renorm, mask and softmax ([`Op`], [`op_kernel`])
 //!
 //! `top_p_renorm_probs`, `top_k_renorm_probs`, `top_k_mask_logits` and `softmax(logits,
-//! temperature)` (f32, one block per row; own code after the published semantics, not
-//! translated): a four-pass 8-bit radix select of the threshold key (lane-private shared
+//! temperature)` (f32, one block per row): a four-pass 8-bit radix select of the threshold key (lane-private shared
 //! histograms with integer atomics, the scan of the module's sampler) then one or two passes
 //! to sum and write; softmax keeps a per-thread online max and sum and merges them once. Kept
 //! tokens are those with `key >= threshold`, so ties at the k-th value are all kept. The top-p
@@ -684,7 +682,7 @@ pub fn gumbel_noise(x: f32) -> f32 {
 /// `curand_init(seed, b * d + 4 * (i / 4), offset)`, word `i % 4` of one `curand_uniform4`, so
 /// the offset must be a multiple of 4 (as FlashInfer's generator makes it). Ties go to the larger
 /// token; a row of `-inf` gives the last token, a token past `d` gives 0 (FlashInfer's rules).
-/// Own code after the published design; `cfg.mode`, `cfg.per_row` are ignored.
+/// `cfg.mode` and `cfg.per_row` are ignored.
 pub fn logits_kernel(cfg: Config) -> Kernel {
     let threads = cfg.threads;
     assert!((32..=1024).contains(&threads) && threads.is_multiple_of(32), "threads = {threads}");
@@ -2109,8 +2107,7 @@ pub fn simulate_op_checked(p: &OpProblem, cfg: OpConfig) -> f64 {
 // Chain speculative sampling.
 
 /// `chain_speculative_sampling` (FlashInfer's `ChainSpeculativeSampling`, `sampling.cuh`;
-/// Python `flashinfer.sampling.chain_speculative_sampling`), f32, own code after the
-/// published semantics.
+/// Python `flashinfer.sampling.chain_speculative_sampling`), f32.
 ///
 /// One block per row (a request). Draft token `i` of the row is accepted while
 /// `u_i * draft_probs[i][id] < target_probs[i][id]`, `u_i` being draw `i` of the row's Philox
@@ -2481,7 +2478,7 @@ pub fn compact_width(k: usize) -> usize {
 /// `probs [batch, kp]` (`kp = compact_width(k)`, zero past `k`), the `softmax(top_k_mask_logits)`
 /// that `top_k_top_p_sampling_from_logits(filter_apply_order="top_k_first")` samples from, over
 /// `k` values instead of the whole vocabulary. Parameters `vals`, `probs`, `k`, `kp` (i32); one
-/// block of [`COMPACT_THREADS`] per row. Own code.
+/// block of [`COMPACT_THREADS`] per row.
 pub fn compact_softmax_kernel() -> Kernel {
     let threads = COMPACT_THREADS;
     Kernel::builder("flashinfer_compact_softmax").block_dim([threads as u32, 1, 1]).build(|| {
@@ -2522,7 +2519,7 @@ pub fn compact_softmax_kernel() -> Kernel {
 /// first. Parameters `vals`, `idx`, `sorted_vals`, `sorted_idx`, `k` (i32); one block of
 /// [`COMPACT_THREADS`] per row. Each element's place is the number of elements before it (`k`
 /// comparisons each), on the integer key that orders every Float32 value, so the places are
-/// always a permutation. Own code.
+/// always a permutation.
 pub fn compact_sort_kernel() -> Kernel {
     let threads = COMPACT_THREADS as i32;
     Kernel::builder("flashinfer_compact_sort").block_dim([threads as u32, 1, 1]).build(|| {
@@ -2579,8 +2576,7 @@ pub fn gather_kernel() -> Kernel {
 
 /// `flashinfer.top_k_page_table_transform` and `top_k_ragged_transform` (`topk.py`; the kernels
 /// behind them are `RadixTopKPageTableTransform` / `RadixTopKRaggedTransform` of
-/// `include/flashinfer/topk.cuh`), f32 scores, own code after the published semantics: nothing
-/// was translated, and the BSD-licensed `topk_varlen` kernels were not read.
+/// `include/flashinfer/topk.cuh`), f32 scores.
 ///
 /// Row `i` of `input [rows, stride]` scores the window `[row_starts[i], row_starts[i] +
 /// lengths[i])`. The `k` largest scores of the window (ties at the k-th: some of them) give

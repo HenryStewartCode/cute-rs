@@ -3,8 +3,8 @@
 //! Kimi Delta Attention (KDA) decode, after FlashInfer's `recurrent_kda`
 //! (`flashinfer/kda_decode.py`, kernel `flashinfer/kda_kernels/recurrent_kda.py`, both
 //! Apache-2.0) and its published reference `naive_recurrent_kda` (`tests/kda/test_recurrent_kda.py`).
-//! This is cute-rs's own code written after that design, modelled on [`crate::gdn`]'s decode
-//! kernel; no FlashInfer source was translated.
+//! It follows that design and is modelled on [`crate::gdn`]'s decode
+//! kernel.
 //!
 //! KDA is Gated Delta Net with a per-channel gate: for each `(batch b, v-head hv)`, with the
 //! state `S` of shape `[V, K]` (K contiguous), `h = hv / (HV / H)` the shared q/k head and

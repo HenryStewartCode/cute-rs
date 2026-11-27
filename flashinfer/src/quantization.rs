@@ -2,9 +2,8 @@
 
 //! Bit packing of boolean masks, after FlashInfer's `packbits` and `segment_packbits`
 //! (`include/flashinfer/quantization.cuh`, Python `flashinfer.quantization.packbits`).
-//! This is cute-rs's own code: it follows the published design (one thread per output
-//! byte, 256 threads per block, one block per segment for the segmented form), but no
-//! FlashInfer source was translated.
+//! It follows FlashInfer's design (one thread per output
+//! byte, 256 threads per block, one block per segment for the segmented form).
 //!
 //! Like `numpy.packbits`, [`pack_kernel`] packs `n` booleans (one byte each, 0 or 1) into
 //! `ceil(n / 8)` bytes, the last padded with zeros: with [`Order::Big`] the first element is
@@ -314,7 +313,7 @@ pub struct QuantMode {
     pub ue8m0: bool,
 }
 
-/// `per_token_group_quant_8bit` (`PerTokenGroupQuant8BitRegisterKernel`; own code, after
+/// `per_token_group_quant_8bit` (`PerTokenGroupQuant8BitRegisterKernel`, after
 /// FlashInfer's register-resident design): the last dimension of the input is cut into groups
 /// of `group_size` (64, 128 or 256); each group is `group_size / 8` lanes of a warp, every
 /// lane loading 8 values with one 16-byte vector, so a 128-value group lives in registers of

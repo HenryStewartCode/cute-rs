@@ -3,8 +3,7 @@
 //! `merge_state`, `merge_state_in_place` and `merge_states`, after FlashInfer's
 //! `MergeStateKernel`, `MergeStateInPlaceKernel`, `MergeStatesKernel` and
 //! `MergeStatesLargeNumIndexSetsKernel` (`include/flashinfer/attention/cascade.cuh`) and
-//! their launchers. This is cute-rs's own code written after the published design; no
-//! FlashInfer source was translated. (`decode::merge_kernel` is the variable-length merge
+//! their launchers. (`decode::merge_kernel` is the variable-length merge
 //! of split-KV states with one thread per element; these are FlashInfer's vectorised
 //! public merges.)
 //!

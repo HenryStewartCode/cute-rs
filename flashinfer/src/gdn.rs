@@ -4,8 +4,7 @@
 //! `gated_delta_rule_decode_pretranspose` (`flashinfer/gdn_decode.py`, kernel
 //! `flashinfer/gdn_kernels/gdn_decode_pretranspose.py`, both Apache-2.0) and its published
 //! reference `decode_delta_rule` (`tests/gdn/reference_delta_rule.py`): the recurrent state
-//! update of Qwen3-Next-style linear-attention layers. This is cute-rs's own code written
-//! after that design; no FlashInfer source was translated.
+//! update of Qwen3-Next-style linear-attention layers.
 //!
 //! For each `(batch b, v-head hv)`, with the state `S` of shape `[V, K]` (v-major, K
 //! contiguous: FlashInfer's "pretranspose" layout), `h = hv / (HV / H)` the shared q/k head
@@ -59,8 +58,8 @@
 //!
 //! **Prefill** ([`prefill_kernel`], FlashInfer's `chunk_gated_delta_rule` in
 //! `flashinfer/gdn_prefill.py`; its SM8x kernel is `gdn_kernels/delta_rule_dsl/delta_rule_sm80.py`
-//! with `collective_inverse_hmma.py`, Apache-2.0 under the repository licence). Own code after
-//! that design: chunks of 64 tokens, one block of 4 warps per `(sequence, v head, 64-row V
+//! with `collective_inverse_hmma.py`, Apache-2.0 under the repository licence).
+//! It follows that design: chunks of 64 tokens, one block of 4 warps per `(sequence, v head, 64-row V
 //! band)`, the `[V, K]` state band in Float32 registers (16 rows a warp, MMA accumulator
 //! layout) and `mma.sync m16n8k16` throughout, so it runs on SM80+. Per chunk, with `G` the
 //! cumulative log decay and `L = I + A`, `A[t][s] = beta_t exp(G_t - G_s) k_t.k_s` (s < t):

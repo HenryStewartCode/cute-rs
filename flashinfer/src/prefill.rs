@@ -4,9 +4,9 @@
 //! `BatchPrefillWithPagedKVCacheKernel` (`include/flashinfer/attention/prefill.cuh`, the
 //! `fa2` backend) and its planner (`PrefillSplitQOKVIndptr` in `scheduler.cuh`), with
 //! split-KV partial states merged by [`decode::merge_kernel`](crate::decode::merge_kernel)
-//! (FlashInfer's `VariableLengthMergeStates`). This is cute-rs's own code: it follows the
-//! published design (tile selection, thread geometry, permuted shared-memory layout,
-//! fragment layouts, pipeline and softmax), but no FlashInfer source was translated.
+//! (FlashInfer's `VariableLengthMergeStates`).
+//! It follows FlashInfer's design (tile selection, thread geometry, permuted shared-memory layout,
+//! fragment layouts, pipeline and softmax).
 //!
 //! * **Plan** ([`Plan::new`], on the host, as FlashInfer's `plan()` outside CUDA-graph
 //!   mode): the query tile `CTA_TILE_Q` is chosen from the average packed query length

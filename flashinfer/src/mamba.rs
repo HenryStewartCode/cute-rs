@@ -2,8 +2,7 @@
 
 //! Mamba-2 `selective_state_update`, after FlashInfer's single-token "simple" kernel
 //! (`include/flashinfer/mamba/kernel_selective_state_update_stp.cuh`, the only algorithm
-//! FlashInfer picks below SM90) and its launcher, and its multi-token (MTP) update. This is cute-rs's own code written after
-//! the published design; no FlashInfer source was translated.
+//! FlashInfer picks below SM90) and its launcher, and its multi-token (MTP) update.
 //!
 //! For each `(batch, head, row d)` of the state `[cache, nheads, dim, dstate]`:
 //!

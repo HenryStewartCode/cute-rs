@@ -3,9 +3,9 @@
 //! Batch decode attention over a paged KV cache, after FlashInfer's
 //! `BatchDecodeWithPagedKVCacheKernel` (`include/flashinfer/attention/decode.cuh`,
 //! the `fa2` backend), with its split-KV plan (`scheduler.cuh`) and merge step
-//! (`cascade.cuh`). This is cute-rs's own code: it follows the published design
+//! (`cascade.cuh`). It follows FlashInfer's design
 //! (thread geometry, cp.async staging, base-2 online softmax, cross-`tz` state merge,
-//! the planner's chunk-size rule), but no FlashInfer source was translated.
+//! the planner's chunk-size rule).
 //!
 //! * **Plan** ([`Plan::new`], on the host, once per batch layout, as FlashInfer's
 //!   `plan()`):
@@ -1194,15 +1194,7 @@ impl Problem {
     }
 }
 
-/// The larger of two differences; NaN if either is (`f32::max` would drop a NaN, and an output
-/// of NaN would then count as no error).
-fn nan_max(a: f32, b: f32) -> f32 {
-    if a.is_nan() || b.is_nan() { f32::NAN } else { a.max(b) }
-}
-
-pub fn max_error(a: &[f32], b: &[f32]) -> f32 {
-    a.iter().zip(b).map(|(x, y)| (x - y).abs()).fold(0.0, nan_max)
-}
+pub use crate::check::max_error;
 
 /// Simulate `p` under a plan for `max_grid` concurrent CTAs (the decode kernel, then the
 /// merge if the plan splits) and return the plan and `(max |o - ref|, max |lse - ref|)`.

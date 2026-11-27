@@ -8,6 +8,9 @@
 //! race-checking simulator against an f64 reference, and on a GPU (`--features cuda`)
 //! checked again and benchmarked against FlashInfer itself.
 //!
+//! The kernels are reimplementations: each module names the FlashInfer kernel it follows and the
+//! parts of that design it keeps, and none is a translation of FlashInfer's source.
+//!
 //! One module per FlashInfer kernel family, named after FlashInfer's Python module:
 //!
 //! | Module | FlashInfer | Status |
@@ -44,6 +47,7 @@
 pub mod activation;
 pub mod attention;
 pub mod cascade;
+pub mod check;
 pub mod decode;
 pub mod gdn;
 pub mod gemm;

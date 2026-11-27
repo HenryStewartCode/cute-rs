@@ -4,9 +4,9 @@
 //! ships it (`csrc/xqa/mha.cu`, `csrc/xqa/xqa_wrapper.cu`, Apache-2.0, NVIDIA), its SM80 /
 //! SM89 path. All query heads of a KV head's group are processed together as the rows of
 //! one 16-row tensor-core tile, over a paged K/V cache that may be FP8 (E4M3) with a scale.
-//! This is cute-rs's own code: it follows mha.cu's published design (grid, CTA tile,
+//! It follows mha.cu's design (grid, CTA tile,
 //! per-warp token slices, multi-block split with a semaphore and an in-kernel merge by the
-//! last CTA, the scale and sink semantics), but no XQA source was translated.
+//! last CTA, the scale and sink semantics).
 //!
 //! * **Grid** `(nb_sub_seq, num_kv_heads, batch)`, as mha.cu's `launchMHA`, with XQA's
 //!   multi-block rule `nb_sub_seq = min(max(1, sm_count / (batch * num_kv_heads)),
@@ -912,15 +912,7 @@ impl Problem {
     }
 }
 
-/// The larger of two differences; NaN if either is (`f32::max` would drop a NaN, and an output
-/// of NaN would then count as no error).
-fn nan_max(a: f32, b: f32) -> f32 {
-    if a.is_nan() || b.is_nan() { f32::NAN } else { a.max(b) }
-}
-
-pub fn max_error(a: &[f32], b: &[f32]) -> f32 {
-    a.iter().zip(b).map(|(x, y)| (x - y).abs()).fold(0.0, nan_max)
-}
+pub use crate::check::max_error;
 
 /// Run `p` on the simulator with `nb_sub` CTAs per sequence; returns the output (f32).
 pub fn execute(p: &Problem, nb_sub: usize) -> Vec<f32> {

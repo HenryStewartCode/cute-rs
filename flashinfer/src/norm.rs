@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! RMSNorm and fused add + RMSNorm, after FlashInfer's `RMSNormKernel` and
-//! `FusedAddRMSNormKernel` (`include/flashinfer/norm.cuh`). This is cute-rs's own code: it
-//! follows the published design (one block per row, 16-byte vector accesses, the block
+//! `FusedAddRMSNormKernel` (`include/flashinfer/norm.cuh`).
+//! It follows FlashInfer's design (one block per row, 16-byte vector accesses, the block
 //! size rule, a warp shuffle then a shared-memory reduction, the residual sum stashed in
-//! shared memory), but no FlashInfer source was translated.
+//! shared memory).
 //!
 //! * **Geometry** ([`num_warps`]): one block per row; `vec = 8` elements (16 bytes of
 //!   Float16 or BFloat16) per thread per round; `block_size = min(1024, d / 8)`, rounded up
@@ -25,17 +25,17 @@
 //! * **Gemma variants** ([`Variant::GemmaRms`], [`Variant::GemmaFusedAdd`]): the same kernels
 //!   with the weight read as `weight + 1` (FlashInfer's `weight_bias = 1`).
 //! * **[`Variant::LayerNorm`]** (`layernorm(input, gamma, beta, eps)`, after the semantics of
-//!   `generalLayerNorm` in `norm.cuh`; own code): `(x - mean) * rsqrt(var + eps) * gamma +
+//!   `generalLayerNorm` in `norm.cuh`): `(x - mean) * rsqrt(var + eps) * gamma +
 //!   beta` per row with Float32 `gamma` and `beta`. The variance is the two-pass `E[(x -
 //!   mean)^2]`. The one-block-per-row kernel stashes the row in Float32 shared memory as
 //!   the fused kernel does and reduces twice; the multi-row kernel keeps the row in registers.
 //!
 //! * **Quantising variants** ([`Variant::RmsQuant`], [`Variant::FusedAddQuant`], after
-//!   `RMSNormQuantKernel` / `FusedAddRMSNormQuantKernel`; own code): the same two passes, with
+//!   `RMSNormQuantKernel` / `FusedAddRMSNormQuantKernel`): the same two passes, with
 //!   the output `fp8_e4m3(clamp(x * rms * w * (1 / scale), +-448))` written as 8 bytes per
 //!   thread; `scale` is a one-element Float32 buffer, its reciprocal taken after the
 //!   reduction. The fused one keeps `input` and updates `residual`.
-//! * **[`Variant::QkRms`]** (`QKRMSNorm`, FlashInfer's `rmsnorm` on 3-D input; own code, see
+//! * **[`Variant::QkRms`]** (`QKRMSNorm`, FlashInfer's `rmsnorm` on 3-D input; see
 //!   [`qk_kernel`]): `[tokens, heads, d]` with token and head strides, `tpr` lanes per row (16 for
 //!   `d = 128`), several rows per block, as FlashInfer's CuTe DSL kernel.
 //!
@@ -553,7 +553,7 @@ pub fn qk_config(d: usize) -> Config {
     Config::Rows { tpr, threads: 128, nvb: (d / VEC).div_ceil(tpr) }
 }
 
-/// `QKRMSNorm` (`norm.cuh`; own code): `rmsnorm` of a `[batch, heads, d]` input with arbitrary
+/// `QKRMSNorm` (`norm.cuh`): `rmsnorm` of a `[batch, heads, d]` input with arbitrary
 /// token and head strides, as FlashInfer's `rmsnorm` does for 3-D input (Q and K head norms),
 /// in the multi-row geometry of its CuTe DSL `QKRMSNormKernel`: `tpr` threads (at most one
 /// warp) per `(token, head)` row, `threads / tpr` rows per block, every vector loaded before

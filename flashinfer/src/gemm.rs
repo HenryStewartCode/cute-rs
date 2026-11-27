@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! FlashInfer's SM80/SM89 GEMM entry points: `SegmentGEMMWrapper.run` (the LoRA segment GEMM)
-//! and `bmm_fp8`. This is cute-rs's own code written after FlashInfer's published design
-//! (`include/flashinfer/gemm/group_gemm.cuh`, `flashinfer/gemm/gemm_base.py`); no FlashInfer
-//! source was translated.
+//! and `bmm_fp8`. They follow FlashInfer's design
+//! (`include/flashinfer/gemm/group_gemm.cuh`, `flashinfer/gemm/gemm_base.py`).
 //!
 //! **Segment GEMM** ([`segment_gemm_kernel`], [`SegmentProblem`]): `x` is `[rows, d_in]`, cut
 //! into `batch_size` segments by `seg_indptr` (i64, `batch_size + 1` entries); segment `i` is
@@ -521,7 +520,10 @@ impl SegmentProblem {
 fn scaled_error(got: &[f32], want: &[f64], rel: f64, k: usize) -> f64 {
     assert_eq!(got.len(), want.len());
     let abs = rel * (k as f64).sqrt() * 0.05;
-    got.iter().zip(want).map(|(&g, &w)| (g as f64 - w).abs() / (abs + rel * w.abs())).fold(0.0, f64::max)
+    got.iter()
+        .zip(want)
+        .map(|(&g, &w)| (g as f64 - w).abs() / (abs + rel * w.abs()))
+        .fold(0.0, crate::check::nan_max_f64)
 }
 
 /// Simulate `p` (with cute-rs's race and alignment checks) and return [`SegmentProblem::check`].
@@ -683,7 +685,7 @@ impl BmmFp8Problem {
         got.iter()
             .zip(&want)
             .map(|(&g, &w)| (g as f64 - w).abs() / (rel * (w.abs() + 0.05 * typical)))
-            .fold(0.0, f64::max)
+            .fold(0.0, crate::check::nan_max_f64)
     }
 }
 

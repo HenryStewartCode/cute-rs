@@ -2,9 +2,7 @@
 
 //! POD attention: a prefill batch and a decode batch in one launch, after FlashInfer's
 //! `PODWithPagedKVCacheWrapper` (`flashinfer/pod.py`) and its kernel
-//! `PODWithKVCacheTensorKernel` (`include/flashinfer/attention/pod.cuh`). This is cute-rs's
-//! own code, written after FlashInfer's published design; no FlashInfer source was
-//! translated.
+//! `PODWithKVCacheTensorKernel` (`include/flashinfer/attention/pod.cuh`).
 //!
 //! A serving step that mixes a chunked prefill with ongoing decodes would otherwise launch
 //! two kernels; the prefill is compute-bound and the decodes bandwidth-bound, so running

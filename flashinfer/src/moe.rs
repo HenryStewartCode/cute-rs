@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! FlashInfer's fused Mixture-of-Experts forward, `cutlass_fused_moe`, for Float16 and
-//! BFloat16 activations and weights on SM80/SM89. This is cute-rs's own code written after
-//! the published design of FlashInfer's CUTLASS backend (`csrc/fused_moe/cutlass_backend/
+//! BFloat16 activations and weights on SM80/SM89.
+//! It follows the design of FlashInfer's CUTLASS backend (`csrc/fused_moe/cutlass_backend/
 //! cutlass_fused_moe_kernels.cuh`, the SM80 fused gated-activation grouped GEMM of
 //! `cutlass_extensions/gemm/kernel/fused_moe_kernel*.cuh` and the dispatch in
-//! `moe_gemm_template_dispatch.h`, all Apache-2.0); no source was translated.
+//! `moe_gemm_template_dispatch.h`, all Apache-2.0).
 //!
 //! **Interface** (FlashInfer's): `input` `[num_tokens, hidden]`; `token_selected_experts`
 //! `[num_tokens, top_k]` (i32, each in `0..num_experts`, distinct per token) and
@@ -1252,7 +1252,10 @@ impl Problem {
         assert_eq!(got.len(), want.len());
         let rms = (want.iter().map(|w| w * w).sum::<f64>() / want.len().max(1) as f64).sqrt();
         let rel = 2.0 * self.dtype.tolerance();
-        got.iter().zip(&want).map(|(&g, &w)| (g as f64 - w).abs() / (rel * (w.abs() + rms))).fold(0.0, f64::max)
+        got.iter()
+            .zip(&want)
+            .map(|(&g, &w)| (g as f64 - w).abs() / (rel * (w.abs() + rms)))
+            .fold(0.0, crate::check::nan_max_f64)
     }
 }
 

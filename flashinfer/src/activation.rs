@@ -2,8 +2,7 @@
 
 //! `silu_and_mul`, `gelu_and_mul` and `gelu_tanh_and_mul`, after FlashInfer's
 //! `act_and_mul_kernel` and `act_and_mul_split_kernel` (`include/flashinfer/activation.cuh`)
-//! and their launcher (`flashinfer/jit/activation.py`). This is cute-rs's own code written
-//! after the published design; no FlashInfer source was translated.
+//! and their launcher (`flashinfer/jit/activation.py`).
 //!
 //! `input` is `[tokens, 2 * d]` (`x` in the first `d` columns, `y` in the last `d`), `out` is
 //! `[tokens, d]`, and `out = act(x) * y` with the activation in Float32. Float16 and

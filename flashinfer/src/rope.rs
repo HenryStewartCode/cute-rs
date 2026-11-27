@@ -4,8 +4,8 @@
 //! KV cache, after FlashInfer's `BatchQKApplyRotaryPosIdsCosSinCache`
 //! (`include/flashinfer/pos_enc.cuh`, Python `flashinfer.apply_rope_with_cos_sin_cache_inplace`)
 //! and `AppendPagedKVCache` (`include/flashinfer/page.cuh`, `flashinfer.append_paged_kv_cache`).
-//! This is cute-rs's own code: it follows the published design (thread geometry, vector
-//! widths, the launch planner), but no FlashInfer source was translated.
+//! It follows FlashInfer's design (thread geometry, vector
+//! widths, the launch planner).
 //!
 //! # RoPE
 //!
@@ -440,15 +440,7 @@ impl<T: Half, I: IndexType> Problem<T, I> {
     }
 }
 
-/// The larger of two differences; NaN if either is (`f32::max` would drop a NaN, and an output
-/// of NaN would then count as no error).
-fn nan_max(a: f32, b: f32) -> f32 {
-    if a.is_nan() || b.is_nan() { f32::NAN } else { a.max(b) }
-}
-
-pub fn max_error(a: &[f32], b: &[f32]) -> f32 {
-    a.iter().zip(b).map(|(x, y)| (x - y).abs()).fold(0.0, nan_max)
-}
+pub use crate::check::max_error;
 
 /// Simulate `p` with the launch shape `variant` (the split one with `split` head groups)
 /// and return the max errors against the reference, for q and k.
