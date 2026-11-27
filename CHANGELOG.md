@@ -6,6 +6,26 @@ No version has been tagged yet; 0.1.0 will be the first.
 
 ### Fixed
 
+- The layout algebra, where a comparison with CuTe DSL 4.8.1 on 20,500 recorded calls showed
+  cute-rs differing (`cutedsl-check/`):
+  - `complement` divides with floor and refuses only overlapping modes, as C++ CuTe does; it
+    used to refuse any strides that do not divide each other, and so did every divide and
+    product built on it;
+  - `composition` follows C++ CuTe's walk over static values: an extent-1 mode keeps the stride
+    the walk reaches (it was 0), and a stride smaller than a mode that does not divide it is
+    accepted when the result is the composition, checked value by value;
+  - `left_inverse` is built directly, as CUTLASS 4.8.1 builds it (`left_inverse(4:3)` is
+    `(3,4):(0,1)`);
+  - `zipped_product`, `tiled_product` and `flat_product` no longer pad to a common rank, and
+    `raked_product` coalesces each mode;
+  - `logical_divide` takes the complement in the layout's coalesced shape;
+  - `make_ordered_layout`, `make_layout_tv` and `max_common_layout` give an extent-1 mode
+    stride 0.
+- `cute-flashinfer`: the error measures of the GEMM and MoE tests no longer drop a NaN, and
+  the modules share one `max_error` (`flashinfer::check`).
+- About twenty statements in the documentation and comments that a feature was not built yet
+  when it is (the tensor-map form of `prefetch`, `CtaGroup::TWO` loads, `param_struct`,
+  `utils::sm90`, the byte-masked bulk store and others).
 - Launch scalars with a `multiple_of` requirement are checked as signed values (an `Int32`
   of -1 used to pass as a multiple of 3).
 - `jit_options()` keeps the `ptxas` flags the driver's JIT can take when another flag has no
@@ -46,6 +66,9 @@ No version has been tagged yet; 0.1.0 will be the first.
 
 ### Added
 
+- `cutedsl-check/`: records NVIDIA CuTe DSL's answers to seeded random layout-algebra calls
+  and replays them in cute-rs. On two seeds (41,000 calls) cute-rs gives the same answer on
+  every call both libraries answer; `docs/testing.md` has the table.
 - Results of the first run on an H100 (`docs/testing.md`): the Hopper device tests pass, the
   simulator agrees with the device on 18,998 of 20,370 kernel runs with no difference that is
   an error, and the Hopper GEMM and FMHA are timed against cuBLAS and PyTorch.
@@ -68,6 +91,12 @@ No version has been tagged yet; 0.1.0 will be the first.
 
 ### Changed
 
+- The README says how the project was built and separates what has been compared with
+  CuTe DSL, FlashInfer and real GPUs from what only its own tests cover.
+- Comments and documentation no longer cite the project's internal milestone names.
+- Lint allowances: `too_many_arguments` and `type_complexity` are allowed once, in
+  `Cargo.toml`, and unused-code allowances once per shared test module, each with its reason.
+- `scripts/pod-run.sh --worktree` takes the paths to leave behind from `POD_EXCLUDE`.
 - Floating-point multiply-adds contract into `fma` by default
   (`CompileOptions::fp_contract`); bit-for-bit comparisons with the simulator turn it off.
 - The README is a short introduction; the reference material moved to `docs/`.

@@ -10,7 +10,7 @@
 //   and media/docs/cpp/cute/02_layout_algebra.md (the logical_product formula),
 //     Copyright (c) 2017 - 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // and from include/cute/layout.hpp of an earlier release, for formulas that later
-// releases changed: CUTLASS 3.8.0 (left_inverse and upcast),
+// releases changed: CUTLASS 3.8.0 (upcast),
 //     Copyright (c) 2023 - 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // Those portions are under the BSD-3-Clause licence, and the rest of the file
 // is cute-rs's own, under MIT OR Apache-2.0. THIRD-PARTY-NOTICES.md has the

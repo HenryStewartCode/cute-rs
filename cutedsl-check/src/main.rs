@@ -75,9 +75,10 @@ impl Verdict {
         }
     }
 
-    /// Whether the call counts against cute-rs.
+    /// Whether the call counts against cute-rs: a different answer, a refusal of a well-posed
+    /// call, or the same map printed another way.
     fn is_disagreement(self) -> bool {
-        matches!(self, Verdict::OnlyOursRefuses | Verdict::Differ)
+        matches!(self, Verdict::SameFunction | Verdict::OnlyOursRefuses | Verdict::Differ)
     }
 }
 

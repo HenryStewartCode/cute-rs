@@ -221,7 +221,7 @@ each need their own tensor map.
   sm_90. Prefetches are not checked, nor the acquire of descriptors written before the
   launch; a release by another warp than the writer's is reported (conservatively).
 * **Evidence** (`tests/tensormap.rs`, `tests/feature_kernels/tensormap.rs`,
-  `tests/diagnostics.rs`): after CuTe DSL's `tma_tensormap_replace.py`, a descriptor copied
+  `tests/diagnostics/`): after CuTe DSL's `tma_tensormap_replace.py`, a descriptor copied
   to a global workspace, pointed at a later row of a second tensor and shrunk to fewer rows
   (zero-filled past them), then TMA-loaded through; a grouped copy where each CTA rewrites
   its load and store descriptors with `TensorMapManager` in both modes for four groups of

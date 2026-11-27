@@ -67,10 +67,12 @@
   right-hand side of a composition, or in the tiler of a divide or a
   product, must be non-zero at launch, as in C++ CuTe: those runtime extents
   divide by it, unchecked (the simulator reports the division by zero; a
-  static stride of 0 is fine). Static composition refuses the cases that
-  C++ CuTe's weak divisibility condition lets through, where a stride
-  splits a mode it does not divide, since C++ CuTe's result is then often
-  not the composition (dividing `(6,8):(8,1)` by 4, say). Runtime leaves are
+  static stride of 0 is fine). Where a stride
+  splits a mode it does not divide, which C++ CuTe's weak divisibility
+  condition lets through, static composition checks its result value by
+  value: it answers when the result is the composition, and refuses when
+  it is not (dividing `(6,8):(8,1)` by 4, say), where C++ CuTe and CuTe
+  DSL return a layout that is not the composition. Runtime leaves are
   compared as expressions (up to the order of a product's factors), so
   `m * 2` and `m + m` are different leaves. Offsets are 32-bit unless a
   64-bit leaf (an `Int64` stride or extent, `param_extent_i64`) or a static

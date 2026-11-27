@@ -188,7 +188,10 @@ pub fn simulate() -> Result<(Vec<f32>, Vec<f32>), SimError> {
 
 /// The largest difference between two vectors; NaN if any element is (`f32::max` would drop it).
 pub fn max_error(a: &[f32], b: &[f32]) -> f32 {
-    a.iter().zip(b).map(|(x, y)| (x - y).abs()).fold(0.0, |m, e| if m.is_nan() || e.is_nan() { f32::NAN } else { m.max(e) })
+    a.iter()
+        .zip(b)
+        .map(|(x, y)| (x - y).abs())
+        .fold(0.0, |m, e| if m.is_nan() || e.is_nan() { f32::NAN } else { m.max(e) })
 }
 
 fn main() {

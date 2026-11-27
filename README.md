@@ -108,7 +108,8 @@ catch regressions, but they are weaker evidence than the comparisons above: the 
 in the FlashInfer ports had passed them. In particular:
 
 * Apart from the layout algebra, whether a feature behaves as CuTe DSL's does has been judged
-  from CuTe DSL's documentation and examples, not by running the two side by side.
+  from CuTe DSL's documentation and examples, not by running the two side by side. The
+  layout comparison itself draws static layouts with non-negative strides only.
 * The JAX (`xla_ffi`) and TVM-FFI bindings are tested against hand-built call frames, not
   under JAX or `libtvm_ffi` themselves.
 * Multicast memory (`MulticastGroup`) has never run: it needs two or more NVLink-connected

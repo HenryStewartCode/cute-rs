@@ -70,7 +70,7 @@ cargo test
   vote that lanes which left a loop never reach is reported, and a
   divergent `mma.sync` and an intra-warp deadlock are reported with each
   group's lanes; a failing seed replays with the same step count.
-* `tests/diagnostics.rs` builds deliberately broken kernels and checks that
+* `tests/diagnostics/` builds deliberately broken kernels and checks that
   each bug is caught (races, missing waits, OOB, misalignment, divergent
   barriers, barriers that cannot complete, mbarrier parity waits that pass
   early, bulk copies missing from `expect_tx`, escaping values, a `Var` or
@@ -349,6 +349,66 @@ cargo test
   16-bit elements, the prefetches, tiled G2R and R2G copies with each
   memory order and hint, and copies built by `make_cotiled_copy` run there
   too, and so on the GPU.
+
+## Checking the layout algebra against CuTe DSL
+
+[`cutedsl-check/`](../cutedsl-check) asks NVIDIA's CuTe DSL and cute-rs the same questions.
+`reference/gen_layouts.py` draws seeded random calls of 41 layout operations, 500 of each
+(`coalesce`, `composition`, `complement`, the inverses, the four divides, the six products,
+`tile_to_shape`, `make_layout_tv`, `recast_layout`, slicing, swizzled layouts and the rest),
+on layouts that are bijections, injections with gaps, or arbitrary, and records what CuTe DSL
+4.8.1 prints for each. `cutedsl-check layouts` makes the same calls in cute-rs and compares
+the text.
+
+Two seeds, 20,500 calls each. The second was recorded after the fixes described below, so
+nothing was tuned on it:
+
+| | Seed 20261126 | Seed 20261127 |
+| --- | ---: | ---: |
+| The same answer, character for character | 18,475 | 18,470 |
+| Both refuse | 1,552 | 1,569 |
+| CuTe DSL refuses, cute-rs answers | 53 | 35 |
+| Ill-posed: CuTe DSL answers, cute-rs refuses | 420 | 426 |
+| cute-rs refuses a well-posed call | 0 | 0 |
+| Different answers | 0 | 0 |
+
+"Both refuse" includes the calls that end CuTe DSL's process with a floating-point exception
+(543 and 559, products and divides of overlapping layouts).
+
+A call counts as ill-posed only when cute-rs refuses it and a rule that looks at the call's
+inputs alone (`cutedsl-check/src/ill_posed.rs`) says why. There are four rules:
+
+* the complement of a layout that is not injective (73 and 96 calls). C++ CuTe refuses it with
+  a static assertion; CuTe DSL returns extents of 0, such as `(0,0,0,2):(3,6,8,12)`;
+* a composition for which CuTe builds a layout that is not the composition: some index gets an
+  offset other than `lhs(rhs(i))` (192 and 181 calls). CuTe's divisibility condition lets
+  through a stride that is smaller than a mode and does not divide it. cute-rs accepts such a
+  stride only when the result is the composition, which it checks value by value, and refuses
+  the rest; C++ CuTe and CuTe DSL return the wrong layout;
+* an upcast by a ratio that a stride neither divides nor is divided by (87 and 82), and a
+  downcast of a layout with no stride-1 mode (68 and 67). Both are static assertions in C++
+  CuTe; CuTe DSL returns rounded values.
+
+The first run found real differences in cute-rs, now fixed. It refused 771 calls that CuTe
+DSL answers: `complement` and `composition` wanted strides that divide each other, where CuTe
+only needs them not to overlap, and every divide and product inherited that. It answered 143
+differently (`left_inverse`, and compositions that run past the left-hand side's domain). And
+it printed 2,205 answers differently though they were the same map: the stride of an extent-1
+mode, and products padded with extent-1 modes. `cutedsl_recorded_vectors` in
+`src/layout/tests.rs` keeps 31 of the recorded calls in the ordinary test suite.
+
+The recorded answers are the output of NVIDIA's package and are not in this repository. To
+record them again (Linux, no GPU needed) and compare:
+
+```bash
+pip install nvidia-cutlass-dsl==4.8.1
+python cutedsl-check/reference/gen_layouts.py --seed 20261126 layouts.tsv
+cargo run --release -p cute-rs-cutedsl-check -- layouts layouts.tsv --show 3
+```
+
+The generator draws static layouts with non-negative integer strides. Runtime extents,
+negative strides and scaled-basis strides are not compared, and nor is anything beyond the
+layout algebra (tensors, atoms, kernels).
 
 ## Checking the simulator against a GPU
 

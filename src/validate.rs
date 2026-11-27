@@ -10,6 +10,7 @@ use crate::backend::Arch;
 mod wgmma;
 // External calls, device functions and multimem.
 mod extern_calls;
+use crate::ir::TmaMode;
 use crate::ir::{
     AsmConstraint, AsmInput, AtomicKind, AtomicType, BarrierKind, BinaryOp, BufferId, BulkCompletion, BulkDirection,
     CacheEvictionPriority, CacheOperator, CarryFn, CarryOp, CmpPred, CvtFn, DType, FenceScope, FloatFn, FloatMode,
@@ -19,9 +20,8 @@ use crate::ir::{
     UnaryOp, ValueId, VoteKind, asm_constraints, asm_empty_constraint, asm_operand_refs, asm_register,
     carry_flag_breaker, float_inst_name, half_inst_name, int_inst_name, redux_inst_name,
 };
-pub use extern_calls::MULTIMEM_FP8;
-use crate::ir::TmaMode;
 use crate::ir::{UmmaDataKind, UmmaKind};
+pub use extern_calls::MULTIMEM_FP8;
 
 /// Static shared memory available to one block. Kernels using more are
 /// compiled to allocate it dynamically, at launch, as are kernels with a

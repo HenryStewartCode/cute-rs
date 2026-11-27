@@ -9,7 +9,7 @@ which is under the BSD-3-Clause licence:
 * CuTe, the C++ template library in `include/cute`, and CUTLASS's
   `include/cutlass/fast_math.h`. A few formulas come from
   earlier CUTLASS releases, whose `include/cute/layout.hpp` later changed:
-  `left_inverse` and `upcast` follow CUTLASS 3.8.0 (and 3.0 to 3.7), and
+  `upcast` follows CUTLASS 3.8.0 (and 3.0 to 3.7), and
   `logical_product` follows
   the formula that CUTLASS 4.8.1's CuTe documentation
   (`media/docs/cpp/cute/02_layout_algebra.md`) gives, which `include/cute`
@@ -63,8 +63,8 @@ it ports, and says which functions come from which file; the
 
 | cute-rs file | NVIDIA source | What it ports |
 |---|---|---|
-| `src/layout/layout.rs` | `include/cute/layout.hpp` | `coalesce` (`bw_coalesce`), `coalesce` with a target profile (`coalesce(layout, trg_profile)`, `Layout::coalesce_profile`), `filter_zeros`, `filter`, `composition` (`composition_impl`, with its runtime `ceil_div` and `min` for dynamic values), `complement` (`complement_prefix`, the rank-1 rule for a runtime stride, and the complement in a cotarget shape that `logical_divide` takes), `right_inverse` (it skips runtime strides), `with_shape`, `nullspace`, `append`, `prepend`, `group`, `select`, `logical_divide`, `zipped_divide`, `tiled_divide` and `flat_divide` (all three with `tile_unzip`, as the helper `zip2_by`), `blocked_product`, `raked_product`, `zipped_product`, `tiled_product`, `flat_product`, `tile_to_shape`, `max_common_layout`, `max_common_vector`, `dice`, `make_ordered_layout`, `make_layout_like` (`make_layout(shape, compact_order(filter_zeros(stride, shape), stride))`), `make_fragment_like` of a layout (`make_fragment_like_layout`), `max_alignment` of a layout (with runtime leaves counted by their divisors), `slice_and_offset` (`Layout::slice`), `cosize` |
-| | `include/cute/layout.hpp` of CUTLASS 3.8.0 | `left_inverse` (the `right_inverse` of the layout and its complement, as CUTLASS 3.0 to 3.8 compute it; later releases build the inverse directly) and `upcast` (with `shape_div`, as CUTLASS 3.0 to 3.8 compute it; later releases round up with `ceil_div`) |
+| `src/layout/layout.rs` | `include/cute/layout.hpp` | `coalesce` (`bw_coalesce`), `coalesce` with a target profile (`coalesce(layout, trg_profile)`, `Layout::coalesce_profile`), `filter_zeros`, `filter`, `composition` (`composition_impl`: its walk over static values as `compose_static`, with its runtime `ceil_div` and `min` for dynamic values; and `detail::coalesce_x`, as `Layout::coalesce_x_modes`), `complement` (`complement_prefix`, the rank-1 rule for a runtime stride, and the complement in a cotarget shape that `logical_divide` takes), `right_inverse` (it skips runtime strides), `left_inverse`, `with_shape`, `nullspace`, `append`, `prepend`, `group`, `select`, `logical_divide`, `zipped_divide`, `tiled_divide` and `flat_divide` (all three with `tile_unzip`, as the helper `zip2_by`), `blocked_product`, `raked_product`, `zipped_product`, `tiled_product`, `flat_product`, `tile_to_shape`, `max_common_layout`, `max_common_vector`, `dice`, `make_ordered_layout`, `make_layout_like` (`make_layout(shape, compact_order(filter_zeros(stride, shape), stride))`), `make_fragment_like` of a layout (`make_fragment_like_layout`), `max_alignment` of a layout (with runtime leaves counted by their divisors), `slice_and_offset` (`Layout::slice`), `cosize` |
+| | `include/cute/layout.hpp` of CUTLASS 3.8.0 | `upcast` (with `shape_div`, as CUTLASS 3.0 to 3.8 compute it; later releases round up with `ceil_div`) |
 | | `media/docs/cpp/cute/02_layout_algebra.md` | `logical_product`, with the formula given there, `(A, complement(A, size(A)*cosize(B)) ∘ B)`, which `include/cute/layout.hpp` used up to CUTLASS 4.7.1 (4.8.0 and later take `complement(A)` without a cotarget); `blocked_product` and `raked_product` build on it |
 | | `include/cute/stride.hpp` | `crd2idx`, `idx2crd`, `compact_major` (`compact_col_major` and `compact_row_major` of a `Shape`, without its stride 0 for size-1 modes), `compact_order` (in `make_ordered_layout`, and the general one, with runtime orders after the static ones, in `make_layout_like` and `make_fragment_like_layout`) |
 | | `include/cute/int_tuple.hpp` | `product`, `product_each`, `size` and `shape` with a mode path, `congruent` and `weakly_congruent` (`is_congruent`, `is_weakly_congruent`), and the `ceil_div` of a tuple by an integer (in the complement in a cotarget shape) |
@@ -187,7 +187,7 @@ comment at each says where it comes from:
   `examples/python/CuTeDSL/cute/notebooks/cute_layout_algebra.ipynb`; and the
   thread and value layouts of `elementwise_add.py` (above). A few doc
   examples in `src/layout/layout.rs` use layouts from `cute_dialect.rst`.
-* `tests/dynamic_tensors.rs` and `tests/diagnostics.rs`: the `elem_less`,
+* `tests/dynamic_tensors.rs` and `tests/diagnostics/`: the `elem_less`,
   `ceil_div` and `shape_div` examples and error cases of
   `media/docs/cutlass_compiler/cute_dialect.rst`.
 * `tests/kernel_params.rs`: the `mark_layout_dynamic` cases t0 to t8 and
