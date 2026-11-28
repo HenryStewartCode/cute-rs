@@ -81,6 +81,7 @@ says how.
 | What | Compared with | Result |
 | --- | --- | --- |
 | The layout algebra | NVIDIA's CuTe DSL 4.8.1, given the same 20,500 seeded random calls ([`cutedsl-check/`](cutedsl-check)) | Two seeds, 41,000 calls. cute-rs gives CuTe DSL's answer character for character on 36,945 and both refuse 3,121. cute-rs answers 88 that CuTe DSL refuses, and refuses 846 that are ill-posed, where CuTe DSL returns a layout that is not what the operation defines (the complement of an overlapping layout, say). No call gets a different answer. The first run found 771 calls that cute-rs wrongly refused and 143 it answered differently; those are fixed, and the second seed was recorded after the fixes ([docs/testing.md](docs/testing.md#checking-the-layout-algebra-against-cute-dsl)). |
+| Atoms and partitioning: which thread holds which element | CuTe DSL 4.8.1, on 9,604 recorded cases over the MMA and copy atoms of five architectures, tiled MMAs and copies, and tensor partitioning | 7,875 identical and 549 refused by both. 762 are the same assignment written differently, and 180 differ in ways that keep every element on the same thread (register order within a thread, shape nesting, the sparse operand's form). cute-rs refuses 5 that CuTe DSL accepts. Two faults of form were found and fixed ([docs/testing.md](docs/testing.md#checking-atoms-and-partitioning-against-cute-dsl)). |
 | The FlashInfer ports ([`flashinfer/`](flashinfer)) | FlashInfer itself, on the same inputs, on an SM89 GPU ([`flashinfer-check/`](flashinfer-check)) | All 1,092 outputs agree within the rule stated for each, 584 of them bit for bit. The first run found three faults in the ports, which are fixed. |
 | The simulator | Real GPUs: each kernel the simulator's tests run is also run on the device, and the buffers compared ([docs/testing.md](docs/testing.md#checking-the-simulator-against-a-gpu)) | On a B200, 15,140 of 15,522 kernel runs give the simulator's bytes exactly; on an H100, 18,998 of 20,237. The rest differ in approximate instructions, last-digit rounding in the tensor cores, addresses, thread order and ties. The B200 run also found places where the simulator was wrong; they are corrected, except one that is refused instead ([docs/limitations.md](docs/limitations.md)). |
 | The generated PTX | NVIDIA's assembler, `ptxas` | It assembles for every target architecture except SM107, which no released CUDA toolkit assembles yet. |
@@ -107,7 +108,7 @@ compare kernels with CPU references and `cute::math` with a double-double refere
 catch regressions, but they are weaker evidence than the comparisons above: the three faults
 in the FlashInfer ports had passed them. In particular:
 
-* Apart from the layout algebra, whether a feature behaves as CuTe DSL's does has been judged
+* Apart from the layout algebra and the atoms' layouts, whether a feature behaves as CuTe DSL's does has been judged
   from CuTe DSL's documentation and examples, not by running the two side by side. The
   layout comparison itself draws static layouts with non-negative strides only.
 * The JAX (`xla_ffi`) and TVM-FFI bindings are tested against hand-built call frames, not

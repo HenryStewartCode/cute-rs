@@ -1,18 +1,22 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! Replays in cute-rs the layout-algebra calls that `reference/gen_layouts.py` recorded from
-//! NVIDIA's CuTe DSL, and compares the answers.
+//! Replays in cute-rs the calls that the scripts in `reference/` recorded from NVIDIA's CuTe
+//! DSL, and compares the answers.
 //!
 //! ```text
 //! cutedsl-check layouts LAYOUTS.tsv [--show N]
+//! cutedsl-check atoms ATOMS.tsv [--show N]
 //! ```
 //!
 //! Each line of the file is a call and CuTe DSL's answer as text. The same call is made here
 //! and its answer printed the same way; the two texts must be equal. The exit status is 1 when
 //! any call ends in one of the columns that count as a disagreement (see [`Verdict`]).
 //! Calls that CuTe DSL answers but that are ill-posed, and that cute-rs refuses,
-//! have their own column; [`ill_posed`] says how they are recognised.
+//! have their own column; [`ill_posed`] says how they are recognised. `layouts` replays the
+//! layout algebra (`gen_layouts.py`), `atoms` the MMA and copy atoms, tiled MMAs, tiled copies
+//! and tensor partitions (`gen_atoms.py`, see [`atoms`]).
 
+mod atoms;
 mod ill_posed;
 
 use std::collections::BTreeMap;
@@ -185,8 +189,12 @@ fn answer(op: &str, a: &[&str]) -> String {
     }
 }
 
-/// Whether two answers are layouts of the same size that send every index to the same offset.
+/// Whether two answers are layouts of the same size that send every index to the same offset,
+/// or tensors over the same first element with such layouts (`tensor<8o(4,2):(1,16)>`).
 fn same_function(a: &str, b: &str) -> bool {
+    if let (Some((oa, la)), Some((ob, lb))) = (atoms::split_tensor(a), atoms::split_tensor(b)) {
+        return oa == ob && same_function(la, lb);
+    }
     let (Ok(a), Ok(b)) = (a.parse::<Layout>(), b.parse::<Layout>()) else { return false };
     panic::catch_unwind(AssertUnwindSafe(|| {
         a.is_static()
@@ -197,7 +205,13 @@ fn same_function(a: &str, b: &str) -> bool {
     .unwrap_or(false)
 }
 
-fn run(path: &str, show: usize) -> Result<bool, String> {
+/// The answer cute-rs gives to one recorded call, as CuTe DSL prints it.
+type Answer = fn(&str, &[&str]) -> String;
+
+/// The class of a call that is ill-posed, for the calls cute-rs refuses.
+type Classify = fn(&str, &[&str]) -> Option<ill_posed::Class>;
+
+fn run(path: &str, show: usize, answer: Answer, classify: Classify) -> Result<bool, String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?;
     // cute-rs refuses a call by panicking; keep the messages out of the report.
     panic::set_hook(Box::new(|_| {}));
@@ -229,7 +243,7 @@ fn run(path: &str, show: usize) -> Result<bool, String> {
             ("ERR" | "CRASH", Err(_)) => Verdict::BothRefuse,
             ("ERR", Ok(_)) => Verdict::OnlyDslRefuses,
             ("CRASH", Ok(_)) => Verdict::DslCrashes,
-            (_, Err(_)) => match ill_posed::class(op, args) {
+            (_, Err(_)) => match classify(op, args) {
                 Some(c) => {
                     *classes.entry(c).or_default() += 1;
                     Verdict::IllPosed
@@ -255,7 +269,8 @@ fn run(path: &str, show: usize) -> Result<bool, String> {
     let _ = panic::take_hook();
 
     println!("reference: {header}");
-    print!("{:<22}{:>7}", "operation", "calls");
+    let w = ops.iter().map(String::len).max().unwrap_or(0).max(21) + 1;
+    print!("{:<w$}{:>7}", "operation", "calls");
     for v in Verdict::ALL {
         print!("{:>13}", v.heading());
     }
@@ -264,21 +279,23 @@ fn run(path: &str, show: usize) -> Result<bool, String> {
     for op in &ops {
         let row: Vec<usize> =
             Verdict::ALL.iter().map(|v| counts.get(&(op.clone(), *v)).copied().unwrap_or(0)).collect();
-        print!("{:<22}{:>7}", op, row.iter().sum::<usize>());
+        print!("{:<w$}{:>7}", op, row.iter().sum::<usize>());
         for (i, c) in row.iter().enumerate() {
             totals[i] += c;
             print!("{:>13}", c);
         }
         println!();
     }
-    print!("{:<22}{:>7}", "total", totals.iter().sum::<usize>());
+    print!("{:<w$}{:>7}", "total", totals.iter().sum::<usize>());
     for c in totals {
         print!("{:>13}", c);
     }
     println!();
-    println!("\nill-posed calls by class:");
-    for c in ill_posed::Class::ALL {
-        println!("  {:<54}{:>7}", c.name(), classes.get(&c).copied().unwrap_or(0));
+    if !classes.is_empty() {
+        println!("\nill-posed calls by class:");
+        for c in ill_posed::Class::ALL {
+            println!("  {:<54}{:>7}", c.name(), classes.get(&c).copied().unwrap_or(0));
+        }
     }
     for ((verdict, op), list) in examples.iter().filter(|(_, list)| !list.is_empty()) {
         println!("\n{} / {op}:", verdict.heading());
@@ -297,10 +314,18 @@ fn panic_text(e: &(dyn std::any::Any + Send)) -> String {
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let usage = "usage: cutedsl-check layouts LAYOUTS.tsv [--show N]";
-    let (Some("layouts"), Some(path)) = (args.first().map(String::as_str), args.get(1)) else {
+    let usage = "usage: cutedsl-check layouts LAYOUTS.tsv [--show N]\n       cutedsl-check atoms ATOMS.tsv [--show N]";
+    let (Some(what), Some(path)) = (args.first().map(String::as_str), args.get(1)) else {
         eprintln!("{usage}");
         return ExitCode::from(2);
+    };
+    let (answer, classify): (Answer, Classify) = match what {
+        "layouts" => (answer, ill_posed::class),
+        "atoms" => (atoms::answer, atoms::ill_posed),
+        _ => {
+            eprintln!("{usage}");
+            return ExitCode::from(2);
+        }
     };
     let show = match args.get(2).map(String::as_str) {
         None => 0,
@@ -316,7 +341,7 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    match run(path, show) {
+    match run(path, show, answer, classify) {
         Ok(true) => ExitCode::SUCCESS,
         Ok(false) => ExitCode::from(1),
         Err(e) => {

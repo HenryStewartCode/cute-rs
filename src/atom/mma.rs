@@ -890,8 +890,15 @@ impl TiledMma {
         stride[i + 1] = shape[0];
         stride[j + 1] = shape[0] * shape[i + 1];
         let to_operand = Layout::new(shape, stride);
-        let thread_map = to_operand.compose(&self.thr_layout_vmnk.right_inverse());
-        let thr = frg.mode(0).compose(&thread_map);
+        // CuTe's `thridx_2_thrid`: thread index -> (v, m, n, k), as
+        // `(size, 1):(1, 0)` composed with the right inverse of the thread
+        // layout extended by its complement. Composing the operand's thread
+        // mode with `to_operand` first and then with it gives the thread mode
+        // in the form C++ CuTe and CuTe DSL give it.
+        let vmnk = &self.thr_layout_vmnk;
+        let extended = Layout::from_modes([vmnk.clone(), vmnk.complement_no_cotarget()]);
+        let thridx = Layout::new((vmnk.size(), 1), (1, 0)).compose(&extended.right_inverse());
+        let thr = frg.mode(0).compose(&to_operand).compose(&thridx);
         Layout::from_modes([thr, frg.mode(1)])
     }
 
@@ -1194,6 +1201,13 @@ impl ThrMma {
             assert!(T::DTYPE == c, "C fragments of {:?} hold {c}, not {}", self.mma.atom.op, T::DTYPE);
             let p = self.partition(t, which);
             return self.mma.make_tmem_fragment::<T>(&Layout::col_major(p.shape().clone()), "partition_fragment_c");
+        }
+        // A tcgen05 MMA with A in tensor memory takes its A fragment there too,
+        // as `make_fragment_a` gives it (C++ CuTe's `partition_fragment_A`
+        // is `make_fragment_A(partition_A(t))`).
+        if which == Operand::A && self.mma.atom.is_tcgen05_tmem_a() {
+            let p = self.partition(t, which);
+            return self.mma.make_tmem_fragment_a::<T>(&Layout::col_major(p.shape().clone()));
         }
         if self.mma.atom.takes_descriptor(which) {
             // A warpgroup MMA's A and B are descriptors of the operand in
@@ -2129,5 +2143,110 @@ pub fn gemm_block_scaled<TA: Numeric, TB: Numeric, TC: Numeric>(
                 d.slice(at(d.shape(), [mm, nn])).store_values(&dv);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::nvgpu::OperandMajorMode::{K, MN};
+    use crate::nvgpu::tcgen05::{self, CtaGroup, OperandSource};
+
+    fn tiled(op: impl Into<MmaOp>, atoms: Layout) -> TiledMma {
+        make_tiled_mma(make_mma_atom(op), atoms)
+    }
+
+    /// The `(thread, value)` layouts of tiled MMAs, as CuTe DSL 4.8.1 gives them
+    /// (`tiled_mma.tv_layout_A_tiled` and its peers), text for text: the thread mode has
+    /// the form of C++ CuTe's `get_layoutA_TV`.
+    #[test]
+    fn tiled_tv_layouts_have_cute_dsl_form() {
+        let fp8 = tiled(MmaFP8Op::new(DType::F8E5M2, DType::F32, (16, 8, 32)), Layout::new((4, 2, 1), (1, 4, 0)));
+        assert_eq!(fp8.layout_a_tv().to_string(), "((4,8,4,2),((4,2,2),(1,1))):((256,1,16,0),((64,8,1024),(0,0)))");
+        assert_eq!(fp8.layout_b_tv().to_string(), "((4,8,4,2),((4,2),(1,1))):((64,1,0,8),((16,256),(0,0)))");
+        assert_eq!(fp8.layout_c_tv().to_string(), "((4,8,4,2),((2,2),(1,1))):((128,1,16,512),((64,8),(0,0)))");
+
+        // A row-major layout of atoms keeps the warp's lanes nested.
+        let bf16 = tiled(MmaF16BF16Op::new(DType::BF16, DType::F32, (16, 8, 8)), Layout::new((2, 2, 1), (2, 1, 0)));
+        assert_eq!(bf16.layout_a_tv().to_string(), "(((4,8),2,2),((2,2),(1,1))):(((64,1),0,16),((32,8),(0,0)))");
+        assert_eq!(bf16.layout_b_tv().to_string(), "(((4,8),2,2),(2,(1,1))):(((32,1),8,0),(16,(0,0)))");
+        assert_eq!(bf16.layout_c_tv().to_string(), "(((4,8),2,2),((2,2),(1,1))):(((64,1),256,16),((32,8),(0,0)))");
+
+        // With permutations.
+        let perm = bf16_perm();
+        assert_eq!(perm.layout_a_tv().to_string(), "((4,8,4,2),((2,2),(1,2))):((256,1,16,0),((128,8),(0,64)))");
+        assert_eq!(perm.layout_b_tv().to_string(), "((4,8,4,2),(2,(1,2))):((64,1,0,8),(32,(0,16)))");
+
+        // A CTA pair tiled twice along M: the four CTAs' halves coalesce into one mode.
+        let pair = tiled(
+            tcgen05::MmaF16BF16Op::new(
+                DType::BF16,
+                DType::F32,
+                (256, 80, 16),
+                CtaGroup::TWO,
+                OperandSource::SMEM,
+                K,
+                K,
+            ),
+            Layout::new((2, 1, 1), (1, 0, 0)),
+        )
+        .with_permutation_mnk([Some(Layout::new(512, 1)), None, Some(Layout::new((16, 2), (2, 1)))]);
+        assert_eq!(pair.layout_a_tv().to_string(), "(4,((128,16),(1,2))):(128,((1,1024),(0,512)))");
+        assert_eq!(pair.layout_c_tv().to_string(), "(4,((128,80),(1,1))):(128,((1,512),(0,0)))");
+        let pair_n = tiled(
+            tcgen05::MmaF16BF16Op::new(
+                DType::BF16,
+                DType::F32,
+                (128, 16, 16),
+                CtaGroup::TWO,
+                OperandSource::SMEM,
+                MN,
+                K,
+            ),
+            Layout::new((1, 2, 1), (0, 1, 0)),
+        )
+        .with_permutation_mnk([None, Some(Layout::new(32, 1)), Some(Layout::new(32, 1))]);
+        assert_eq!(pair_n.layout_a_tv().to_string(), "((2,2),((64,16),(1,2))):((64,0),((1,128),(0,2048)))");
+        assert_eq!(pair_n.layout_c_tv().to_string(), "((2,2),((64,16),(1,1))):((64,2048),((1,128),(0,0)))");
+    }
+
+    /// `partition_fragment_a` of a tcgen05 MMA with A in tensor memory is the TMEM fragment,
+    /// as CuTe DSL's `make_fragment_A(partition_A(t))` gives it.
+    #[test]
+    fn tmem_a_partition_fragment_is_in_tensor_memory() {
+        let mma = tiled(
+            tcgen05::MmaF16BF16Op::new(
+                DType::BF16,
+                DType::F32,
+                (64, 232, 16),
+                CtaGroup::ONE,
+                OperandSource::TMEM,
+                K,
+                K,
+            ),
+            Layout::new((2, 1, 1), (1, 0, 0)),
+        )
+        .with_permutation_mnk([
+            Some(Layout::new((128, 2), (2, 1))),
+            Some(Layout::new(232, 1)),
+            Some(Layout::new(32, 1)),
+        ]);
+        let t = crate::make_tensor(0usize, Layout::new((256, 32), (1, 256)));
+        let mut text = String::new();
+        crate::Kernel::build("tmem_a_fragment", || {
+            let f = mma.get_slice(0).partition_fragment_a::<crate::BF16, _>(&t);
+            assert_eq!(f.memspace(), crate::tensor::AddressSpace::Tmem);
+            text = f.layout().to_string();
+        });
+        assert_eq!(text, "(((16,4),16),2,2):(((131072,4194304),1),16,32)");
+    }
+
+    fn bf16_perm() -> TiledMma {
+        tiled(MmaF16BF16Op::new(DType::BF16, DType::F32, (16, 8, 8)), Layout::new((4, 2, 1), (1, 4, 0)))
+            .with_permutation_mnk([
+                Some(Layout::new(64, 1)),
+                Some(Layout::new(16, 1)),
+                Some(Layout::new((8, 2), (2, 1))),
+            ])
     }
 }

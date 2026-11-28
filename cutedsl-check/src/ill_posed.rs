@@ -4,6 +4,8 @@
 //! answer is not the layout the operation is defined to give, so cute-rs
 //! refuses them. Each class is recognised from the call's inputs alone (never
 //! from either answer), by walking the static algebra as C++ CuTe 4.8.1 does.
+//! The classes of the atom questions are recognised in [`crate::atoms::ill_posed`],
+//! which reads the sizes of atoms and tiles it needs from cute-rs.
 //! A call counts as ill-posed only when cute-rs refuses it; where cute-rs
 //! answers, it is compared as any other call.
 
@@ -56,11 +58,50 @@ pub enum Class {
     /// adjacent elements")` in `downcast`. CuTe DSL multiplies every stride,
     /// which leaves the narrower elements between them unaddressed.
     RecastNoUnitStride,
+    /// A tiled copy whose threads each hold a number of values that is not a
+    /// multiple of what one copy of its atom moves: C++ CuTe's
+    /// `CUTE_STATIC_ASSERT_V(TiledNumVal{} % AtomNumVal{} == Int<0>{}, "TiledCopy uses too few vals
+    /// for selected CopyAtom")` in `TiledCopy` (include/cute/atom/copy_atom.hpp). CuTe DSL builds
+    /// the tiled copy, and its partitions repeat values with stride 0.
+    CopyTooFewValues,
+    /// A cotiled copy whose atom layout reaches addresses the data layout does not hold: C++
+    /// CuTe's `CUTE_STATIC_ASSERT_V(... , "The memory pointed to by AtomTVLayout does not exist
+    /// in the DataLayout.")` in `make_cotiled_copy`.
+    CotiledOutsideData,
+    /// `local_partition` by a thread layout that is not a bijection onto `[0, size)`: thread
+    /// `i` has no coordinate, or several. C++ CuTe has no assertion; its `get_flat_coord`
+    /// gives a coordinate that means something only for compact layouts.
+    ThreadLayoutNotCompact,
+    /// A warpgroup MMA with A in registers and MN-major: C++ CuTe's
+    /// `static_assert(tnspA == GMMA::Major::K, "Register source operand A must have K major
+    /// layout.")` (include/cute/arch/mma_sm90_gmma.hpp); `wgmma.mma_async` with A in registers
+    /// has no transpose of A.
+    RegisterAMnMajor,
+    /// A tcgen05 Int8 MMA whose N is neither 8 nor a multiple of 16: C++ CuTe's
+    /// `static_assert(N == 8 || ((N % 16 == 0) && (16 <= N) && (N <= 256)), ...)` in
+    /// `SM100_MMA_S8_SS` (include/cute/arch/mma_sm100_umma.hpp).
+    UmmaInt8N,
+    /// The tensor-memory accumulator of an `M = 64` tcgen05 MMA tiled over a first rest mode
+    /// of odd extent: C++ CuTe's `tmem_frg_1sm` (include/cute/atom/mma_traits_sm100_frag.hpp)
+    /// tiles the atom `((16,4),N):((1,32),128)` into its 16-lane gaps first, and the composition
+    /// in that `tiled_product` fails its shape divisibility assertion when the first tile count
+    /// is not even. CuTe DSL places such tiles in columns, or prints `x` for strides it lacks.
+    TmemLaneGap,
 }
 
 impl Class {
-    pub const ALL: [Class; 4] =
-        [Class::NonInjective, Class::InexactComposition, Class::RecastIndivisible, Class::RecastNoUnitStride];
+    pub const ALL: [Class; 10] = [
+        Class::NonInjective,
+        Class::InexactComposition,
+        Class::RecastIndivisible,
+        Class::RecastNoUnitStride,
+        Class::CopyTooFewValues,
+        Class::CotiledOutsideData,
+        Class::ThreadLayoutNotCompact,
+        Class::RegisterAMnMajor,
+        Class::UmmaInt8N,
+        Class::TmemLaneGap,
+    ];
 
     pub fn name(self) -> &'static str {
         match self {
@@ -68,6 +109,12 @@ impl Class {
             Class::InexactComposition => "inexact composition (indivisible stride)",
             Class::RecastIndivisible => "upcast of an indivisible stride",
             Class::RecastNoUnitStride => "downcast with no stride-1 leaf",
+            Class::CopyTooFewValues => "tiled copy of too few values for its atom",
+            Class::CotiledOutsideData => "cotiled copy outside its data layout",
+            Class::ThreadLayoutNotCompact => "local_partition by a non-compact thread layout",
+            Class::RegisterAMnMajor => "warpgroup MMA with an MN-major A in registers",
+            Class::UmmaInt8N => "tcgen05 Int8 MMA of an N C++ CuTe refuses",
+            Class::TmemLaneGap => "M = 64 TMEM accumulator tiles in its lane gaps",
         }
     }
 }

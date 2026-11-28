@@ -410,6 +410,47 @@ The generator draws static layouts with non-negative integer strides. Runtime ex
 negative strides and scaled-basis strides are not compared, and nor is anything beyond the
 layout algebra (tensors, atoms, kernels).
 
+## Checking atoms and partitioning against CuTe DSL
+
+The same record-and-replay method, on which thread holds which element
+(`cutedsl-check/reference/gen_atoms.py`, `cutedsl-check atoms`): the thread-value layouts of
+the MMA atoms of sm_80, sm_89, sm_90a, sm_100a and sm_120a and of the copy atoms, tiled MMAs
+and tiled copies with their tilers, fragments and per-thread partitions, and `local_tile`,
+`local_partition` and the divides on tensors. 9,604 cases with CuTe DSL 4.8.1:
+
+| | Cases |
+| --- | ---: |
+| same | 7,875 |
+| both refuse | 549 |
+| same map | 762 |
+| DSL refuses | 63 |
+| ill-posed | 170 |
+| we refuse | 5 |
+| differ | 180 |
+
+No difference found moves an element to another thread. What remains:
+
+* **same map (762):** the same assignment written differently. An extent-1 mode has stride 0
+  in one and a product in the other; for the single-thread mode of the tcgen05 atoms and for
+  WGMMA's C with N = 8, cute-rs follows C++ CuTe, which CuTe DSL differs from; the value mode
+  of the transposed `ldmatrix` and `stmatrix` atoms is nested differently.
+* **differ (180):** the order of a fragment's rest modes (73: cute-rs lays a fragment out
+  column-major, CuTe DSL by the partition's strides, so a thread holds the same elements in
+  another register order); `partition_shape_*` under a nested permutation (64: cute-rs follows
+  C++ CuTe); the sparse A operand of tcgen05, which cute-rs partitions in its compressed
+  `(M, K/2)` form (32); and the tiler of a tiled copy with an extent-1 mode (11).
+* **we refuse (5):** `tcgen05.MmaMXF8F6F4Op` with an 8-bit MN-major B and N = 216. cute-rs
+  wants N to be a multiple of 16; CuTe DSL and C++ CuTe take a multiple of 8.
+* **ill-posed (170):** six rules in `cutedsl-check/src/ill_posed.rs`, most of them a tiled copy
+  that holds too few values for its atom, which C++ CuTe refuses with an assertion.
+
+Two faults of form were found in cute-rs and fixed: a tiled MMA's thread mode was nested
+(`((4,8,4),2)` for `(4,8,4,2)`), and `partition_fragment_a` of a tcgen05 MMA with A in tensor
+memory gave a register fragment instead of the tensor-memory one.
+
+Not recorded, because CuTe DSL needs real tensors or descriptors to build them: descriptor
+fragments in shared memory, the TMA atoms and `make_tmem_copy`.
+
 ## Checking the simulator against a GPU
 
 On a machine with a GPU, every simulated kernel can also be run on the device and

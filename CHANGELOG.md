@@ -6,6 +6,10 @@ No version has been tagged yet; 0.1.0 will be the first.
 
 ### Fixed
 
+- A tiled MMA's thread-value layouts write the thread mode flat, `(4,8,4,2)`, as CuTe does (it
+  was nested, `((4,8,4),2)`: the same map).
+- `partition_fragment_a` of a tcgen05 MMA with A in tensor memory gives the tensor-memory
+  fragment (it gave a register fragment).
 - The layout algebra, where a comparison with CuTe DSL 4.8.1 on 20,500 recorded calls showed
   cute-rs differing (`cutedsl-check/`):
   - `complement` divides with floor and refuses only overlapping modes, as C++ CuTe does; it
@@ -66,6 +70,8 @@ No version has been tagged yet; 0.1.0 will be the first.
 
 ### Added
 
+- `cutedsl-check atoms`: the same comparison with CuTe DSL for atoms and partitioning, on 9,604
+  recorded cases. `docs/testing.md` has the table and what still differs.
 - `cutedsl-check/`: records NVIDIA CuTe DSL's answers to seeded random layout-algebra calls
   and replays them in cute-rs. On two seeds (41,000 calls) cute-rs gives the same answer on
   every call both libraries answer; `docs/testing.md` has the table.
